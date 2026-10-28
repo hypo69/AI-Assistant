@@ -1,0 +1,70 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Graph Tab
+=============================================================================
+Description:
+  Интерфейс темпорального графа связей кода (EvidenceLink).
+  Панель panel-knowledge-links подключена к GET /v1/panel/panel-knowledge-links.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_graph
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="container-fluid p-3">
+<div class="d-flex align-items-center justify-content-between mb-3">
+<div>
+<h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+<span class="fs-5">🕸️</span>
+<span data-i18n="tabs.graph" id="tab-graph-heading-text">Темпоральный граф связей</span>
+</h4>
+<div class="small text-muted" data-i18n="ui.graph.txt_ead893b3" id="graph-div-ead893b3">Связи между ревизиями Git и фактами WikiLLM с поддержкой окон валидности (Active / Superseded)</div>
+</div>
+<div class="d-flex align-items-center gap-2">
+<select class="form-select form-select-sm col-w-140" id="graph-status-filter">
+<option data-i18n="ui.graph.txt_92656172" id="graph-option-92656172" value="ALL">Все связи</option>
+<option data-i18n="ui.graph.txt_435de34f" id="graph-option-435de34f" selected="" value="ACTIVE">Только активные</option>
+<option data-i18n="ui.graph.txt_89e42354" id="graph-option-89e42354" value="SUPERSEDED">Инвалидированные</option>
+</select>
+<button class="btn btn-sm btn-primary d-flex align-items-center gap-1" id="graph-refresh-btn">
+<i class="bi bi-arrow-clockwise"></i>
+<span data-i18n="common.refresh" id="tab-graph-refresh-btn-text">Обновить</span>
+</button>
+</div>
+</div>
+<div class="card shadow-sm border mb-3" data-panel-id="panel-knowledge-links" id="panel-knowledge-links">
+<div class="card-header bg-body-tertiary d-flex align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<i class="bi bi-bezier2 text-primary"></i>
+<span data-i18n="ui.graph.txt_4861a594" id="graph-span-4861a594">Ребра темпорального графа (REST: /v1/panel/panel-knowledge-links)</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border" data-i18n="ui.graph.txt_9aba7815" id="graph-count-badge">0 ребер</span>
+</div>
+<div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0 font-size-85">
+<thead class="table-light">
+<tr>
+<th class="col-w-130" data-i18n="ui.graph.txt_337352d3" id="graph-th-337352d3" scope="col">Source ID</th>
+<th class="col-w-120" data-i18n="ui.graph.txt_32b1b65b" id="graph-th-32b1b65b" scope="col">Отношение</th>
+<th class="col-w-160" data-i18n="ui.graph.txt_ec2fbd93" id="graph-th-ec2fbd93" scope="col">Target ID</th>
+<th class="col-w-150" data-i18n="ui.graph.txt_ea1fb3d8" id="graph-th-ea1fb3d8" scope="col">Окно валидности</th>
+<th class="col-w-100" data-i18n="ui.graph.txt_7203f7a4" id="graph-th-7203f7a4" scope="col">Статус</th>
+<th class="col-w-110 text-end" data-i18n="ui.graph.txt_50a761a1" id="graph-th-50a761a1" scope="col">Действие</th>
+</tr>
+</thead>
+<tbody id="graph-table-body">
+<tr>
+<td class="text-center py-4 text-muted" colspan="6">
+<div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+<div data-i18n="ui.graph.txt_4bfaca3e" id="graph-div-4bfaca3e">Загрузка графа через универсальный загрузчик панелей...</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>

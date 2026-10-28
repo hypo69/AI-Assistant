@@ -1,0 +1,356 @@
+<!--
+=============================================================================
+Process Name: Common WebGUI - Universal Rust + WebAssembly File Editor Tab
+=============================================================================
+Description:
+  Интерактивный универсальный редактор файлов на базе Rust + WebAssembly,
+  поддерживающий редактирование всех типов файлов, доступных в VS Code:
+  исходный код (70+ языков), Markdown (Split-View), таблицы CSV/TSV (Grid),
+  блокноты Jupyter (.ipynb), векторная графика SVG, растровые изображения,
+  документы PDF (Wasm экстрактор), медиа-файлы и бинарный Hex-редактор
+  с инспектором типов данных (Data Inspector).
+
+Usage Examples:
+  Ленивая загрузка через tab-core.js:
+    /html/tab_file_editor/index.html?v=20261028_v1
+
+File: index.html
+Project: ai-windows-admin
+Package: apps/common/webgui/tab_file_editor
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-28 17:16:00
+=============================================================================
+-->
+
+<link rel="stylesheet" href="/html/tab_file_editor/style.css?v=20261028_v1">
+
+<div class="container-fluid p-2 d-flex flex-column gap-2" id="wasm-file-editor-root">
+
+  <!-- 1. Верхняя шапка вкладки и панель инструментов -->
+  <div class="tab-header d-flex justify-content-between align-items-center flex-wrap gap-2 px-2 py-1">
+    <div class="d-flex align-items-center gap-2">
+      <span class="tab-header-icon fs-4 text-primary"><i class="bi bi-code-square"></i></span>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h3 class="tab-header-title panel-header mb-0" id="fe-header-title" data-i18n="fileEditor.title">Универсальный редактор файлов (Rust + Wasm)</h3>
+          <span class="ui-badge ui-badge-success" id="wasm-engine-status-badge" data-i18n="fileEditor.wasmReady">Wasm Core Ready</span>
+          <span class="ui-badge ui-badge-info" id="wasm-active-mode-badge" data-i18n="fileEditor.modeCode">Code / Text</span>
+        </div>
+        <small class="tab-header-subtitle text-muted" id="fe-header-subtitle" data-i18n="fileEditor.subtitle">
+          Редактирование всех типов файлов VS Code: код, Markdown, CSV/TSV, Jupyter (.ipynb), SVG, изображения, PDF и бинарный Hex-редактор
+        </small>
+      </div>
+    </div>
+
+    <!-- Группа быстрых действий редактора -->
+    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+      <!-- Переключатель бокового дерева файлов -->
+      <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" id="fe-btn-toggle-tree" data-i18n-title="fileEditor.toggleTreeTitle" title="Показать/скрыть дерево файлов">
+        <i class="bi bi-layout-sidebar"></i>
+        <span class="d-none d-lg-inline" id="fe-lbl-files-panel" data-i18n="fileEditor.filesPanel">Файлы</span>
+      </button>
+
+      <!-- Создать новый файл -->
+      <button type="button" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" id="fe-btn-new-file" data-i18n-title="fileEditor.newFileTitle" title="Создать новый файл в рабочей области">
+        <i class="bi bi-file-earmark-plus"></i>
+        <span id="fe-lbl-new-file" data-i18n="fileEditor.newFile">Новый</span>
+      </button>
+
+      <!-- Открыть локальный файл с диска в Wasm-память браузера -->
+      <label class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 mb-0" id="fe-lbl-open-local-wrap" for="fe-local-file-input" data-i18n-title="fileEditor.openLocalTitle" title="Загрузить любой файл с компьютера в память Wasm">
+        <i class="bi bi-folder2-open"></i>
+        <span id="fe-lbl-open-local" data-i18n="fileEditor.openLocal">С диска</span>
+        <input type="file" id="fe-local-file-input" class="d-none">
+      </label>
+
+      <!-- Поиск и замена -->
+      <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" id="fe-btn-toggle-search" data-i18n-title="fileEditor.searchReplaceTitle" title="Поиск и замена (Ctrl+F)">
+        <i class="bi bi-search"></i>
+        <span class="d-none d-xl-inline" id="fe-lbl-find-replace" data-i18n="fileEditor.findReplace">Поиск</span>
+      </button>
+
+      <!-- Форматирование буфера (Alt+Shift+F) -->
+      <button type="button" class="btn btn-sm btn-outline-info d-flex align-items-center gap-1" id="fe-btn-format" data-i18n-title="fileEditor.formatTitle" title="Форматировать документ и проверить синтаксис (Alt+Shift+F)">
+        <i class="bi bi-magic"></i>
+        <span class="d-none d-md-inline" id="fe-lbl-format" data-i18n="fileEditor.formatBtn">Формат</span>
+      </button>
+
+      <!-- Сравнение с диском (Diff) -->
+      <button type="button" class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" id="fe-btn-diff" data-i18n-title="fileEditor.diffTitle" title="Показать построчные изменения относительно диска (Diff)">
+        <i class="bi bi-file-earmark-diff"></i>
+        <span class="d-none d-md-inline" id="fe-lbl-diff" data-i18n="fileEditor.diffBtn">Diff</span>
+      </button>
+
+      <!-- Скачать файл -->
+      <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" id="fe-btn-download" data-i18n-title="fileEditor.downloadTitle" title="Скачать текущий буфер на устройство">
+        <i class="bi bi-download"></i>
+      </button>
+
+      <!-- Сохранить в рабочую область с Git-коммитом (Ctrl+S) -->
+      <button type="button" class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 shadow-sm" id="fe-btn-save" data-i18n-title="fileEditor.saveTitle" title="Сохранить изменения и зафиксировать в Git (Ctrl+S)">
+        <i class="bi bi-floppy-fill"></i>
+        <span id="fe-lbl-save" data-i18n="fileEditor.saveBtn">Сохранить (Ctrl+S)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. Переключатель режимов отображения VS Code (Subtabs Nav-Pills) -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 px-2 py-1 bg-body-tertiary rounded border border-subtle">
+    <ul class="nav nav-pills gap-1" id="fe-mode-pills" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button type="button" class="nav-link active py-1 px-2.5 rounded-pill small d-flex align-items-center gap-1" id="fe-pill-btn-code" data-editor-mode="code">
+          <i class="bi bi-code-slash text-primary"></i>
+          <span id="fe-pill-lbl-code" data-i18n="fileEditor.pillCode">Код и Текст</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button type="button" class="nav-link py-1 px-2.5 rounded-pill small d-flex align-items-center gap-1" id="fe-pill-btn-markdown" data-editor-mode="markdown">
+          <i class="bi bi-markdown text-info"></i>
+          <span id="fe-pill-lbl-markdown" data-i18n="fileEditor.pillMarkdown">Markdown Split</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button type="button" class="nav-link py-1 px-2.5 rounded-pill small d-flex align-items-center gap-1" id="fe-pill-btn-tabular" data-editor-mode="tabular">
+          <i class="bi bi-table text-success"></i>
+          <span id="fe-pill-lbl-tabular" data-i18n="fileEditor.pillTabular">Таблица CSV/TSV</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button type="button" class="nav-link py-1 px-2.5 rounded-pill small d-flex align-items-center gap-1" id="fe-pill-btn-notebook" data-editor-mode="notebook">
+          <i class="bi bi-journal-code text-warning"></i>
+          <span id="fe-pill-lbl-notebook" data-i18n="fileEditor.pillNotebook">Jupyter (.ipynb)</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button type="button" class="nav-link py-1 px-2.5 rounded-pill small d-flex align-items-center gap-1" id="fe-pill-btn-media" data-editor-mode="media_studio">
+          <i class="bi bi-images text-danger"></i>
+          <span id="fe-pill-lbl-media" data-i18n="fileEditor.pillMedia">SVG / Изображения / PDF</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button type="button" class="nav-link py-1 px-2.5 rounded-pill small d-flex align-items-center gap-1" id="fe-pill-btn-hex" data-editor-mode="hex">
+          <i class="bi bi-file-earmark-binary text-secondary"></i>
+          <span id="fe-pill-lbl-hex" data-i18n="fileEditor.pillHex">Hex Editor (Wasm)</span>
+        </button>
+      </li>
+    </ul>
+
+    <!-- Поле сообщения коммита Git и выбора переноса строк -->
+    <div class="d-flex align-items-center gap-2">
+      <input type="text" class="form-control form-control-sm" id="fe-commit-msg-input" data-i18n-placeholder="fileEditor.commitPlaceholder" placeholder="Сообщение коммита Git (необязательно)...">
+      <select class="form-select form-select-sm w-auto" id="fe-line-ending-select" data-i18n-title="fileEditor.lineEndingTitle" title="Перевод строк">
+        <option value="LF" id="fe-opt-lf" data-i18n="fileEditor.lineEndingLf">LF (\n)</option>
+        <option value="CRLF" id="fe-opt-crlf" data-i18n="fileEditor.lineEndingCrlf">CRLF (\r\n)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 3. Выдвижная панель поиска и замены (Find & Replace) -->
+  <div class="card bg-body-tertiary border-subtle p-2 d-none" id="fe-search-bar">
+    <div class="row g-2 align-items-center">
+      <div class="col-12 col-md-4">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control" id="fe-find-input" data-i18n-placeholder="fileEditor.findPlaceholder" placeholder="Найти текст или Hex-байты...">
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-arrow-left-right"></i></span>
+          <input type="text" class="form-control" id="fe-replace-input" data-i18n-placeholder="fileEditor.replacePlaceholder" placeholder="Заменить на...">
+        </div>
+      </div>
+      <div class="col-12 col-md-4 d-flex align-items-center gap-1.5 flex-wrap">
+        <button type="button" class="btn btn-sm btn-outline-primary" id="fe-btn-find-next" data-i18n="fileEditor.findNextBtn">Найти</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="fe-btn-replace-one" data-i18n="fileEditor.replaceOneBtn">Заменить</button>
+        <button type="button" class="btn btn-sm btn-outline-warning" id="fe-btn-replace-all" data-i18n="fileEditor.replaceAllBtn">Заменить все</button>
+        <span class="small text-muted ms-auto" id="fe-search-matches-badge"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Основная оболочка IDE Редактора -->
+  <div class="wasm-editor-shell shadow-sm">
+
+    <!-- Полоса открытых файловых вкладок -->
+    <div class="wasm-editor-tabs-bar" id="fe-open-tabs-bar">
+      <!-- Динамически заполняется вкладками открытых файлов -->
+    </div>
+
+    <!-- Рабочая область: Дерево файлов слева + Центральная сцена + Инспектор справа -->
+    <div class="wasm-editor-workbench" id="fe-workbench">
+
+      <!-- Левая панель: Файлы рабочего пространства и фильтр типов -->
+      <aside class="wasm-editor-sidepanel" id="fe-left-panel">
+        <div class="p-2 border-bottom border-subtle d-flex align-items-center justify-content-between bg-body-tertiary">
+          <span class="small fw-semibold d-flex align-items-center gap-1">
+            <i class="bi bi-folder2-open text-primary"></i>
+            <span id="fe-lbl-ws-files" data-i18n="fileEditor.workspaceFiles">Файлы области</span>
+          </span>
+          <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1.5" id="fe-btn-refresh-files" data-i18n-title="common.refresh" title="Обновить">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+        <div class="p-1.5 border-bottom border-subtle">
+          <input type="text" class="form-control form-control-sm" id="fe-file-filter-input" data-i18n-placeholder="fileEditor.filterFilesPlaceholder" placeholder="Фильтр по имени или .ext...">
+        </div>
+        <div class="wasm-editor-file-list" id="fe-workspace-file-list">
+          <!-- Заполняется списком файлов из активной рабочей области -->
+        </div>
+      </aside>
+
+      <!-- Центральная сцена редактора -->
+      <section class="d-flex flex-column overflow-hidden position-relative">
+
+        <!-- Панель 1: Код, Текст и Markdown Split-View -->
+        <div class="wasm-code-stage" id="fe-stage-code">
+          <div class="wasm-line-gutter" id="fe-line-gutter">1</div>
+          <textarea class="wasm-code-textarea" id="fe-code-textarea" spellcheck="false" data-i18n-placeholder="fileEditor.editorPlaceholder" placeholder="Выберите файл слева или создайте новый для редактирования..."></textarea>
+          <div class="wasm-split-preview d-none" id="fe-markdown-split-preview"></div>
+        </div>
+
+        <!-- Панель 2: Табличный редактор CSV / TSV (Grid View) -->
+        <div class="p-3 overflow-auto d-none flex-column gap-2 h-100" id="fe-stage-tabular">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-sm btn-outline-success" id="fe-csv-add-row">
+                <i class="bi bi-plus-circle me-1"></i><span id="fe-lbl-csv-add-row" data-i18n="fileEditor.csvAddRow">+ Строка</span>
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="fe-csv-add-col">
+                <i class="bi bi-layout-three-columns me-1"></i><span id="fe-lbl-csv-add-col" data-i18n="fileEditor.csvAddCol">+ Столбец</span>
+              </button>
+            </div>
+            <span class="small text-muted" id="fe-csv-dimensions-label">0 × 0</span>
+          </div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm table-bordered table-hover mb-0 align-middle" id="fe-csv-grid-table">
+              <thead class="table-light" id="fe-csv-thead"></thead>
+              <tbody id="fe-csv-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Панель 3: Редактор Jupyter Notebook (.ipynb) -->
+        <div class="p-3 overflow-auto d-none flex-column gap-3 h-100" id="fe-stage-notebook">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-sm btn-outline-primary" id="fe-nb-add-code">
+                <i class="bi bi-code-slash me-1"></i><span id="fe-lbl-nb-add-code" data-i18n="fileEditor.nbAddCode">+ Ячейка кода</span>
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-info" id="fe-nb-add-md">
+                <i class="bi bi-markdown me-1"></i><span id="fe-lbl-nb-add-md" data-i18n="fileEditor.nbAddMd">+ Ячейка Markdown</span>
+              </button>
+            </div>
+            <span class="ui-badge ui-badge-neutral" id="fe-nb-kernel-badge">Python 3 (ipykernel)</span>
+          </div>
+          <div class="d-flex flex-column gap-3" id="fe-nb-cells-container"></div>
+        </div>
+
+        <!-- Панель 4: Медиа-студия (SVG, Растровые изображения, PDF Wasm Extractor, Аудио/Видео) -->
+        <div class="p-3 overflow-auto d-none flex-column gap-3 h-100" id="fe-stage-media">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom border-subtle pb-2">
+            <div class="btn-group btn-group-sm" role="group">
+              <button type="button" class="btn btn-outline-secondary" id="fe-img-rotate-left" data-i18n-title="fileEditor.rotateLeft" title="Повернуть на -90°">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="fe-img-rotate-right" data-i18n-title="fileEditor.rotateRight" title="Повернуть на +90°">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="fe-img-flip-h" data-i18n-title="fileEditor.flipH" title="Отразить по горизонтали">
+                <i class="bi bi-symmetry-vertical"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="fe-img-flip-v" data-i18n-title="fileEditor.flipV" title="Отразить по вертикали">
+                <i class="bi bi-symmetry-horizontal"></i>
+              </button>
+              <button type="button" class="btn btn-outline-primary" id="fe-pdf-extract-md" data-i18n-title="fileEditor.extractPdfMd" title="Извлечь текст PDF в редактор Markdown">
+                <i class="bi bi-file-earmark-richtext me-1"></i><span id="fe-lbl-extract-pdf" data-i18n="fileEditor.extractPdfBtn">Извлечь в Markdown</span>
+              </button>
+            </div>
+            <span class="small text-muted font-monospace" id="fe-media-meta-label"></span>
+          </div>
+          <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 gap-3 p-2 bg-body-tertiary rounded border border-subtle" id="fe-media-viewport">
+            <!-- Динамический холст изображения, SVG, PDF страниц или аудио/видео плеера -->
+          </div>
+        </div>
+
+        <!-- Панель 5: Побайтовый бинарный редактор (VS Code Hex Editor) -->
+        <div class="d-none flex-column h-100" id="fe-stage-hex">
+          <div class="px-3 py-1.5 bg-body-tertiary border-bottom border-subtle d-flex align-items-center justify-content-between flex-wrap gap-2 small">
+            <span class="fw-semibold"><i class="bi bi-cpu text-primary me-1"></i><span id="fe-lbl-hex-header" data-i18n="fileEditor.hexHeader">Побайтовое редактирование памяти (Rust + Wasm Hex View)</span></span>
+            <div class="d-flex align-items-center gap-2">
+              <span class="text-muted" id="fe-lbl-hex-page" data-i18n="fileEditor.hexPageLabel">Страница (4 КБ):</span>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" id="fe-hex-prev-page">&laquo;</button>
+              <span class="font-monospace fw-semibold" id="fe-hex-page-indicator">1 / 1</span>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" id="fe-hex-next-page">&raquo;</button>
+            </div>
+          </div>
+          <div class="wasm-hex-grid-wrapper" id="fe-hex-grid-container"></div>
+        </div>
+
+        <!-- Панель 6: Просмотр Unified Diff -->
+        <div class="p-3 overflow-auto d-none flex-column gap-2 h-100" id="fe-stage-diff">
+          <div class="d-flex align-items-center justify-content-between">
+            <span class="fw-semibold small"><i class="bi bi-file-earmark-diff text-warning me-1"></i><span id="fe-lbl-diff-header" data-i18n="fileEditor.diffHeader">Сравнение буфера с сохранённой версией на диске</span></span>
+            <span class="ui-badge ui-badge-info" id="fe-diff-summary-badge">+0 / -0</span>
+          </div>
+          <pre class="p-3 rounded border border-subtle bg-body-tertiary font-monospace small mb-0 flex-grow-1 overflow-auto" id="fe-diff-output"></pre>
+        </div>
+
+      </section>
+
+      <!-- Правая панель: Структура документа (Outline) и Инспектор байтов (Data Inspector) -->
+      <aside class="wasm-editor-inspector" id="fe-right-inspector">
+        <!-- Блок 1: Символы и оглавление (Outline) -->
+        <div class="p-2 border-bottom border-subtle bg-body-tertiary small fw-semibold d-flex align-items-center gap-1.5">
+          <i class="bi bi-list-nested text-info"></i>
+          <span id="fe-lbl-outline-title" data-i18n="fileEditor.outlineTitle">Структура (Outline)</span>
+        </div>
+        <div class="p-2 border-bottom border-subtle overflow-auto" id="fe-outline-list">
+          <div class="small text-muted" id="fe-lbl-outline-empty" data-i18n="fileEditor.outlineEmpty">Символы не обнаружены</div>
+        </div>
+
+        <!-- Блок 2: Инспектор типов данных Wasm (Data Inspector) -->
+        <div class="p-2 border-bottom border-subtle bg-body-tertiary small fw-semibold d-flex align-items-center justify-content-between">
+          <span><i class="bi bi-binary text-warning me-1"></i><span id="fe-lbl-inspector-title" data-i18n="fileEditor.dataInspectorTitle">Data Inspector</span></span>
+          <span class="badge bg-secondary-subtle text-secondary font-monospace" id="fe-inspector-offset">0x0000</span>
+        </div>
+        <div class="p-2 small font-monospace d-flex flex-column gap-1" id="fe-data-inspector-body">
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-bin" data-i18n="fileEditor.inspBinary">8-bit:</span><strong id="fe-insp-bin">00000000</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-u8" data-i18n="fileEditor.inspUint8">UInt8:</span><strong id="fe-insp-u8">0</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-i8" data-i18n="fileEditor.inspInt8">Int8:</span><strong id="fe-insp-i8">0</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-u16" data-i18n="fileEditor.inspUint16">UInt16 LE:</span><strong id="fe-insp-u16">0</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-i16" data-i18n="fileEditor.inspInt16">Int16 LE:</span><strong id="fe-insp-i16">0</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-u32" data-i18n="fileEditor.inspUint32">UInt32 LE:</span><strong id="fe-insp-u32">0</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-i32" data-i18n="fileEditor.inspInt32">Int32 LE:</span><strong id="fe-insp-i32">0</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-f32" data-i18n="fileEditor.inspFloat32">Float32:</span><strong id="fe-insp-f32">0.0</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted" id="fe-lbl-insp-ascii" data-i18n="fileEditor.inspAscii">ASCII / UTF-8:</span><strong id="fe-insp-char">.</strong></div>
+        </div>
+
+        <!-- Блок 3: Поддерживаемые категории VS Code -->
+        <div class="p-2 border-top border-bottom border-subtle bg-body-tertiary small fw-semibold d-flex align-items-center justify-content-between mt-auto">
+          <span><i class="bi bi-check2-all text-success me-1"></i><span id="fe-lbl-supported-types" data-i18n="fileEditor.supportedTypesTitle">Форматы VS Code</span></span>
+          <span class="badge bg-primary-subtle text-primary" id="fe-catalog-count-badge">85+</span>
+        </div>
+      </aside>
+
+    </div>
+
+    <!-- 5. Нижняя строка состояния (VS Code Status Bar) -->
+    <div class="wasm-status-bar">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <span class="font-monospace" id="fe-status-cursor">Ln 1, Col 1</span>
+        <span class="font-monospace" id="fe-status-lines">1 lines</span>
+        <span class="font-monospace" id="fe-status-size">0 B</span>
+        <span class="font-monospace text-primary" id="fe-status-hash">FNV1a: 00000000</span>
+      </div>
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <span id="fe-status-wasm-timing">⚡ Wasm: 0.0 ms</span>
+        <span id="fe-status-encoding">UTF-8</span>
+        <span class="fw-semibold" id="fe-status-lang">Plain Text</span>
+      </div>
+    </div>
+
+  </div>
+
+</div>

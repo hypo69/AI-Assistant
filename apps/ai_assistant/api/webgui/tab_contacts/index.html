@@ -1,0 +1,140 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Google Contacts Tab
+=============================================================================
+Description:
+  Интерфейс телефонной книги и контактов Google People API: карточки контактов,
+  поиск по именам, номерам и компаниям, добавление новых записей и удаление.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_contacts
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-28 19:00:00
+=============================================================================
+-->
+<div class="container-fluid p-3" id="tab-contacts-container">
+  <!-- Верхняя строка заголовка и действий -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+        <span class="fs-4">👥</span>
+        <span data-i18n="ui.contacts.title" id="contacts-span-title">Телефонная книга (Контакты)</span>
+      </h4>
+      <div class="small text-muted" data-i18n="ui.contacts.subtitle" id="contacts-div-subtitle">
+        Управление адресной книгой, номерами телефонов и адресами через Google People API
+      </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 shadow-sm d-flex align-items-center gap-1.5" id="contacts-account-badge">
+        <i class="bi bi-google"></i>
+        <span data-i18n="ui.contacts.connected" id="contacts-account-email">Google Contacts</span>
+      </span>
+      <button class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 shadow-sm fw-semibold" id="btn-contacts-create" type="button">
+        <i class="bi bi-person-plus"></i>
+        <span data-i18n="ui.contacts.btn_create" id="contacts-span-create">Добавить контакт</span>
+      </button>
+      <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1.5 shadow-sm" id="btn-contacts-refresh" title="Обновить список контактов" type="button">
+        <i class="bi bi-arrow-clockwise"></i>
+        <span class="d-none d-sm-inline" data-i18n="ui.contacts.btn_refresh" id="contacts-span-refresh">Обновить</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Поисковая панель -->
+  <div class="card shadow-sm border mb-3">
+    <div class="card-body py-2 px-3">
+      <div class="row g-2 align-items-center">
+        <div class="col-12 col-md-6 col-lg-5">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-body-tertiary border-end-0">
+              <i class="bi bi-search text-muted"></i>
+            </span>
+            <input class="form-control border-start-0" id="contacts-search-input" placeholder="Поиск по имени, номеру телефона или email..." type="text"/>
+            <button class="btn btn-outline-secondary" id="btn-contacts-search-clear" title="Сбросить" type="button">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-7 text-md-end">
+          <span class="small text-muted" id="contacts-counter">Всего контактов: 0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Список карточек контактов -->
+  <div id="contacts-cards-container">
+    <div class="d-flex justify-content-center py-5" id="contacts-loading-spinner">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Загрузка...</span>
+      </div>
+    </div>
+    <div class="row g-3" id="contacts-cards-list"></div>
+    <div class="text-center py-5 d-none" id="contacts-empty-state">
+      <i class="bi bi-person-x fs-1 text-muted d-block mb-2"></i>
+      <h6 class="text-muted" data-i18n="ui.contacts.no_contacts" id="cnt-h6-no-contacts">Контакты не найдены</h6>
+      <p class="small text-muted mb-0" data-i18n="ui.contacts.create_hint" id="cnt-p-create-hint">Используйте кнопку «Добавить контакт», чтобы сохранить новый номер.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно добавления контакта -->
+<div class="modal fade" id="modal-contacts-create" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+          <i class="bi bi-person-plus text-primary"></i>
+          <span data-i18n="ui.contacts.modal_create_title" id="cnt-span-modal-create-title">Новый контакт</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-contacts-create">
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold" data-i18n="ui.contacts.label_given_name" id="cnt-label-given-name">Имя *</label>
+              <input type="text" class="form-control form-control-sm" id="cnt-create-given-name" required placeholder="Иван">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold" data-i18n="ui.contacts.label_family_name" id="cnt-label-family-name">Фамилия</label>
+              <input type="text" class="form-control form-control-sm" id="cnt-create-family-name" placeholder="Иванов">
+            </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold" data-i18n="ui.contacts.label_phone" id="cnt-label-phone">Номер телефона</label>
+              <input type="tel" class="form-control form-control-sm" id="cnt-create-phone" placeholder="+7 (999) 000-00-00">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold" data-i18n="ui.contacts.label_email" id="cnt-label-email">Email адрес</label>
+              <input type="email" class="form-control form-control-sm" id="cnt-create-email" placeholder="ivan@example.com">
+            </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold" data-i18n="ui.contacts.label_org" id="cnt-label-org">Компания</label>
+              <input type="text" class="form-control form-control-sm" id="cnt-create-org" placeholder="Компания / Проект">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold" data-i18n="ui.contacts.label_title" id="cnt-label-title">Должность</label>
+              <input type="text" class="form-control form-control-sm" id="cnt-create-title" placeholder="Инженер">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold" data-i18n="ui.contacts.label_notes" id="cnt-label-notes">Заметки</label>
+            <textarea class="form-control form-control-sm" id="cnt-create-notes" rows="2" placeholder="Дополнительная информация..."></textarea>
+          </div>
+          <div class="alert alert-danger d-none py-1 small mb-0 mt-2" id="contacts-create-error"></div>
+        </form>
+      </div>
+      <div class="modal-footer border-top">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" data-i18n="ui.contacts.btn_cancel" id="cnt-btn-modal-cancel">Отмена</button>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-contacts-save">
+          <i class="bi bi-check-lg me-1"></i> <span data-i18n="ui.contacts.btn_save" id="cnt-span-btn-save">Сохранить</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,772 @@
+<!--
+=============================================================================
+Process Name: Windows Web Interface - Theme Editor Tab
+=============================================================================
+Description:
+  Интерактивный редактор тем оформления WebGUI (размеры, цвета, элементы,
+  скругления, типографика, визуальные эффекты и пресеты).
+  Позволяет настраивать оформление интерфейса в реальном времени (Live Preview),
+  применять изменения на лету, сохранять в LocalStorage, экспортировать/импортировать
+  в JSON и генерировать чистый CSS-код.
+
+Usage Examples:
+  Ленивая загрузка через tab-core.js:
+    /html/tab_theme_editor/index.html?v=20261015_v1
+
+File: index.html
+Project: ai-windows-admin
+Package: windows/api/webgui/tab_theme_editor
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="container-fluid p-3 d-flex flex-column gap-3 theme-editor-wrapper max-w-1600 mx-auto">
+<!-- Заголовок вкладки -->
+<div class="tab-header d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+<div class="d-flex align-items-center gap-2">
+<span class="tab-header-icon fs-4 text-primary"><i class="bi bi-palette2"></i></span>
+<div>
+<div class="d-flex align-items-center gap-2 flex-wrap">
+<h3 class="tab-header-title panel-header mb-0" data-i18n="ui.thm.txt_bd251f54" id="thm-h3-bd251f54">Редактор тем и дизайн-системы</h3>
+<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 small" data-i18n="ui.thm.txt_318150c5" id="theme-editor-status-badge">Активен</span>
+</div>
+<small class="tab-header-subtitle text-secondary" data-i18n="ui.thm.txt_6afec899" id="thm-small-6afec899">Тонкая настройка размеров, цветовых палитр, геометрии компонентов, шрифтов и эффектов с живым предпросмотром</small>
+</div>
+</div>
+<!-- Панель быстрых действий -->
+<div class="d-flex align-items-center gap-2 flex-wrap">
+<button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2" data-i18n-title="titles.thm.title_310f22f4" id="theme-btn-reset" title="Сбросить все кастомные изменения к выбранной теме" type="button">
+<i class="bi bi-arrow-counterclockwise"></i>
+<span data-i18n="ui.thm.txt_02d901c1" id="thm-span-02d901c1">Сбросить</span>
+</button>
+<button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2" data-i18n-title="titles.thm.title_8a9bdc69" id="theme-btn-export" title="Экспортировать текущую тему в JSON-файл" type="button">
+<i class="bi bi-download"></i>
+<span data-i18n="ui.thm.txt_38ef64ab" id="thm-span-38ef64ab">Экспорт JSON</span>
+</button>
+<label class="cursor-pointer" data-i18n-title="titles.thm.title_f716dc1a" for="theme-file-import" id="thm-title-f716dc1a" title="Импортировать тему из JSON-файла">
+<i class="bi bi-upload"></i>
+<span data-i18n="ui.thm.txt_05facd17" id="thm-span-05facd17">Импорт JSON</span>
+<input accept=".json" class="d-none" id="theme-file-import" type="file"/>
+</label>
+<button class="btn btn-sm btn-outline-info d-flex align-items-center gap-2" data-i18n-title="titles.thm.title_fb1f8653" id="theme-btn-copy-css" title="Скопировать готовый CSS-код переменных в буфер обмена" type="button">
+<i class="bi bi-code-slash"></i>
+<span data-i18n="ui.thm.txt_ee35a9fa" id="thm-span-ee35a9fa">Копировать CSS</span>
+</button>
+<button class="btn btn-sm btn-primary d-flex align-items-center gap-2 shadow-sm" data-i18n-title="titles.thm.title_c22e1edd" id="theme-btn-save" title="Сохранить настройки темы в LocalStorage" type="button">
+<i class="bi bi-check-circle-fill"></i>
+<span data-i18n="ui.thm.txt_cfab6643" id="thm-span-cfab6643">Сохранить тему</span>
+</button>
+</div>
+</div>
+<!-- 2. Основная рабочая область: Панель настроек (слева) + Живой предпросмотр (справа) -->
+<div class="row g-3">
+<!-- Левая колонка: Элементы управления и настройки токенов -->
+<div class="col-12 col-xl-6 d-flex flex-column gap-3">
+<!-- Карточка: Выбор темы и наследование -->
+<div class="card border-subtle shadow-sm bg-body">
+<div class="card-header bg-body-tertiary py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<i class="bi bi-collection-fill text-warning"></i>
+<span data-i18n="ui.thm.txt_dfd8209e" id="thm-span-dfd8209e">Тема оформления и наследование</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary small border border-secondary-subtle" data-i18n="ui.thm.txt_ba0d2326" id="theme-type-badge"><i class="bi bi-lock-fill me-1"></i>Стандартная (только чтение)</span>
+</div>
+<div class="card-body p-3">
+<!-- Индикатор статуса и наследования -->
+<div class="alert alert-secondary py-2 px-3 small d-flex align-items-center gap-2 mb-2" id="theme-inheritance-alert">
+<i class="bi bi-shield-lock-fill fs-6 text-secondary"></i>
+<span data-i18n="ui.thm.txt_0172050d" id="thm-span-0172050d">Стандартные темы системы защищены от перезаписи. Чтобы изменить оформление, создайте дочернюю тему на базе этой.</span>
+</div>
+<div class="row g-2 align-items-center">
+<div class="col-12 col-sm-8">
+<label class="form-label small text-muted mb-1" data-i18n="ui.thm.txt_65e4184a" for="theme-preset-select" id="thm-label-65e4184a">Активная тема для настройки:</label>
+<select class="form-select form-select-sm" id="theme-preset-select">
+<!-- Опции генерируются динамически через ThemeEngine -->
+</select>
+</div>
+<div class="col-12 col-sm-4 d-flex align-items-end">
+<button class="btn btn-sm btn-outline-primary w-100 d-flex align-items-center justify-content-center gap-2" id="theme-btn-apply-preset" type="button">
+<i class="bi bi-lightning-fill"></i>
+<span data-i18n="ui.thm.txt_5b88e85d" id="thm-span-5b88e85d">Загрузить тему</span>
+</button>
+</div>
+</div>
+<!-- Панель управления дочерними темами -->
+<div class="d-flex align-items-center gap-2 mt-2 pt-2 border-top border-subtle flex-wrap">
+<button class="btn btn-sm btn-success d-flex align-items-center gap-1.5 shadow-sm" data-i18n-title="titles.thm.title_b097d564" id="theme-btn-create-child" title="Создать новую дочернюю тему на основе выбранной" type="button">
+<i class="bi bi-diagram-3-fill"></i>
+<span data-i18n="ui.thm.txt_2259fdbf" id="thm-span-2259fdbf">Создать дочернюю тему</span>
+</button>
+<button class="d-none" data-i18n-title="titles.thm.title_67970054" id="theme-btn-rename-child" title="Переименовать дочернюю тему" type="button">
+<i class="bi bi-pencil"></i>
+<span data-i18n="ui.thm.txt_e5551a68" id="thm-span-e5551a68">Переименовать</span>
+</button>
+<button class="d-none" data-i18n-title="titles.thm.title_eaaabd93" id="theme-btn-reset-to-parent" title="Сбросить оформление дочерней темы к исходным значениям родителя" type="button">
+<i class="bi bi-arrow-counterclockwise"></i>
+<span data-i18n="ui.thm.txt_8ddf888c" id="thm-span-8ddf888c">Сбросить к родителю</span>
+</button>
+<button class="d-none" data-i18n-title="titles.thm.title_9fd5c43b" id="theme-btn-delete-child" title="Удалить дочернюю тему" type="button">
+<i class="bi bi-trash"></i>
+<span data-i18n="ui.thm.txt_85fe0ede" id="thm-span-85fe0ede">Удалить тему</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Аккордеон настроек -->
+<div class="accordion shadow-sm" id="themeEditorAccordion">
+<!-- 1. Размеры, геометрия и плотность -->
+<div class="accordion-item border-subtle bg-body">
+<h2 class="accordion-header" id="headingSizes">
+<button aria-controls="collapseSizes" aria-expanded="true" class="accordion-button py-2 px-3 fw-semibold small bg-body-tertiary text-body" data-bs-target="#collapseSizes" data-bs-toggle="collapse" type="button">
+<i class="bi bi-aspect-ratio text-info me-2"></i>
+<span data-i18n="ui.thm.txt_b2b65a66" id="thm-span-b2b65a66">Размеры, геометрия и плотность интерфейса</span>
+</button>
+</h2>
+<div aria-labelledby="headingSizes" class="accordion-collapse collapse show" id="collapseSizes">
+<div class="accordion-body p-3 d-flex flex-column gap-3">
+<!-- Базовый размер шрифта -->
+<div>
+<div class="d-flex justify-content-between align-items-center mb-1">
+<label class="form-label small fw-medium mb-0" data-i18n="ui.thm.txt_1a80b097" for="range-font-size" id="thm-label-1a80b097">Базовый масштаб шрифта (Root Font Size):</label>
+<span class="badge bg-secondary-subtle text-body font-monospace small" data-i18n="ui.thm.txt_cf3c032c" id="val-font-size">16px</span>
+</div>
+<input class="form-range" id="range-font-size" max="20" min="12" step="1" type="range" value="16"/>
+<div class="d-flex justify-content-between text-muted small font-size-72">
+<span data-i18n="ui.thm.txt_c729673f" id="thm-span-c729673f">12px (Компактный)</span>
+<span data-i18n="ui.thm.txt_0e851a3c" id="thm-span-0e851a3c">16px (Стандарт)</span>
+<span data-i18n="ui.thm.txt_346e2219" id="thm-span-346e2219">20px (Крупный)</span>
+</div>
+</div>
+<!-- Радиус скругления углов -->
+<div>
+<div class="d-flex justify-content-between align-items-center mb-1">
+<label class="form-label small fw-medium mb-0" data-i18n="ui.thm.txt_9720ac56" for="range-border-radius" id="thm-label-9720ac56">Скругление углов (Border Radius):</label>
+<span class="badge bg-secondary-subtle text-body font-monospace small" data-i18n="ui.thm.txt_4e01dbcf" id="val-border-radius">8px</span>
+</div>
+<input class="form-range" id="range-border-radius" max="24" min="0" step="2" type="range" value="8"/>
+<div class="d-flex justify-content-between text-muted small font-size-72">
+<span data-i18n="ui.thm.txt_e4dfaffb" id="thm-span-e4dfaffb">0px (Прямоугольный / Строгий)</span>
+<span data-i18n="ui.thm.txt_a5c6fb1f" id="thm-span-a5c6fb1f">8px (Умеренный)</span>
+<span data-i18n="ui.thm.txt_677cb2e5" id="thm-span-677cb2e5">24px (Максимально круглый)</span>
+</div>
+</div>
+<!-- Плотность компоновки -->
+<div>
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_ad909d20" id="thm-label-ad909d20">Плотность отступов (Density):</label>
+<div class="btn-group btn-group-sm w-100" id="btn-group-density" role="group">
+<input class="btn-check" id="density-compact" name="theme-density" type="radio" value="compact"/>
+<label class="btn btn-outline-secondary" data-i18n="ui.thm.txt_4fcc154a" for="density-compact" id="thm-label-4fcc154a">Компактная (Таблицы / Сервер)</label>
+<input checked="" class="btn-check" id="density-normal" name="theme-density" type="radio" value="normal"/>
+<label class="btn btn-outline-secondary" data-i18n="ui.thm.txt_464643a1" for="density-normal" id="thm-label-464643a1">Стандартная</label>
+<input class="btn-check" id="density-comfortable" name="theme-density" type="radio" value="comfortable"/>
+<label class="btn btn-outline-secondary" data-i18n="ui.thm.txt_fd5fcca7" for="density-comfortable" id="thm-label-fd5fcca7">Просторная (Тач / Планшет)</label>
+</div>
+</div>
+<!-- Высота KPI карточек -->
+<div>
+<div class="d-flex justify-content-between align-items-center mb-1">
+<label class="form-label small fw-medium mb-0" data-i18n="ui.thm.txt_a92fcfeb" for="range-kpi-height" id="thm-label-a92fcfeb">Минимальная высота KPI-карточек:</label>
+<span class="badge bg-secondary-subtle text-body font-monospace small" data-i18n="ui.thm.txt_ba698890" id="val-kpi-height">72px</span>
+</div>
+<input class="form-range" id="range-kpi-height" max="110" min="56" step="4" type="range" value="72"/>
+</div>
+</div>
+</div>
+</div>
+<!-- 2. Цвета фона и поверхностей -->
+<div class="accordion-item border-subtle bg-body">
+<h2 class="accordion-header" id="headingSurfaces">
+<button aria-controls="collapseSurfaces" aria-expanded="false" class="accordion-button collapsed py-2 px-3 fw-semibold small bg-body-tertiary text-body" data-bs-target="#collapseSurfaces" data-bs-toggle="collapse" type="button">
+<i class="bi bi-layers text-primary me-2"></i>
+<span data-i18n="ui.thm.txt_ab2311d1" id="thm-span-ab2311d1">Цвета поверхностей и фона (Surfaces &amp; Backgrounds)</span>
+</button>
+</h2>
+<div aria-labelledby="headingSurfaces" class="accordion-collapse collapse" id="collapseSurfaces">
+<div class="accordion-body p-3">
+<div class="row g-3">
+<!-- Фон страницы -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_7bbb3019" for="color-bg-base" id="thm-label-7bbb3019">Фон страницы (--bg-color / --ui-bg-base):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-bg-base" title="Выбрать цвет" type="color" value="#0b0f19"/>
+<input class="form-control font-monospace" id="color-bg-base" type="text" value="#0b0f19"/>
+</div>
+</div>
+<!-- Фон карточек -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_63d2f25c" for="color-bg-surface" id="thm-label-63d2f25c">Поверхность карточек (--surface-1 / --card-bg):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-bg-surface" title="Выбрать цвет" type="color" value="#111827"/>
+<input class="form-control font-monospace" id="color-bg-surface" type="text" value="#111827"/>
+</div>
+</div>
+<!-- Фон шапок и панелей -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_11a013e2" for="color-bg-elevated" id="thm-label-11a013e2">Шапки карточек и тулбары (--surface-2):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-bg-elevated" title="Выбрать цвет" type="color" value="#1f2937"/>
+<input class="form-control font-monospace" id="color-bg-elevated" type="text" value="#1f2937"/>
+</div>
+</div>
+<!-- Фон навигации -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_bdff0e7a" for="color-bg-nav" id="thm-label-bdff0e7a">Фон шапки и навигации (--nav-bg):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-bg-nav" title="Выбрать цвет" type="color" value="#111827"/>
+<input class="form-control font-monospace" id="color-bg-nav" type="text" value="#111827"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Цвета текста и акцентов -->
+<div class="accordion-item border-subtle bg-body">
+<h2 class="accordion-header" id="headingTextColors">
+<button aria-controls="collapseTextColors" aria-expanded="false" class="accordion-button collapsed py-2 px-3 fw-semibold small bg-body-tertiary text-body" data-bs-target="#collapseTextColors" data-bs-toggle="collapse" type="button">
+<i class="bi bi-type text-success me-2"></i>
+<span data-i18n="ui.thm.txt_8a4f85f9" id="thm-span-8a4f85f9">Цвета текста, ссылок и акцентов</span>
+</button>
+</h2>
+<div aria-labelledby="headingTextColors" class="accordion-collapse collapse" id="collapseTextColors">
+<div class="accordion-body p-3">
+<div class="row g-3">
+<!-- Основной текст -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_0b2b38e4" for="color-text-primary" id="thm-label-0b2b38e4">Основной текст (--text-color / --ui-text-primary):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-text-primary" title="Выбрать цвет" type="color" value="#f9fafb"/>
+<input class="form-control font-monospace" id="color-text-primary" type="text" value="#f9fafb"/>
+</div>
+</div>
+<!-- Вторичный приглушенный текст -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_967433e1" for="color-text-muted" id="thm-label-967433e1">Приглушенный текст (--text-muted / --ui-text-muted):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-text-muted" title="Выбрать цвет" type="color" value="#9ca3af"/>
+<input class="form-control font-monospace" id="color-text-muted" type="text" value="#9ca3af"/>
+</div>
+</div>
+<!-- Главный акцентный цвет -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_a9c64f76" for="color-accent" id="thm-label-a9c64f76">Главный акцент (--ui-accent / --nav-active):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-accent" title="Выбрать цвет" type="color" value="#38bdf8"/>
+<input class="form-control font-monospace" id="color-accent" type="text" value="#38bdf8"/>
+</div>
+</div>
+<!-- Акцент при наведении -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_4f3791bf" for="color-accent-hover" id="thm-label-4f3791bf">Акцент при наведении (--ui-accent-hover):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-accent-hover" title="Выбрать цвет" type="color" value="#0ea5e9"/>
+<input class="form-control font-monospace" id="color-accent-hover" type="text" value="#0ea5e9"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 4. Границы, разделители и тени -->
+<div class="accordion-item border-subtle bg-body">
+<h2 class="accordion-header" id="headingBorders">
+<button aria-controls="collapseBorders" aria-expanded="false" class="accordion-button collapsed py-2 px-3 fw-semibold small bg-body-tertiary text-body" data-bs-target="#collapseBorders" data-bs-toggle="collapse" type="button">
+<i class="bi bi-bounding-box text-warning me-2"></i>
+<span data-i18n="ui.thm.txt_18607f1c" id="thm-span-18607f1c">Границы, разделители и стили теней</span>
+</button>
+</h2>
+<div aria-labelledby="headingBorders" class="accordion-collapse collapse" id="collapseBorders">
+<div class="accordion-body p-3">
+<div class="row g-3">
+<!-- Цвет границы -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_ba559b64" for="color-border" id="thm-label-ba559b64">Основная граница (--border-color):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-border" title="Выбрать цвет" type="color" value="#374151"/>
+<input class="form-control font-monospace" id="color-border" type="text" value="#374151"/>
+</div>
+</div>
+<!-- Контрастная / активная граница -->
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_3503a39d" for="color-border-strong" id="thm-label-3503a39d">Активная граница (--border-strong):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-border-strong" title="Выбрать цвет" type="color" value="#596b82"/>
+<input class="form-control font-monospace" id="color-border-strong" type="text" value="#596b82"/>
+</div>
+</div>
+<!-- Стиль теней -->
+<div class="col-12">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_1a97c6c7" for="select-shadow-style" id="thm-label-1a97c6c7">Стиль теней и свечения (Shadow Style):</label>
+<select class="form-select form-select-sm" id="select-shadow-style">
+<option data-i18n="ui.thm.txt_d2831e91" id="thm-option-d2831e91" value="none">Без теней (Flat / Плоский стиль)</option>
+<option data-i18n="ui.thm.txt_2692969e" id="thm-option-2692969e" selected="" value="soft">Мягкие тени (Soft / Subtle Drop Shadows)</option>
+<option data-i18n="ui.thm.txt_0f332eb2" id="thm-option-0f332eb2" value="deep">Глубокие контрастные тени (Deep Shadows)</option>
+<option data-i18n="ui.thm.txt_f014af8f" id="thm-option-f014af8f" value="neon">Неоновое свечение (Neon Glow под цвет акцента)</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 5. Статусные цвета и индикаторы -->
+<div class="accordion-item border-subtle bg-body">
+<h2 class="accordion-header" id="headingStatuses">
+<button aria-controls="collapseStatuses" aria-expanded="false" class="accordion-button collapsed py-2 px-3 fw-semibold small bg-body-tertiary text-body" data-bs-target="#collapseStatuses" data-bs-toggle="collapse" type="button">
+<i class="bi bi-shield-check text-success me-2"></i>
+<span data-i18n="ui.thm.txt_09cfe73b" id="thm-span-09cfe73b">Статусные цвета (Успех, Предупреждение, Ошибка, Инфо)</span>
+</button>
+</h2>
+<div aria-labelledby="headingStatuses" class="accordion-collapse collapse" id="collapseStatuses">
+<div class="accordion-body p-3">
+<div class="row g-3">
+<!-- Успех -->
+<div class="col-6 col-md-3">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_3d9aab48" for="color-status-success" id="thm-label-3d9aab48">Успех / Норма:</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-status-success" title="Выбрать цвет" type="color" value="#10b981"/>
+<input class="form-control font-monospace" id="color-status-success" type="text" value="#10b981"/>
+</div>
+</div>
+<!-- Предупреждение -->
+<div class="col-6 col-md-3">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_a276535d" for="color-status-warning" id="thm-label-a276535d">Предупреждение:</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-status-warning" title="Выбрать цвет" type="color" value="#f59e0b"/>
+<input class="form-control font-monospace" id="color-status-warning" type="text" value="#f59e0b"/>
+</div>
+</div>
+<!-- Ошибка / Опасность -->
+<div class="col-6 col-md-3">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_6d0a472d" for="color-status-danger" id="thm-label-6d0a472d">Ошибка / Сбой:</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-status-danger" title="Выбрать цвет" type="color" value="#ef4444"/>
+<input class="form-control font-monospace" id="color-status-danger" type="text" value="#ef4444"/>
+</div>
+</div>
+<!-- Инфо -->
+<div class="col-6 col-md-3">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_ef2ddb43" for="color-status-info" id="thm-label-ef2ddb43">Информация:</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-status-info" title="Выбрать цвет" type="color" value="#38bdf8"/>
+<input class="form-control font-monospace" id="color-status-info" type="text" value="#38bdf8"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 6. Типографика и визуальные эффекты -->
+<div class="accordion-item border-subtle bg-body">
+<h2 class="accordion-header" id="headingTypography">
+<button aria-controls="collapseTypography" aria-expanded="false" class="accordion-button collapsed py-2 px-3 fw-semibold small bg-body-tertiary text-body" data-bs-target="#collapseTypography" data-bs-toggle="collapse" type="button">
+<i class="bi bi-magic text-danger me-2"></i>
+<span data-i18n="ui.thm.txt_cbb4b4d0" id="thm-span-cbb4b4d0">Шрифты и спецэффекты (Glassmorphism, CRT Scanlines)</span>
+</button>
+</h2>
+<div aria-labelledby="headingTypography" class="accordion-collapse collapse" id="collapseTypography">
+<div class="accordion-body p-3 d-flex flex-column gap-3">
+<!-- Семейство шрифтов -->
+<div>
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_76a8a0bd" for="select-font-family" id="thm-label-76a8a0bd">Основной шрифт интерфейса (Font Family):</label>
+<select class="form-select form-select-sm" id="select-font-family">
+<option data-i18n="ui.thm.txt_53105ed1" id="thm-option-53105ed1" selected="" value="system">Системный (Segoe UI / Roboto / Apple System)</option>
+<option data-i18n="ui.thm.txt_3801eed4" id="thm-option-3801eed4" value="inter">Inter / Clean Modern (Современный гротеск)</option>
+<option data-i18n="ui.thm.txt_9d8074f5" id="thm-option-9d8074f5" value="mono">Моноширинный (Consolas / Cascadia Code / Courier)</option>
+<option data-i18n="ui.thm.txt_a964d0ec" id="thm-option-a964d0ec" value="georgia">Georgia / Serif (Классическая печатная гарнитура)</option>
+</select>
+</div>
+<!-- Переключатели эффектов -->
+<div class="row g-2 pt-2 border-top border-subtle">
+<div class="col-12 col-sm-6">
+<div class="form-check form-switch">
+<input class="form-check-input" id="toggle-glassmorphism" role="switch" type="checkbox"/>
+<label class="form-check-label small fw-medium" data-i18n="ui.thm.txt_47cbbac1" for="toggle-glassmorphism" id="thm-label-47cbbac1">
+                      Glassmorphism (Backdrop blur)
+                    </label>
+<div class="text-muted small font-size-72" data-i18n="ui.thm.txt_8fbaedd0" id="thm-div-8fbaedd0">Эффект матового стекла на панелях</div>
+</div>
+</div>
+<div class="col-12 col-sm-6">
+<div class="form-check form-switch">
+<input class="form-check-input" id="toggle-crt-scanlines" role="switch" type="checkbox"/>
+<label class="form-check-label small fw-medium" data-i18n="ui.thm.txt_c5bc63a4" for="toggle-crt-scanlines" id="thm-label-c5bc63a4">
+                      CRT Scanlines (Ретро-линии)
+                    </label>
+<div class="text-muted small font-size-72" data-i18n="ui.thm.txt_20b45710" id="thm-div-20b45710">Горизонтальные полосы кинескопа</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 7. Заголовок панели (.panel-header / H3) -->
+<div class="accordion-item border-subtle bg-body">
+<h2 class="accordion-header" id="headingPanelHeader">
+<button aria-controls="collapsePanelHeader" aria-expanded="false" class="accordion-button collapsed py-2 px-3 fw-semibold small bg-body-tertiary text-body" data-bs-target="#collapsePanelHeader" data-bs-toggle="collapse" type="button">
+<i class="bi bi-window-sidebar text-info me-2"></i>
+<span data-i18n="ui.thm.txt_a8b77831" id="thm-span-a8b77831">Заголовок панели (.panel-header, размер H3)</span>
+</button>
+</h2>
+<div aria-labelledby="headingPanelHeader" class="accordion-collapse collapse" id="collapsePanelHeader">
+<div class="accordion-body p-3 d-flex flex-column gap-3">
+<!-- Размер шрифта H3 заголовка панели -->
+<div>
+<div class="d-flex justify-content-between align-items-center mb-1">
+<label class="form-label small fw-medium mb-0" data-i18n="ui.thm.txt_00d54c51" for="range-panel-header-font-size" id="thm-label-00d54c51">Размер шрифта заголовка панели (H3):</label>
+<span class="badge bg-secondary-subtle text-body font-monospace small" data-i18n="ui.thm.txt_c7c6a7b0" id="val-panel-header-font-size">28px</span>
+</div>
+<input class="form-range" id="range-panel-header-font-size" max="38" min="18" step="1" type="range" value="28"/>
+<div class="d-flex justify-content-between text-muted small font-size-72">
+<span data-i18n="ui.thm.txt_3d317d12" id="thm-span-3d317d12">18px (Компактный)</span>
+<span data-i18n="ui.thm.txt_50111b5c" id="thm-span-50111b5c">28px (H3 Стандарт 1.75rem)</span>
+<span data-i18n="ui.thm.txt_1873af21" id="thm-span-1873af21">38px (Крупный)</span>
+</div>
+</div>
+<!-- Цвета текста и фона заголовка панели -->
+<div class="row g-3">
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_b6f68542" for="color-panel-header-text" id="thm-label-b6f68542">Цвет текста заголовка (--panel-header-color):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-panel-header-text" title="Выбрать цвет" type="color" value="#f9fafb"/>
+<input class="form-control font-monospace" id="color-panel-header-text" type="text" value="#f9fafb"/>
+</div>
+</div>
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_d6494df2" for="color-panel-header-bg" id="thm-label-d6494df2">Фон заголовка панели (--panel-header-bg):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-panel-header-bg" title="Выбрать цвет" type="color" value="#1f2937"/>
+<input class="form-control font-monospace" id="color-panel-header-bg" type="text" value="#1f2937"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 8. Заголовок вкладки (.tab-header / .tab-header-title) -->
+<div class="accordion-item border-subtle bg-body">
+<h2 class="accordion-header" id="headingTabHeader">
+<button aria-controls="collapseTabHeader" aria-expanded="false" class="accordion-button collapsed py-2 px-3 fw-semibold small bg-body-tertiary text-body" data-bs-target="#collapseTabHeader" data-bs-toggle="collapse" type="button">
+<i class="bi bi-layout-text-window text-warning me-2"></i>
+<span data-i18n="ui.thm.txt_bf777d11" id="thm-span-bf777d11">Заголовок вкладки (.tab-header / .tab-header-title)</span>
+</button>
+</h2>
+<div aria-labelledby="headingTabHeader" class="accordion-collapse collapse" id="collapseTabHeader">
+<div class="accordion-body p-3 d-flex flex-column gap-3">
+<!-- Размер шрифта заголовка вкладки -->
+<div>
+<div class="d-flex justify-content-between align-items-center mb-1">
+<label class="form-label small fw-medium mb-0" data-i18n="ui.thm.txt_1d1d837f" for="range-tab-header-font-size" id="thm-label-1d1d837f">Размер шрифта заголовка вкладки:</label>
+<span class="badge bg-secondary-subtle text-body font-monospace small" data-i18n="ui.thm.txt_14cdf596" id="val-tab-header-font-size">22px</span>
+</div>
+<input class="form-range" id="range-tab-header-font-size" max="32" min="16" step="1" type="range" value="22"/>
+<div class="d-flex justify-content-between text-muted small font-size-72">
+<span data-i18n="ui.thm.txt_3fa52afe" id="thm-span-3fa52afe">16px (Компактный)</span>
+<span data-i18n="ui.thm.txt_52d5fb61" id="thm-span-52d5fb61">22px (Стандарт 1.35rem)</span>
+<span data-i18n="ui.thm.txt_6279ac0c" id="thm-span-6279ac0c">32px (Крупный)</span>
+</div>
+</div>
+<!-- Цвета текста заголовка и описания вкладки -->
+<div class="row g-3">
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_0a88059f" for="color-tab-header-text" id="thm-label-0a88059f">Цвет названия вкладки (--tab-header-title-color):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-tab-header-text" title="Выбрать цвет" type="color" value="#f9fafb"/>
+<input class="form-control font-monospace" id="color-tab-header-text" type="text" value="#f9fafb"/>
+</div>
+</div>
+<div class="col-12 col-sm-6">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_ca34d396" for="color-tab-header-sub" id="thm-label-ca34d396">Цвет подзаголовка (--tab-header-subtitle-color):</label>
+<div class="input-group input-group-sm">
+<input class="form-control form-control-color" data-i18n-title="titles.thm.title_8c7bffa4" id="picker-tab-header-sub" title="Выбрать цвет" type="color" value="#9ca3af"/>
+<input class="form-control font-monospace" id="color-tab-header-sub" type="text" value="#9ca3af"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Правая колонка: Интерактивный Live Preview стенд -->
+<div class="col-12 col-xl-6">
+<div class="card border-subtle shadow-sm bg-body sticky-xl-top sticky-preview-card">
+<div class="card-header bg-body-tertiary py-2 px-3 d-flex align-items-center justify-content-between">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<i class="bi bi-eye-fill text-success"></i>
+<span data-i18n="ui.thm.txt_9cabad06" id="thm-span-9cabad06">Живой предпросмотр компонентов (Live Preview)</span>
+</div>
+<span class="badge bg-success-subtle text-success border border-success-subtle small" data-i18n="ui.thm.txt_09eaf881" id="thm-span-09eaf881">Мгновенный рендер</span>
+</div>
+<div class="card-body p-3 d-flex flex-column gap-3" id="theme-preview-sandbox">
+<!-- Превью 1: Карточки метрик (KPI Cards) -->
+<div>
+<div class="small fw-semibold text-muted text-uppercase mb-2 font-size-75" data-i18n="ui.thm.txt_196fc629" id="thm-div-196fc629">1. KPI Карточки телеметрии</div>
+<div class="row g-2">
+<div class="col-4">
+<div class="card border-subtle p-2 text-center bg-body shadow-sm preview-kpi-card">
+<div class="text-muted small preview-kpi-label" data-i18n="ui.thm.txt_b5a32dbf" id="thm-div-b5a32dbf">Процессор (CPU)</div>
+<div class="fs-4 fw-bold text-primary preview-kpi-val" id="preview-cpu-val">18.4%</div>
+<div class="progress mt-1 progress-h-4">
+<div aria-valuemax="100" aria-valuemin="0" aria-valuenow="18" class="progress-bar bg-primary w-25" role="progressbar"></div>
+</div>
+</div>
+</div>
+<div class="col-4">
+<div class="card border-subtle p-2 text-center bg-body shadow-sm preview-kpi-card">
+<div class="text-muted small preview-kpi-label" data-i18n="ui.thm.txt_f98e8b5e" id="thm-div-f98e8b5e">Память (RAM)</div>
+<div class="fs-4 fw-bold text-success preview-kpi-val" id="preview-ram-val">42.1%</div>
+<div class="progress mt-1 progress-h-4">
+<div aria-valuemax="100" aria-valuemin="0" aria-valuenow="42" class="progress-bar bg-success w-50" role="progressbar"></div>
+</div>
+</div>
+</div>
+<div class="col-4">
+<div class="card border-subtle p-2 text-center bg-body shadow-sm preview-kpi-card">
+<div class="text-muted small preview-kpi-label" data-i18n="ui.thm.txt_4f5cd10e" id="thm-div-4f5cd10e">Температура</div>
+<div class="fs-4 fw-bold text-warning preview-kpi-val" data-i18n="ui.thm.txt_2aa68282" id="preview-temp-val">58°C</div>
+<div class="progress mt-1 progress-h-4">
+<div aria-valuemax="100" aria-valuemin="0" aria-valuenow="58" class="progress-bar bg-warning w-75" role="progressbar"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Превью 1.5: Заголовок панели (.panel-header / H3) -->
+<div>
+<div class="small fw-semibold text-muted text-uppercase mb-2 font-size-75" data-i18n="ui.thm.txt_052aaff3" id="thm-div-052aaff3">Заголовок панели (.panel-header — H3)</div>
+<div class="card border-subtle shadow-sm overflow-hidden preview-panel-header-card">
+<div class="panel-header py-2 px-3 d-flex align-items-center justify-content-between">
+<h3 class="panel-header mb-0 d-flex align-items-center gap-2">
+<i class="bi bi-window-sidebar text-primary"></i>
+<span data-i18n="ui.thm.txt_9c6d5553" id="thm-span-9c6d5553">Заголовок панели (H3)</span>
+</h3>
+<span class="badge bg-primary-subtle text-primary border border-primary-subtle small" data-i18n="ui.thm.txt_48c5d020" id="thm-span-48c5d020">panel-header</span>
+</div>
+<div class="card-body p-3">
+<p class="text-muted small mb-0" data-i18n="ui.thm.txt_9b35fc6a" id="thm-p-9b35fc6a">Содержимое панели с адаптивным размером H3 и настраиваемой палитрой темы оформления.</p>
+</div>
+</div>
+</div>
+<!-- Превью 1.6: Заголовок страницы/вкладки (.tab-header) -->
+<div>
+<div class="small fw-semibold text-muted text-uppercase mb-2 font-size-75" data-i18n="ui.thm.txt_b073cb8d" id="thm-div-b073cb8d">Заголовок вкладки (.tab-header)</div>
+<div class="card border-subtle shadow-sm p-3 bg-body preview-tab-header-box">
+<div class="tab-header d-flex justify-content-between align-items-center mb-0 flex-wrap gap-2">
+<div class="d-flex align-items-center gap-2">
+<span class="tab-header-icon fs-4 text-warning">⚡</span>
+<div>
+<div class="d-flex align-items-center gap-2 flex-wrap">
+<h3 class="tab-header-title panel-header mb-0" data-i18n="ui.thm.txt_ad23ffb0" id="thm-h3-ad23ffb0">Мониторинг процессов и активности хоста</h3>
+<span class="badge bg-success-subtle text-success border border-success px-2 py-0.5 small" data-i18n="ui.thm.txt_558ebc12" id="thm-span-558ebc12">
+                        🟢 ACTIVE
+                      </span>
+</div>
+<small class="tab-header-subtitle text-secondary" data-i18n="ui.thm.txt_98f5940b" id="thm-small-98f5940b">Диспетчер задач Windows, мониторинг нагрузки ЦП/RAM в реальном времени</small>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Превью 2: Кнопки и статусные бейджи -->
+<div>
+<div class="small fw-semibold text-muted text-uppercase mb-2 font-size-75" data-i18n="ui.thm.txt_94c394cd" id="thm-div-94c394cd">2. Кнопки и бейджи действий</div>
+<div class="d-flex flex-wrap gap-2 align-items-center">
+<button class="btn btn-sm btn-primary" data-i18n="ui.thm.txt_83bb639d" id="thm-button-83bb639d" type="button">Primary Button</button>
+<button class="btn btn-sm btn-outline-secondary" data-i18n="ui.thm.txt_59297129" id="thm-button-59297129" type="button">Secondary Outline</button>
+<button class="btn btn-sm btn-success" data-i18n="ui.thm.txt_0954b11a" id="thm-button-0954b11a" type="button">
+<i class="bi bi-check2"></i> Успешно
+              </button>
+<button class="btn btn-sm btn-danger" data-i18n="ui.thm.txt_ed2bbfbc" id="thm-button-ed2bbfbc" type="button">
+<i class="bi bi-trash"></i> Удалить
+              </button>
+<span class="badge bg-success-subtle text-success border border-success-subtle" data-i18n="ui.thm.txt_318150c5" id="thm-span-318150c5">Активен</span>
+<span class="badge bg-warning-subtle text-warning border border-warning-subtle" data-i18n="ui.thm.txt_8b54b4ee" id="thm-span-8b54b4ee">Внимание</span>
+<span class="badge bg-danger-subtle text-danger border border-danger-subtle" data-i18n="ui.thm.txt_6c1f4a25" id="thm-span-6c1f4a25">Сбой</span>
+<span class="badge bg-info-subtle text-info border border-info-subtle" data-i18n="ui.thm.txt_86b340c6" id="thm-span-86b340c6">Телеметрия</span>
+</div>
+</div>
+<!-- Превью 3: Интерактивная таблица -->
+<div>
+<div class="small fw-semibold text-muted text-uppercase mb-2 font-size-75" data-i18n="ui.thm.txt_d0644fc4" id="thm-div-d0644fc4">3. Таблицы и списки сущностей</div>
+<div class="table-responsive border border-subtle rounded">
+<table class="table table-hover align-middle mb-0 small">
+<thead class="table-light">
+<tr>
+<th data-i18n="ui.thm.txt_1eba5adf" id="thm-th-1eba5adf">Служба / Процесс</th>
+<th data-i18n="ui.thm.txt_2d73559f" id="thm-th-2d73559f">PID</th>
+<th data-i18n="ui.thm.txt_7203f7a4" id="thm-th-7203f7a4">Статус</th>
+<th class="text-end" data-i18n="ui.thm.txt_4f1c0265" id="thm-th-4f1c0265">Использование</th>
+</tr>
+</thead>
+<tbody>
+<tr class="interactive-table-row">
+<td>
+<div class="fw-semibold text-body" data-i18n="ui.thm.txt_73cd9d0f" id="thm-div-73cd9d0f">RuntimeBroker.exe</div>
+<div class="text-muted font-size-75" data-i18n="ui.thm.txt_3e03b569" id="thm-div-3e03b569">C:\Windows\System32</div>
+</td>
+<td class="font-monospace">4812</td>
+<td><span class="badge bg-success-subtle text-success border border-success-subtle" data-i18n="ui.thm.txt_5bda814c" id="thm-span-5bda814c">Running</span></td>
+<td class="text-end font-monospace" data-i18n="ui.thm.txt_cf252a9b" id="thm-td-cf252a9b">14.2 MB</td>
+</tr>
+<tr class="interactive-table-row">
+<td>
+<div class="fw-semibold text-body" data-i18n="ui.thm.txt_b50f1194" id="thm-div-b50f1194">TelemetryCollector.py</div>
+<div class="text-muted font-size-75" data-i18n="ui.thm.txt_e3d55e75" id="thm-div-e3d55e75">apps.windows.telemetry</div>
+</td>
+<td class="font-monospace">9104</td>
+<td><span class="badge bg-primary-subtle text-primary border border-primary-subtle" data-i18n="ui.thm.txt_5e3ee0af" id="thm-span-5e3ee0af">Active 5s</span></td>
+<td class="text-end font-monospace" data-i18n="ui.thm.txt_baadb739" id="thm-td-baadb739">38.6 MB</td>
+</tr>
+<tr class="interactive-table-row">
+<td>
+<div class="fw-semibold text-body" data-i18n="ui.thm.txt_b09eabc1" id="thm-div-b09eabc1">Spooler (Print Subsystem)</div>
+<div class="text-muted font-size-75" data-i18n="ui.thm.txt_346e68ab" id="thm-div-346e68ab">spoolsv.exe</div>
+</td>
+<td class="font-monospace">1840</td>
+<td><span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" data-i18n="ui.thm.txt_c23e2b09" id="thm-span-c23e2b09">Stopped</span></td>
+<td class="text-end font-monospace" data-i18n="ui.thm.txt_76fe0e4f" id="thm-td-76fe0e4f">0 MB</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Превью 4: Формы ввода и тумблеры -->
+<div>
+<div class="small fw-semibold text-muted text-uppercase mb-2 font-size-75" data-i18n="ui.thm.txt_7dc68abe" id="thm-div-7dc68abe">4. Элементы форм и переключатели</div>
+<div class="row g-2">
+<div class="col-12 col-sm-6">
+<div class="input-group input-group-sm">
+<span class="input-group-text bg-body-tertiary text-muted"><i class="bi bi-search"></i></span>
+<input class="form-control" data-i18n-placeholder="placeholders.thm.ph_b2d7008e" id="thm-ph-b2d7008e" placeholder="Поисковый запрос..." type="text" value="explorer.exe"/>
+</div>
+</div>
+<div class="col-12 col-sm-6 d-flex align-items-center gap-3">
+<div class="form-check form-switch mb-0">
+<input checked="" class="form-check-input" id="preview-switch" type="checkbox"/>
+<label class="form-check-label small" data-i18n="ui.thm.txt_41590112" for="preview-switch" id="thm-label-41590112">Live опрос</label>
+</div>
+<div class="form-check mb-0">
+<input checked="" class="form-check-input" id="preview-check" type="checkbox"/>
+<label class="form-check-label small" data-i18n="ui.thm.txt_d2ed721d" for="preview-check" id="thm-label-d2ed721d">Уведомления</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Превью 5: Информационные сообщения (Alerts) -->
+<div>
+<div class="small fw-semibold text-muted text-uppercase mb-2 font-size-75" data-i18n="ui.thm.txt_639cc051" id="thm-div-639cc051">5. Системные алерты и уведомления</div>
+<div class="alert alert-info py-2 px-3 small d-flex align-items-center gap-2 mb-2">
+<i class="bi bi-info-circle-fill fs-6 text-info"></i>
+<span data-i18n="ui.thm.txt_618bb2cd" id="thm-span-618bb2cd">Служба Windows API успешно инициализирована. Порт 8001 готов к приёму команд.</span>
+</div>
+<div class="alert alert-warning py-2 px-3 small d-flex align-items-center gap-2 mb-0">
+<i class="bi bi-exclamation-triangle-fill fs-6 text-warning"></i>
+<span data-i18n="ui.thm.txt_d728dac9" id="thm-span-d728dac9">Обнаружено повышенное выделение дескрипторов в процессе explorer.exe (1 240 шт).</span>
+</div>
+</div>
+</div>
+<div class="card-footer bg-body-tertiary py-2 px-3 d-flex align-items-center justify-content-between small text-muted">
+<span data-i18n="ui.thm.txt_24114b23" id="thm-span-24114b23">Стенд обновляется в режиме реального времени</span>
+<button class="btn btn-sm btn-link p-0 text-decoration-none" data-i18n="ui.thm.txt_3f284f48" data-i18n-title="titles.thm.title_d3786fa7" id="preview-btn-toggle-fullscreen" title="Полноэкранный режим предварительного просмотра" type="button">
+<i class="bi bi-arrows-fullscreen me-1"></i>Развернуть превью
+          </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно для отображения сгенерированного CSS-кода -->
+<div aria-hidden="true" aria-labelledby="themeCssModalLabel" class="modal fade" id="themeCssModal" tabindex="-1">
+<div class="modal-dialog modal-lg modal-dialog-centered">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle">
+<h5 class="modal-title d-flex align-items-center gap-2" id="themeCssModalLabel">
+<i class="bi bi-code-slash text-primary"></i>
+<span data-i18n="ui.thm.txt_fb304078" id="thm-span-fb304078">Сгенерированный CSS-код темы</span>
+</h5>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3">
+<p class="small text-muted mb-2" data-i18n="ui.thm.txt_55b020b7" id="thm-p-55b020b7">
+            Вы можете скопировать этот блок CSS в файл стилей (например, <code>themes.css</code> или <code>custom.css</code>) для постоянного применения темы оформления:
+          </p>
+<textarea class="form-control font-monospace small bg-body-tertiary font-size-80" id="theme-css-output" readonly="" rows="14"></textarea>
+</div>
+<div class="modal-footer border-secondary-subtle py-2">
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="ui.thm.txt_dd9463bd" id="thm-button-dd9463bd" type="button">Закрыть</button>
+<button class="btn btn-primary btn-sm d-flex align-items-center gap-1.5" id="btn-copy-css-modal" type="button">
+<i class="bi bi-clipboard-check"></i>
+<span data-i18n="ui.thm.txt_8ea2c071" id="thm-span-8ea2c071">Скопировать в буфер</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно создания дочерней темы -->
+<div aria-hidden="true" aria-labelledby="themeCreateChildModalLabel" class="modal fade" id="themeCreateChildModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle py-2 px-3">
+<h5 class="modal-title fs-6 d-flex align-items-center gap-2" id="themeCreateChildModalLabel">
+<i class="bi bi-diagram-3-fill text-success"></i>
+<span data-i18n="ui.thm.txt_00ca30ba" id="thm-span-00ca30ba">Создание дочерней темы оформления</span>
+</h5>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3 d-flex flex-column gap-3">
+<div class="alert alert-info py-2 px-3 small d-flex align-items-center gap-2 mb-0">
+<i class="bi bi-info-circle-fill fs-6 text-info"></i>
+<span data-i18n="ui.thm.txt_222bf411" id="thm-span-222bf411">Дочерняя тема наследует все свойства выбранной базовой темы и позволяет кастомизировать палитру и размеры.</span>
+</div>
+<div>
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_71a3c5ef" for="child-theme-parent-select" id="thm-label-71a3c5ef">Базовая (родительская) тема:</label>
+<select class="form-select form-select-sm" id="child-theme-parent-select">
+<!-- Наполняется динамически -->
+</select>
+<div class="form-text small font-size-75" data-i18n="ui.thm.txt_54908dc2" id="thm-div-54908dc2">Все ненастроенные параметры будут унаследованы от этой темы.</div>
+</div>
+<div>
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_f54cd941" for="child-theme-name-input" id="thm-label-f54cd941">Название новой темы:</label>
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.thm.ph_a24eb8d1" id="child-theme-name-input" placeholder="Например: Мой Тёмный Сланец" type="text"/>
+</div>
+<div>
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_0c7a8705" for="child-theme-desc-input" id="thm-label-0c7a8705">Описание (опционально):</label>
+<textarea class="form-control form-control-sm" data-i18n-placeholder="placeholders.thm.ph_bbeb1857" id="child-theme-desc-input" placeholder="Краткое назначение темы" rows="2"></textarea>
+</div>
+</div>
+<div class="modal-footer border-secondary-subtle py-2 px-3">
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="ui.thm.txt_987b33c6" id="thm-button-987b33c6" type="button">Отмена</button>
+<button class="btn btn-success btn-sm d-flex align-items-center gap-1.5" id="btn-confirm-create-child" type="button">
+<i class="bi bi-check-circle-fill"></i>
+<span data-i18n="ui.thm.txt_6d3d85e6" id="thm-span-6d3d85e6">Создать и применить</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно переименования дочерней темы -->
+<div aria-hidden="true" aria-labelledby="themeRenameChildModalLabel" class="modal fade" id="themeRenameChildModal" tabindex="-1">
+<div class="modal-dialog modal-sm modal-dialog-centered">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle py-2 px-3">
+<h5 class="modal-title fs-6 d-flex align-items-center gap-2" id="themeRenameChildModalLabel">
+<i class="bi bi-pencil-square text-primary"></i>
+<span data-i18n="ui.thm.txt_5c980cd5" id="thm-span-5c980cd5">Переименовать тему</span>
+</h5>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3">
+<label class="form-label small fw-medium mb-1" data-i18n="ui.thm.txt_bf2965cf" for="child-theme-rename-input" id="thm-label-bf2965cf">Новое название темы:</label>
+<input class="form-control form-control-sm" id="child-theme-rename-input" type="text"/>
+</div>
+<div class="modal-footer border-secondary-subtle py-2 px-3">
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="ui.thm.txt_987b33c6" id="thm-button-987b33c6-1" type="button">Отмена</button>
+<button class="btn btn-primary btn-sm d-flex align-items-center gap-1.5" id="btn-confirm-rename-child" type="button">
+<i class="bi bi-check-lg"></i>
+<span data-i18n="ui.thm.txt_74ea58b6" id="thm-span-74ea58b6">Сохранить</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>

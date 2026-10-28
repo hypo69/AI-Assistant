@@ -1,0 +1,21 @@
+{
+  "id": "ai_assistant",
+  "name": "AI Assistant (Умная история версий)",
+  "version": "1.0.0",
+  "description": "Интеллектуальный ассистент с координатором умной истории версий на основе Git, WikiLLM и RAG с единым графом знаний.",
+  "author": "hypo69",
+  "enabled": true,
+  "category": "ai",
+  "entrypoint": "apps.ai_assistant",
+  "api_prefix": "/api/v1/ai-assistant",
+  "routes": [
+    "/api/v1/ai-assistant/version-history/query",
+    "/api/v1/ai-assistant/version-history/commits",
+    "/api/v1/ai-assistant/version-history/diff",
+    "/api/v1/ai-assistant/version-history/file-revision",
+    "/api/v1/ai-assistant/version-history/index",
+    "/api/v1/ai-assistant/version-history/knowledge-links",
+    "/api/v1/ai-assistant/version-history/link",
+    "/api/v1/ai-assistant/version-history/status"
+  ]
+}

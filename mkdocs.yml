@@ -1,0 +1,79 @@
+site_name: AI-Windows-Admin
+site_description: Interactive AI Model Testbench & AI Windows Admin
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, 'http://localhost:8000']
+repo_url: https://github.com/hypo69/AI-Windows-Admin
+edit_uri: edit/master/docs/
+docs_dir: docs/ru
+exclude_docs: |
+  **/README.md
+
+# Theme
+theme:
+  name: material
+  language: ru
+  palette:
+    primary: indigo
+    accent: indigo
+  favicon: assets/favicon.png
+  logo: assets/logo.png
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - toc.integrate
+    - content.code.copy
+
+# Navigation
+nav:
+  - Разработчику:
+    - Changelog: changelog.md
+
+# Plugins
+plugins:
+  - search:
+      lang:
+        - ru
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - .
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            show_signature_annotations: true
+            show_if_no_docstring: false
+            heading_level: 2
+            preload_modules:
+              - src
+
+# Markdown extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+# Custom CSS / JS
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - js/chat.js
+
+# Site metadata
+extra:
+  version: 1.0.0
+  authors:
+    - hypo69
+  license: MIT
+  repository: github
+
+# Validation
+strict: false
+

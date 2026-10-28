@@ -1,0 +1,241 @@
+<!--
+=============================================================================
+Process Name: Windows WebGUI - AI Modal Dialog Template
+=============================================================================
+Description:
+  Шаблон разметки универсального модального окна AI-анализатора со встроенным
+  редактором системной инструкции, выбором модели и привязкой к ID панели.
+
+Usage Examples:
+  HTML Integration:
+    <div id="ai-modal-dialog-container">...</div>
+
+File: index.html
+Project: ai-windows-admin
+Package: apps.windows.api.webgui.ai_modal_dialog
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<!-- Universal AI Table & Diagnostic Modal Dialog -->
+<div aria-hidden="true" class="modal fade" id="universal-ai-table-modal" tabindex="-1">
+<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+<div class="modal-content shadow-lg">
+<div class="modal-header py-2 px-3">
+<div class="d-flex align-items-center gap-2 flex-wrap">
+<span class="fs-5 text-info" id="uai-modal-icon">🔍</span>
+<h5 class="modal-title fw-bold text-info mb-0" data-i18n="ui.uai.txt_55182974" id="uai-modal-title">Детали записи</h5>
+<div class="d-flex align-items-center gap-1" id="uai-modal-badges"></div>
+</div>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body py-3 px-3">
+<!-- Metadata Grid -->
+<div class="row g-2 mb-3 small" id="uai-modal-metadata-grid"></div>
+<!-- AI Contextual Diagnostic Card (Чистый ответ ИИ) -->
+<div class="card border-info p-3 uai-ai-section mb-3" id="uai-modal-ai-section">
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+<div class="d-flex align-items-center gap-2">
+<h6 class="fw-bold text-info mb-0" data-i18n="ui.uai.txt_d661b9e0" id="uai-h6-d661b9e0"><i class="bi bi-robot me-1"></i> AI Contextual Explanation</h6>
+<span class="badge border border-info text-info small px-2 py-0.5" data-i18n="ui.uai.txt_7ee2924b" data-i18n-title="titles.uai.title_b472c301" id="uai-modal-web-status" title="Сведения обогащаются поиском в интернете">
+<i class="bi bi-globe me-1"></i>Web Grounding
+              </span>
+</div>
+<div class="d-flex align-items-center gap-1.5">
+<button class="btn btn-sm btn-outline-secondary py-0 px-2 rounded-pill" data-i18n="ui.uai.txt_97aa2beb" data-i18n-title="titles.uai.title_5ee9f13c" id="btn-uai-modal-edit-prompt" title="Настроить расширенный шаблон промпта">
+<i class="bi bi-gear-fill me-1"></i>Промпт
+              </button>
+<button class="btn btn-sm btn-outline-info py-0 px-2 rounded-pill d-none" data-i18n="ui.uai.txt_dbe5444a" data-i18n-title="titles.uai.title_eb7129b1" id="btn-uai-modal-refresh" title="Обновить AI-анализ">
+<i class="bi bi-arrow-clockwise me-1"></i>Обновить
+              </button>
+</div>
+</div>
+<div class="uai-explanation-content" id="uai-modal-ai-explanation"></div>
+</div>
+<!-- Collapsible Technical Sections (Скрыты по умолчанию) -->
+<div class="mt-3 pt-2 border-top border-secondary border-opacity-25" id="uai-modal-spoilers-container">
+<div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+<!-- Spoiler Toggle 1: Raw Content -->
+<button aria-expanded="false" class="d-none" data-bs-target="#collapseRawData" data-bs-toggle="collapse" data-i18n="ui.uai.txt_f6afcdcf" id="btn-toggle-raw-data" type="button">
+<i class="bi bi-code-slash me-1"></i> Показать сырой код / данные
+            </button>
+<!-- Spoiler Toggle 2: Developer Advice & Automation -->
+<button aria-expanded="false" class="d-none" data-bs-target="#collapseDevAdvice" data-bs-toggle="collapse" data-i18n="ui.uai.txt_ed328ea1" id="btn-toggle-dev-advice" type="button">
+<i class="bi bi-code-slash me-1"></i> Советы разработчику
+            </button>
+<!-- Spoiler Toggle 3: System Instruction & Config -->
+<button aria-expanded="false" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 font-monospace" data-bs-target="#collapseSysInstruction" data-bs-toggle="collapse" data-i18n="ui.uai.txt_0c050ead" id="btn-toggle-sys-instruction" type="button">
+<i class="bi bi-shield-lock me-1"></i> Показать системную инструкцию
+            </button>
+</div>
+<!-- Developer Advice & Automation Scripts Section -->
+<div class="collapse mb-2" id="collapseDevAdvice">
+<div class="card p-3 uai-dev-card" id="uai-modal-dev-card">
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+<div class="d-flex align-items-center gap-2">
+<span class="fs-6 text-info">🛠️</span>
+<h6 class="fw-bold text-info mb-0" data-i18n="ui.uai.txt_ad432afe" id="uai-h6-ad432afe">Советы разработчику и документация по компоненту</h6>
+</div>
+<div class="d-flex align-items-center gap-1.5 flex-wrap">
+<button class="btn btn-xs btn-outline-warning py-0 px-2 rounded" data-i18n="ui.uai.txt_9c168094" data-i18n-title="titles.uai.title_b584d9f4" id="btn-uai-dev-save-instrument" title="Сохранить эти скрипты и утилиты в изолированную базу инструментов агента ai_instruments.db" type="button">
+<i class="bi bi-tools me-1"></i>Сохранить в ai_instruments.db
+                  </button>
+</div>
+</div>
+<div class="uai-dev-content text-light small" id="uai-modal-dev-content"></div>
+</div>
+</div>
+<!-- Raw / Code Content Section -->
+<div class="collapse mb-2" id="collapseRawData">
+<div class="card p-3 uai-raw-container bg-black bg-opacity-50 border border-secondary" id="uai-modal-raw-container">
+<div class="d-flex justify-content-between align-items-center mb-1">
+<h6 class="small text-uppercase text-muted fw-bold mb-0" data-i18n="ui.uai.txt_9bc5892d" id="uai-modal-raw-title">Контекст / Данные</h6>
+</div>
+<pre class="m-0 small font-monospace text-info uai-raw-content pre-scrollable-220" id="uai-modal-raw-content"></pre>
+</div>
+</div>
+<!-- System Instruction & Model Configuration Section -->
+<div class="collapse" id="collapseSysInstruction">
+<div class="card p-3 border-secondary-subtle uai-system-card" id="uai-modal-system-card">
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+<div class="d-flex align-items-center gap-2">
+<span class="fs-6 text-warning">🤖</span>
+<h6 class="fw-bold text-warning mb-0" data-i18n="ui.uai.txt_6f17e141" id="uai-h6-6f17e141">Системная инструкция и конфигурация ИИ</h6>
+</div>
+<div class="d-flex align-items-center gap-1.5 flex-wrap">
+<span class="badge bg-secondary-subtle text-secondary border small" data-i18n="ui.uai.txt_8b394c8e" data-i18n-title="titles.uai.title_e17dfc2c" id="uai-modal-panel-badge" title="ID вызывающей панели">Панель: -</span>
+<span class="badge bg-secondary-subtle text-secondary border small" data-i18n="ui.uai.txt_d079f59c" id="uai-modal-type-badge">Тип: -</span>
+<span class="badge border border-info text-info small d-none" data-i18n="ui.uai.txt_16e685ec" id="uai-modal-custom-badge">Кастомная</span>
+</div>
+</div>
+<!-- Model & Provider Selection Bar -->
+<div class="row g-2 mb-2 align-items-center">
+<div class="col-sm-6">
+<div class="input-group input-group-sm">
+<span class="input-group-text text-secondary small py-0" data-i18n="ui.uai.txt_e426ebc4" id="uai-span-e426ebc4">Провайдер</span>
+<select class="form-select form-select-sm" id="uai-modal-provider-select">
+<option data-i18n="ui.uai.txt_222cf5ed" id="uai-option-222cf5ed" value="gemini">Google Gemini</option>
+<option data-i18n="ui.uai.txt_ad57fca5" id="uai-option-ad57fca5" value="openai">OpenAI / Compatible</option>
+<option data-i18n="ui.uai.txt_80275d5b" id="uai-option-80275d5b" value="ollama">Ollama Local</option>
+<option data-i18n="ui.uai.txt_14d122fa" id="uai-option-14d122fa" value="foundry">Foundry Local</option>
+<option data-i18n="ui.uai.txt_f89e77c6" id="uai-option-f89e77c6" value="windows_ai">Windows Copilot+ AI</option>
+</select>
+</div>
+</div>
+<div class="col-sm-6">
+<div class="input-group input-group-sm">
+<span class="input-group-text text-secondary small py-0" data-i18n="ui.uai.txt_23c9d9be" id="uai-span-23c9d9be">Модель</span>
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.uai.ph_5266c0ab" id="uai-modal-model-input" placeholder="По умолчанию (из config.json)" type="text"/>
+</div>
+</div>
+</div>
+<!-- System Instruction Textarea -->
+<div class="mb-1">
+<div class="d-flex justify-content-between align-items-center mb-1">
+<label class="form-label small text-secondary fw-bold mb-0" data-i18n="ui.uai.txt_88991579" id="uai-label-88991579">Системная инструкция (System Instruction):</label>
+<div class="d-flex gap-1">
+<button class="btn btn-xs btn-outline-info py-0 px-2" data-i18n="ui.uai.txt_74ea58b6" data-i18n-title="titles.uai.title_0ba599cc" id="btn-uai-modal-save-system" title="Сохранить измененную инструкцию для этой сущности" type="button">
+<i class="bi bi-floppy me-1"></i>Сохранить
+                    </button>
+<button class="btn btn-xs btn-outline-secondary py-0 px-2" data-i18n="ui.uai.txt_1b421ddb" data-i18n-title="titles.uai.title_55967664" id="btn-uai-modal-reset-system" title="Сбросить к системной инструкции по умолчанию" type="button">
+<i class="bi bi-arrow-counterclockwise me-1"></i>Сброс
+                    </button>
+</div>
+</div>
+<textarea class="form-control form-control-sm font-monospace" data-i18n-placeholder="placeholders.uai.ph_d8f59208" id="uai-modal-system-instruction" placeholder="Роль эксперта, правила анализа и формат ответа для модели..." rows="3"></textarea>
+<div class="d-flex justify-content-between align-items-center mt-1">
+<span class="text-secondary small font-size-72" data-i18n="ui.uai.txt_327f3f39" id="uai-modal-system-status">Инструкция передается при вызове модели и анализе</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="modal-footer py-2 px-3 d-flex justify-content-between">
+<div class="d-flex gap-1.5 flex-wrap" id="uai-modal-custom-actions"></div>
+<button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="ui.uai.txt_dd9463bd" id="uai-button-dd9463bd" type="button">Закрыть</button>
+</div>
+</div>
+</div>
+</div>
+<!-- AI Prompt Editor Modal Dialog -->
+<div aria-hidden="true" class="modal fade" id="universal-ai-prompt-editor-modal" tabindex="-1">
+<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+<div class="modal-content shadow-lg">
+<div class="modal-header py-2 px-3">
+<div class="d-flex align-items-center gap-2">
+<span class="fs-5 text-warning">⚙️</span>
+<h5 class="modal-title fw-bold text-warning mb-0" data-i18n="ui.uai.txt_de57f90c" id="uai-h5-de57f90c">Редактор шаблона промпта</h5>
+</div>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body py-3 px-3">
+<div class="row g-2 mb-3">
+<div class="col-sm-6">
+<label class="form-label small text-secondary fw-bold mb-1" data-i18n="ui.uai.txt_136ef989" id="uai-label-136ef989">Тип таблицы / сущности</label>
+<select class="form-select form-select-sm" id="uai-prompt-type-select">
+<option data-i18n="ui.uai.txt_c0b2cc9d" id="uai-option-c0b2cc9d" value="user_account">user_account (Учетные записи и сессии Windows)</option>
+<option data-i18n="ui.uai.txt_19edf2e2" id="uai-option-19edf2e2" value="security_event">security_event (События безопасности Windows)</option>
+<option data-i18n="ui.uai.txt_5f52d102" id="uai-option-5f52d102" value="process">process (Процессы Windows)</option>
+<option data-i18n="ui.uai.txt_b0d09b68" id="uai-option-b0d09b68" value="service">service (Службы Windows)</option>
+<option data-i18n="ui.uai.txt_e15c720e" id="uai-option-e15c720e" value="software">software (Установленное ПО)</option>
+<option data-i18n="ui.uai.txt_30a5c091" id="uai-option-30a5c091" value="task">task (Задачи планировщика)</option>
+<option data-i18n="ui.uai.txt_c3381e18" id="uai-option-c3381e18" value="startup">startup (Автозагрузка)</option>
+<option data-i18n="ui.uai.txt_20e86a88" id="uai-option-20e86a88" value="network">network (Сетевые соединения)</option>
+<option data-i18n="ui.uai.txt_93f5f8e5" id="uai-option-93f5f8e5" value="registry">registry (Реестр Windows)</option>
+<option data-i18n="ui.uai.txt_bd12000a" id="uai-option-bd12000a" value="disk">disk (Диски и тома)</option>
+<option data-i18n="ui.uai.txt_642070e5" id="uai-option-642070e5" value="cpu">cpu (Процессор CPU)</option>
+<option data-i18n="ui.uai.txt_3c592f70" id="uai-option-3c592f70" value="gpu">gpu (Видеокарта GPU)</option>
+<option data-i18n="ui.uai.txt_5b9d2f66" id="uai-option-5b9d2f66" value="file_event">file_event (Файловые события)</option>
+<option data-i18n="ui.uai.txt_9e590ec2" id="uai-option-9e590ec2" value="website">website (Мониторинг сайтов)</option>
+<option data-i18n="ui.uai.txt_e3ba964e" id="uai-option-e3ba964e" value="rag_doc">rag_doc (RAG База знаний)</option>
+<option data-i18n="ui.uai.txt_f81f6a12" id="uai-option-f81f6a12" value="generic">generic (Общий шаблон)</option>
+</select>
+</div>
+<div class="col-sm-6">
+<label class="form-label small text-secondary fw-bold mb-1" data-i18n="ui.uai.txt_674d0134" id="uai-label-674d0134">Название шаблона</label>
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.uai.ph_674d0134" id="uai-prompt-name-input" placeholder="Название шаблона" type="text"/>
+</div>
+</div>
+<div class="mb-3">
+<div class="d-flex justify-content-between align-items-center mb-1">
+<label class="form-label small text-secondary fw-bold mb-0" data-i18n="ui.uai.txt_7242bdab" id="uai-label-7242bdab">Системная инструкция (System Instruction)</label>
+<span class="badge bg-secondary-subtle text-secondary small font-size-72" data-i18n="ui.uai.txt_5e0ec3d1" id="uai-span-5e0ec3d1">Роль и поведение ИИ</span>
+</div>
+<textarea class="form-control form-control-sm font-monospace" data-i18n-placeholder="placeholders.uai.ph_bc757134" id="uai-prompt-system-input" placeholder="Роль, экспертный контекст и правила поведения модели..." rows="4"></textarea>
+<div class="form-text small text-secondary font-size-75" data-i18n="ui.uai.txt_637641ad" id="uai-div-637641ad">
+            Системная инструкция задаёт контекст роли эксперта, ограничения и формат ответа ИИ для выбранного типа сущности.
+          </div>
+</div>
+<div class="mb-2">
+<div class="d-flex justify-content-between align-items-center mb-1">
+<label class="form-label small text-secondary fw-bold mb-0" data-i18n="ui.uai.txt_5bc7813f" id="uai-label-5bc7813f">Шаблон текста промпта (Prompt Template)</label>
+<div class="d-flex gap-1" id="uai-prompt-variables-bar">
+<button class="btn btn-xs btn-outline-info py-0 px-1 font-monospace font-size-75" data-i18n="ui.uai.txt_fbce292d" id="uai-button-fbce292d" onclick="window.AIModalDialog.insertVariable('{title}')" type="button">{title}</button>
+<button class="btn btn-xs btn-outline-info py-0 px-1 font-monospace font-size-75" data-i18n="ui.uai.txt_e3eaa977" id="uai-button-e3eaa977" onclick="window.AIModalDialog.insertVariable('{subtitle}')" type="button">{subtitle}</button>
+<button class="btn btn-xs btn-outline-info py-0 px-1 font-monospace font-size-75" data-i18n="ui.uai.txt_88211293" id="uai-button-88211293" onclick="window.AIModalDialog.insertVariable('{metadata}')" type="button">{metadata}</button>
+<button class="btn btn-xs btn-outline-info py-0 px-1 font-monospace font-size-75" data-i18n="ui.uai.txt_b424fd08" id="uai-button-b424fd08" onclick="window.AIModalDialog.insertVariable('{raw_data}')" type="button">{raw_data}</button>
+</div>
+</div>
+<textarea class="form-control form-control-sm font-monospace" data-i18n-placeholder="placeholders.uai.ph_dded5389" id="uai-prompt-template-input" placeholder="Текст промпта с плейсхолдерами..." rows="8"></textarea>
+<div class="form-text small text-secondary font-size-75" data-i18n="ui.uai.txt_53f4f0ae" id="uai-div-53f4f0ae">
+            Используйте переменные <code>{title}</code>, <code>{subtitle}</code>, <code>{metadata}</code>, <code>{raw_data}</code> для автоматической подстановки контекста строки таблицы.
+          </div>
+</div>
+<div class="small mt-2 d-none" id="uai-prompt-status-msg"></div>
+</div>
+<div class="modal-footer py-2 px-3 d-flex justify-content-between">
+<button class="btn btn-sm btn-outline-danger" data-i18n="ui.uai.txt_b7d58390" id="btn-uai-prompt-reset" type="button">
+<i class="bi bi-arrow-counterclockwise me-1"></i>Сбросить по умолчанию
+        </button>
+<div class="d-flex gap-2">
+<button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="ui.uai.txt_dd9463bd" id="uai-button-dd9463bd-1" type="button">Закрыть</button>
+<button class="btn btn-sm btn-primary" data-i18n="ui.uai.txt_45346fe2" id="btn-uai-prompt-save" type="button">
+<i class="bi bi-check2 me-1"></i>Сохранить промпт
+          </button>
+</div>
+</div>
+</div>
+</div>
+</div>

@@ -1,0 +1,145 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Google Drive Tab
+=============================================================================
+Description:
+  Интерфейс управления Google Диском: просмотр файлов и папок, поиск,
+  фильтрация по типам документов, загрузка локальных файлов, скачивание и удаление.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_drive
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-28 19:00:00
+=============================================================================
+-->
+<div class="container-fluid p-3" id="tab-drive-container">
+  <!-- Верхняя строка заголовка и действий -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+        <span class="fs-4">📁</span>
+        <span data-i18n="ui.drive.title" id="drive-span-title">Google Диск</span>
+      </h4>
+      <div class="small text-muted" data-i18n="ui.drive.subtitle" id="drive-div-subtitle">
+        Хранилище документов, таблиц, файлов и папок Google Drive
+      </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 shadow-sm d-flex align-items-center gap-1.5" id="drive-account-badge">
+        <i class="bi bi-google"></i>
+        <span data-i18n="ui.drive.connected" id="drive-account-email">Google Drive</span>
+      </span>
+      <button class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 shadow-sm fw-semibold" id="btn-drive-upload" type="button">
+        <i class="bi bi-cloud-upload"></i>
+        <span data-i18n="ui.drive.btn_upload" id="drive-span-upload">Загрузить файл</span>
+      </button>
+      <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1.5 shadow-sm" id="btn-drive-refresh" title="Обновить список файлов" type="button">
+        <i class="bi bi-arrow-clockwise"></i>
+        <span class="d-none d-sm-inline" data-i18n="ui.drive.btn_refresh" id="drive-span-refresh">Обновить</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Поисковая панель и фильтры по типам -->
+  <div class="card shadow-sm border mb-3">
+    <div class="card-body py-2 px-3">
+      <div class="row g-2 align-items-center">
+        <div class="col-12 col-md-5">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-body-tertiary border-end-0">
+              <i class="bi bi-search text-muted"></i>
+            </span>
+            <input class="form-control border-start-0" id="drive-search-input" placeholder="Поиск по имени файла..." type="text"/>
+            <button class="btn btn-outline-secondary" id="btn-drive-search-clear" title="Сбросить" type="button">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-md-7 d-flex flex-wrap justify-content-md-end gap-1" id="drive-type-filters">
+          <button class="btn btn-sm btn-primary filter-type-btn active" data-mime="">Все</button>
+          <button class="btn btn-sm btn-outline-secondary filter-type-btn" data-mime="application/vnd.google-apps.folder">📁 Папки</button>
+          <button class="btn btn-sm btn-outline-secondary filter-type-btn" data-mime="application/vnd.google-apps.spreadsheet">📊 Таблицы</button>
+          <button class="btn btn-sm btn-outline-secondary filter-type-btn" data-mime="application/vnd.google-apps.document">📄 Документы</button>
+          <button class="btn btn-sm btn-outline-secondary filter-type-btn" data-mime="application/pdf">📑 PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Хлебные крошки для навигации по папкам -->
+  <nav aria-label="breadcrumb" class="mb-2 d-none" id="drive-breadcrumbs-nav">
+    <ol class="breadcrumb mb-0 small" id="drive-breadcrumbs-list">
+      <li class="breadcrumb-item active" id="drive-bc-root"><a href="#" class="text-decoration-none" id="drive-bc-root-link">📁 Google Диск</a></li>
+    </ol>
+  </nav>
+
+  <!-- Таблица файлов -->
+  <div class="card shadow-sm border">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light small text-muted">
+            <tr>
+              <th style="width: 40px;" class="text-center">#</th>
+              <th>Имя файла</th>
+              <th style="width: 140px;">Размер</th>
+              <th style="width: 180px;">Изменен</th>
+              <th style="width: 140px;" class="text-end pe-3">Действия</th>
+            </tr>
+          </thead>
+          <tbody id="drive-files-tbody">
+            <tr>
+              <td colspan="5" class="text-center py-5">
+                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                <span class="ms-2 small text-muted">Загрузка файлов Google Drive...</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="text-center py-5 d-none" id="drive-empty-state">
+        <i class="bi bi-folder2-open fs-1 text-muted d-block mb-2"></i>
+        <h6 class="text-muted" data-i18n="ui.drive.no_files" id="drive-h6-no-files">Файлы не найдены</h6>
+        <p class="small text-muted mb-0" data-i18n="ui.drive.upload_hint" id="drive-p-upload-hint">Вы можете загрузить новый документ с помощью кнопки вверху.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно загрузки файла -->
+<div class="modal fade" id="modal-drive-upload" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+          <i class="bi bi-cloud-arrow-up text-primary"></i>
+          <span data-i18n="ui.drive.modal_upload_title" id="drive-span-modal-upload-title">Загрузка файла на Google Drive</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-drive-upload">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" data-i18n="ui.drive.select_file" id="drive-label-select-file">Выберите файл *</label>
+            <input type="file" class="form-control form-control-sm" id="drive-upload-file-input" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold" data-i18n="ui.drive.parent_folder" id="drive-label-parent-folder">ID папки на Диске (необязательно)</label>
+            <input type="text" class="form-control form-control-sm" id="drive-upload-folder-id" placeholder="Оставьте пустым для корня Диска">
+          </div>
+          <div class="alert alert-danger d-none py-1 small mb-0 mt-2" id="drive-upload-error"></div>
+          <div class="progress d-none mt-2" id="drive-upload-progress" style="height: 6px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-top">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" data-i18n="ui.drive.btn_cancel" id="drive-btn-modal-cancel">Отмена</button>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-drive-start-upload">
+          <i class="bi bi-upload me-1"></i> <span data-i18n="ui.drive.btn_start_upload" id="drive-span-start-upload">Загрузить</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

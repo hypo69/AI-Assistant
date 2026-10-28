@@ -1,0 +1,150 @@
+<!--
+=============================================================================
+Process Name: AI Assistant Web Interface - Plugins Tab View
+=============================================================================
+Description:
+  Веб-интерфейс вкладки управления модульными плагинами (Plugins Hub & Marketplace).
+  Обеспечивает визуализацию каталога плагинов, маркетплейс стандартных расширений
+  в стиле VS Code, установку в один клик, переключение их активности,
+  вызов объявленных действий (Actions) и модальное редактирование параметров.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_plugins
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="container-fluid py-3">
+<!-- Заголовок вкладки -->
+<div class="tab-header d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div class="d-flex align-items-center gap-2">
+<span class="tab-header-icon fs-3">🧩</span>
+<div>
+<div class="d-flex align-items-center gap-2 flex-wrap">
+<h3 class="tab-header-title panel-header mb-0" data-i18n="ui.plg.txt_a957f0d3" id="plg-h3-a957f0d3">Плагины и Маркетплейс расширений</h3>
+<span class="badge bg-primary-subtle text-primary border" data-i18n="ui.plg.txt_8bb87ef5" id="plugins-total-count-badge">0 плагинов</span>
+</div>
+<small class="tab-header-subtitle text-secondary" data-i18n="ui.plg.txt_954073dc" id="plg-small-954073dc">Управление установленными модулями и каталог стандартных IDE плагинов в стиле Visual Studio Code</small>
+</div>
+</div>
+<div class="d-flex align-items-center gap-2 flex-wrap">
+<button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1.5 shadow-sm" data-i18n-title="titles.plg.title_d06719a3" id="btn-reload-plugins" title="Пересканировать каталог plugins/ и обновить статус">
+<i class="bi bi-arrow-clockwise"></i>
+<span data-i18n="ui.plg.txt_62f5367b" id="plg-span-62f5367b">Перезагрузить реестр</span>
+</button>
+</div>
+</div>
+<!-- Верхние вкладки: Установленные vs Маркетплейс расширений -->
+<ul class="nav nav-tabs mb-3" id="pluginsTabNav" role="tablist">
+<li class="nav-item" role="presentation">
+<button class="nav-link active fw-semibold d-flex align-items-center gap-1.5" data-bs-target="#tab-pane-installed" data-bs-toggle="tab" id="nav-installed-tab" role="tab" type="button">
+<i class="bi bi-check2-circle text-success"></i>
+<span data-i18n="ui.plg.txt_cc2f1a66" id="plg-span-cc2f1a66">Установленные плагины</span>
+</button>
+</li>
+<li class="nav-item" role="presentation">
+<button class="nav-link fw-semibold d-flex align-items-center gap-1.5" data-bs-target="#tab-pane-marketplace" data-bs-toggle="tab" id="nav-marketplace-tab" role="tab" type="button">
+<i class="bi bi-shop text-primary"></i>
+<span data-i18n="ui.plg.txt_c2db0209" id="plg-span-c2db0209">Маркетплейс стандартных плагинов</span>
+<span class="badge bg-primary text-white rounded-pill px-2 py-0.5 font-size-75" id="marketplace-available-badge">10</span>
+</button>
+</li>
+</ul>
+<div class="tab-content" id="pluginsTabContent">
+<!-- ПАНЕЛЬ 1: Установленные плагины -->
+<div class="tab-pane fade show active" id="tab-pane-installed" role="tabpanel">
+<!-- Панель фильтров и поиска -->
+<div class="card shadow-sm border mb-3">
+<div class="card-body p-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+<!-- Фильтр по скоупам -->
+<div class="btn-group btn-group-sm" id="plugins-scope-filter-group" role="group">
+<button class="btn btn-primary active" data-filter-scope="all" data-i18n="ui.plg.txt_fc505dae" id="plg-button-fc505dae" type="button">Все плагины</button>
+<button class="btn btn-outline-secondary" data-filter-scope="system" data-i18n="ui.plg.txt_13155df4" id="plg-button-13155df4" type="button">
+<i class="bi bi-gear-fill me-1"></i>Системные
+            </button>
+<button class="btn btn-outline-secondary" data-filter-scope="developer" data-i18n="ui.plg.txt_da097394" id="plg-button-da097394" type="button">
+<i class="bi bi-code-slash me-1"></i>Для разработчиков
+            </button>
+<button class="btn btn-outline-secondary" data-filter-scope="user" data-i18n="ui.plg.txt_0f2f3df5" id="plg-button-0f2f3df5" type="button">
+<i class="bi bi-person-fill me-1"></i>Пользовательские
+            </button>
+</div>
+<!-- Поиск по названию или описанию -->
+<div class="d-flex align-items-center gap-2" style="min-width: 260px; max-width: 400px; flex-grow: 1;">
+<div class="input-group input-group-sm">
+<span class="input-group-text bg-body-tertiary border-end-0">
+<i class="bi bi-search text-secondary"></i>
+</span>
+<input class="form-control border-start-0 ps-0" data-i18n-placeholder="placeholders.plg.ph_1dc959f6" id="plugins-search-input" placeholder="Поиск по установленным плагинам..." type="text"/>
+<button class="btn btn-outline-secondary d-none" id="btn-clear-plugin-search" type="button">
+<i class="bi bi-x-circle"></i>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Сетка карточек плагинов -->
+<div class="row g-3" id="plugins-cards-grid">
+<div class="col-12 text-center py-5 text-secondary">
+<div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+<div class="small" data-i18n="ui.plg.txt_c21691d4" id="plg-div-c21691d4">Загрузка каталога плагинов...</div>
+</div>
+</div>
+</div>
+<!-- ПАНЕЛЬ 2: Маркетплейс стандартных плагинов (VS Code Extensions Marketplace) -->
+<div class="tab-pane fade" id="tab-pane-marketplace" role="tabpanel">
+<div class="card shadow-sm border mb-3">
+<div class="card-body p-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+<div class="d-flex align-items-center gap-2">
+<span class="badge bg-primary-subtle text-primary border px-2 py-1" data-i18n="ui.plg.txt_f1d276b0" id="plg-span-f1d276b0">
+<i class="bi bi-star-fill text-warning me-1"></i>Рекомендуемые расширения IDE
+            </span>
+<small class="text-secondary" data-i18n="ui.plg.txt_53ec8fe6" id="plg-small-53ec8fe6">Установка стандартных плагинов Visual Studio Code в один клик</small>
+</div>
+<div class="d-flex align-items-center gap-2" style="min-width: 260px; max-width: 400px; flex-grow: 1;">
+<div class="input-group input-group-sm">
+<span class="input-group-text bg-body-tertiary border-end-0">
+<i class="bi bi-search text-secondary"></i>
+</span>
+<input class="form-control border-start-0 ps-0" data-i18n-placeholder="placeholders.plg.ph_b0265d96" id="marketplace-search-input" placeholder="Поиск в маркетплейсе..." type="text"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Сетка карточек маркетплейса -->
+<div class="row g-3" id="marketplace-cards-grid">
+<div class="col-12 text-center py-5 text-secondary">
+<div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+<div class="small" data-i18n="ui.plg.txt_fea358e4" id="plg-div-fea358e4">Загрузка маркетплейса плагинов...</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно конфигурации плагина -->
+<div aria-hidden="true" aria-labelledby="modalPluginConfigTitle" class="modal fade" id="modal-plugin-config" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered modal-lg">
+<div class="modal-content shadow border">
+<div class="modal-header py-2 border-bottom">
+<h6 class="modal-title fw-bold d-flex align-items-center gap-2" id="modalPluginConfigTitle">
+<span id="modal-config-plugin-icon">⚙️</span>
+<span data-i18n="ui.plg.txt_2b8cb57e" id="plg-span-2b8cb57e">Настройки плагина: <span class="text-primary font-monospace" id="modal-config-plugin-name"></span></span>
+</h6>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3">
+<div class="d-flex flex-column gap-3" id="modal-config-fields-container">
+<!-- Динамические поля формы -->
+</div>
+</div>
+<div class="modal-footer py-2 border-top">
+<button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="ui.plg.txt_987b33c6" id="plg-button-987b33c6" type="button">Отмена</button>
+<button class="btn btn-sm btn-primary d-flex align-items-center gap-1.5" id="btn-save-plugin-config" type="button">
+<i class="bi bi-check-circle"></i>
+<span data-i18n="ui.plg.txt_f2e3f707" id="plg-span-f2e3f707">Сохранить настройки</span>
+</button>
+</div>
+</div>
+</div>
+</div>

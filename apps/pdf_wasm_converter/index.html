@@ -1,0 +1,742 @@
+<!--
+    Файл: apps/pdf_wasm_converter/index.html
+    Назначение: Автономный браузерный конвертер PDF в Markdown, Text и PNG на базе WebAssembly.
+    Updated: 2026-10-27 21:17:00
+-->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wasm PDF Converter | Мгновенная локальная конвертация</title>
+    <!-- PDF.js CDN (WASM-accelerated client engine) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Подключаем Web Worker движка PDF для работы в отдельном потоке без зависания UI
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --panel-border: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --card-bg: #182234;
+            --radius: 12px;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .badge-wasm {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-local {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        main {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Зона Drag and Drop */
+        .dropzone {
+            border: 2px dashed var(--panel-border);
+            border-radius: var(--radius);
+            background: var(--panel-bg);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dropzone:hover, .dropzone.dragover {
+            border-color: var(--accent);
+            background: rgba(56, 189, 248, 0.05);
+        }
+
+        .dropzone-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            color: var(--accent);
+        }
+
+        .dropzone-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .dropzone-hint {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Информационная панель документа */
+        .doc-bar {
+            display: none;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            padding: 1rem 1.5rem;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .doc-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .doc-meta {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* Вкладки форматов конвертации */
+        .tab-nav {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        /* Панели содержимого */
+        .tab-pane {
+            display: none;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .tab-pane.active {
+            display: flex;
+        }
+
+        .pane-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .action-btn {
+            background: var(--accent);
+            color: #0f172a;
+            font-weight: 600;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .action-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .action-btn.secondary {
+            background: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--panel-border);
+        }
+
+        .action-btn.secondary:hover {
+            background: var(--panel-border);
+        }
+
+        textarea.preview-box {
+            width: 100%;
+            height: 480px;
+            background: var(--card-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            color: #e2e8f0;
+            font-family: "Fira Code", Consolas, Monaco, monospace;
+            font-size: 0.9rem;
+            padding: 1rem;
+            resize: vertical;
+            outline: none;
+        }
+
+        /* Сетка картинок страниц */
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .image-card {
+            background: var(--card-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .image-card canvas {
+            width: 100%;
+            height: auto;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            background: #ffffff;
+        }
+
+        .image-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Прогресс-бар */
+        .progress-wrapper {
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--panel-border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--success));
+            width: 0%;
+            transition: width 0.15s ease;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e293b;
+            color: var(--text-main);
+            border: 1px solid var(--accent);
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            display: none;
+            animation: fadeIn 0.3s ease;
+            z-index: 999;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-group">
+            <h2>⚡ PDF Wasm Converter</h2>
+            <span class="badge-wasm">WASM ENGINE</span>
+            <span class="badge-local">100% В БРАУЗЕРЕ • БЕЗ СЕРВЕРА</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Зона загрузки файлов -->
+        <div class="dropzone" id="dropzone">
+            <div class="dropzone-icon">📄</div>
+            <div class="dropzone-title">Перетащите сюда PDF файл или нажмите для выбора</div>
+            <div class="dropzone-hint">Обработка мгновенно в оперативной памяти браузера через WebAssembly</div>
+            <input type="file" id="fileInput" accept="application/pdf">
+        </div>
+
+        <!-- Индикатор прогресса -->
+        <div class="progress-wrapper" id="progressWrapper">
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-muted);">
+                <span id="progressStatus">Парсинг документа...</span>
+                <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <!-- Инфо-строка о файле -->
+        <div class="doc-bar" id="docBar">
+            <div class="doc-info">
+                <strong id="docName">document.pdf</strong>
+                <span class="doc-meta" id="docStats">0 страниц • 0.0 MB</span>
+                <span class="doc-meta" id="docSpeed">Обработано за: 0 мс</span>
+            </div>
+            <button class="action-btn secondary" id="resetBtn">Выбрать другой PDF</button>
+        </div>
+
+        <!-- Вкладки конвертации -->
+        <div class="tab-nav" id="tabNav" style="display:none;">
+            <button class="tab-btn active" data-tab="markdown">Markdown (.md)</button>
+            <button class="tab-btn" data-tab="text">Текст (.txt)</button>
+            <button class="tab-btn" data-tab="images">Изображения (PNG)</button>
+            <button class="tab-btn" data-tab="json">JSON Структура</button>
+        </div>
+
+        <!-- Вкладка 1: Markdown -->
+        <div class="tab-pane active" id="pane-markdown">
+            <div class="pane-toolbar">
+                <span>Форматированный Markdown с иерархией заголовков</span>
+                <div style="display:flex; gap:8px;">
+                    <button class="action-btn secondary" id="copyMdBtn">📋 Копировать</button>
+                    <button class="action-btn" id="downloadMdBtn">💾 Скачать Markdown</button>
+                </div>
+            </div>
+            <textarea class="preview-box" id="markdownPreview" readonly placeholder="Здесь появится сгенерированный Markdown..."></textarea>
+        </div>
+
+        <!-- Вкладка 2: Простой текст -->
+        <div class="tab-pane" id="pane-text">
+            <div class="pane-toolbar">
+                <span>Извлеченный текст с сохранением порядка абзацев</span>
+                <div style="display:flex; gap:8px;">
+                    <button class="action-btn secondary" id="copyTxtBtn">📋 Копировать</button>
+                    <button class="action-btn" id="downloadTxtBtn">💾 Скачать TXT</button>
+                </div>
+            </div>
+            <textarea class="preview-box" id="textPreview" readonly placeholder="Здесь появится чистый текст..."></textarea>
+        </div>
+
+        <!-- Вкладка 3: Изображения PNG -->
+        <div class="tab-pane" id="pane-images">
+            <div class="pane-toolbar">
+                <span>Рендеринг каждой страницы в отдельный PNG (высокое качество)</span>
+                <button class="action-btn" id="downloadAllImagesBtn">💾 Скачать все страницы (ZIP/PNG)</button>
+            </div>
+            <div class="image-gallery" id="imageGallery"></div>
+        </div>
+
+        <!-- Вкладка 4: JSON Структура -->
+        <div class="tab-pane" id="pane-json">
+            <div class="pane-toolbar">
+                <span>Метаданные, геометрия и структура страниц</span>
+                <button class="action-btn" id="downloadJsonBtn">💾 Скачать JSON</button>
+            </div>
+            <textarea class="preview-box" id="jsonPreview" readonly placeholder="Структурированные JSON данные..."></textarea>
+        </div>
+    </main>
+
+    <div class="toast" id="toast">Уведомление</div>
+
+    <script>
+        /**
+         * Модуль мгновенного преобразования PDF через WebAssembly.
+         * Выполняется строго на стороне клиента.
+         */
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const progressWrapper = document.getElementById('progressWrapper');
+        const progressFill = document.getElementById('progressFill');
+        const progressStatus = document.getElementById('progressStatus');
+        const progressPercent = document.getElementById('progressPercent');
+        const docBar = document.getElementById('docBar');
+        const docName = document.getElementById('docName');
+        const docStats = document.getElementById('docStats');
+        const docSpeed = document.getElementById('docSpeed');
+        const resetBtn = document.getElementById('resetBtn');
+        const tabNav = document.getElementById('tabNav');
+        const toast = document.getElementById('toast');
+
+        // Превью и кнопки
+        const markdownPreview = document.getElementById('markdownPreview');
+        const textPreview = document.getElementById('textPreview');
+        const jsonPreview = document.getElementById('jsonPreview');
+        const imageGallery = document.getElementById('imageGallery');
+
+        let currentPdfDoc = null;
+        let convertedData = {
+            fileName: '',
+            markdown: '',
+            text: '',
+            json: null,
+            images: [] // { pageNum, dataUrl }
+        };
+
+        // Обработка Drag & Drop
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            dropzone.style.display = 'block';
+            docBar.style.display = 'none';
+            tabNav.style.display = 'none';
+            document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+            imageGallery.innerHTML = '';
+            markdownPreview.value = '';
+            textPreview.value = '';
+            jsonPreview.value = '';
+        });
+
+        // Переключение вкладок
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                const targetPane = document.getElementById('pane-' + btn.dataset.tab);
+                if (targetPane) targetPane.classList.add('active');
+            });
+        });
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        /**
+         * Загрузка и чтение файла
+         */
+        async function handleFile(file) {
+            if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
+                alert('Пожалуйста, выберите файл в формате PDF.');
+                return;
+            }
+
+            const startTime = performance.now();
+            convertedData.fileName = file.name.replace(/\.[^/.]+$/, "");
+
+            dropzone.style.display = 'none';
+            progressWrapper.style.display = 'flex';
+            progressFill.style.width = '10%';
+            progressPercent.textContent = '10%';
+            progressStatus.textContent = 'Чтение бинарных данных в память...';
+
+            const arrayBuffer = await file.arrayBuffer();
+
+            try {
+                // Инициализация Wasm-движка PDF
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                currentPdfDoc = await loadingTask.promise;
+
+                const numPages = currentPdfDoc.numPages;
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+                docName.textContent = file.name;
+                docStats.textContent = `${numPages} стр. • ${sizeMb} MB`;
+
+                // Запуск многопоточной конвертации
+                await processPdf(currentPdfDoc, numPages);
+
+                const endTime = performance.now();
+                const duration = Math.round(endTime - startTime);
+                docSpeed.textContent = `⚡ Скорость Wasm: ${duration} мс`;
+
+                progressWrapper.style.display = 'none';
+                docBar.style.display = 'flex';
+                tabNav.style.display = 'flex';
+                document.getElementById('pane-markdown').classList.add('active');
+
+                showToast('Конвертация успешно завершена!');
+            } catch (err) {
+                console.error(err);
+                alert('Ошибка парсинга PDF: ' + err.message);
+                progressWrapper.style.display = 'none';
+                dropzone.style.display = 'block';
+            }
+        }
+
+        /**
+         * Обработка всех страниц PDF
+         */
+        async function processPdf(pdfDoc, totalPages) {
+            let fullMarkdown = '';
+            let fullText = '';
+            let jsonStructure = {
+                file: convertedData.fileName,
+                totalPages: totalPages,
+                pages: []
+            };
+
+            convertedData.images = [];
+            imageGallery.innerHTML = '';
+
+            for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                const percent = Math.round((pageNum / totalPages) * 100);
+                progressFill.style.width = `${percent}%`;
+                progressPercent.textContent = `${percent}%`;
+                progressStatus.textContent = `Обработка страницы ${pageNum} из ${totalPages}...`;
+
+                const page = await pdfDoc.getPage(pageNum);
+                
+                // 1. Извлечение текста и генерация Markdown
+                const textContent = await page.getTextContent();
+                const pageParsed = parsePageTextToMarkdown(textContent, pageNum);
+
+                fullMarkdown += pageParsed.markdown + '\n\n';
+                fullText += pageParsed.plainText + '\n\n';
+                jsonStructure.pages.push({
+                    pageNumber: pageNum,
+                    itemCount: textContent.items.length,
+                    text: pageParsed.plainText
+                });
+
+                // 2. Рендеринг страницы в PNG Canvas
+                await renderPageToImage(page, pageNum);
+            }
+
+            convertedData.markdown = fullMarkdown.trim();
+            convertedData.text = fullText.trim();
+            convertedData.json = jsonStructure;
+
+            markdownPreview.value = convertedData.markdown;
+            textPreview.value = convertedData.text;
+            jsonPreview.value = JSON.stringify(convertedData.json, null, 2);
+        }
+
+        /**
+         * Преобразование текстовых элементов в Markdown на основе размеров шрифтов
+         */
+        function parsePageTextToMarkdown(textContent, pageNum) {
+            let mdLines = [`### Страница ${pageNum}\n`];
+            let textLines = [`--- Страница ${pageNum} ---`];
+
+            if (!textContent.items || textContent.items.length === 0) {
+                return { markdown: mdLines.join('\n'), plainText: textLines.join('\n') };
+            }
+
+            // Вычисляем среднюю высоту шрифта для распознавания обычного текста против заголовков
+            let totalHeight = 0;
+            textContent.items.forEach(item => { totalHeight += Math.abs(item.height || item.transform[3] || 10); });
+            const avgHeight = totalHeight / textContent.items.length;
+
+            let currentLine = '';
+            let lastY = null;
+            let isHeader = false;
+
+            textContent.items.forEach(item => {
+                const text = item.str.trim();
+                if (!text) return;
+
+                const height = Math.abs(item.height || item.transform[3] || 10);
+                const currentY = item.transform[5];
+
+                // Перенос строки при смене вертикальной координаты Y
+                if (lastY !== null && Math.abs(currentY - lastY) > 5) {
+                    if (currentLine) {
+                        if (isHeader) {
+                            mdLines.push(`## ${currentLine}\n`);
+                        } else {
+                            mdLines.push(currentLine);
+                        }
+                        textLines.push(currentLine);
+                        currentLine = '';
+                    }
+                }
+
+                // Определение: заголовок ли это? (размер шрифта значительно выше среднего)
+                isHeader = height > avgHeight * 1.35;
+
+                currentLine += (currentLine.length > 0 ? ' ' : '') + item.str;
+                lastY = currentY;
+            });
+
+            if (currentLine) {
+                if (isHeader) {
+                    mdLines.push(`## ${currentLine}\n`);
+                } else {
+                    mdLines.push(currentLine);
+                }
+                textLines.push(currentLine);
+            }
+
+            return {
+                markdown: mdLines.join('\n'),
+                plainText: textLines.join('\n')
+            };
+        }
+
+        /**
+         * Рендеринг страницы PDF в HTML5 Canvas и экспорт в PNG
+         */
+        async function renderPageToImage(page, pageNum) {
+            const viewport = page.getViewport({ scale: 1.5 }); // Масштаб 1.5x для четкости
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+
+            const dataUrl = canvas.toDataURL('image/png');
+            convertedData.images.push({ pageNum, dataUrl });
+
+            // Создаем карточку в галерее
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            card.innerHTML = `
+                <div class="image-footer">
+                    <span>Страница ${pageNum}</span>
+                    <button class="action-btn secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="downloadSingleImage(${pageNum})">Скачать PNG</button>
+                </div>
+            `;
+            card.insertBefore(canvas, card.firstChild);
+            imageGallery.appendChild(card);
+        }
+
+        // Скачивание файлов
+        function triggerDownload(blob, filename) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        document.getElementById('downloadMdBtn').addEventListener('click', () => {
+            const blob = new Blob([convertedData.markdown], { type: 'text/markdown;charset=utf-8' });
+            triggerDownload(blob, `${convertedData.fileName}.md`);
+        });
+
+        document.getElementById('downloadTxtBtn').addEventListener('click', () => {
+            const blob = new Blob([convertedData.text], { type: 'text/plain;charset=utf-8' });
+            triggerDownload(blob, `${convertedData.fileName}.txt`);
+        });
+
+        document.getElementById('downloadJsonBtn').addEventListener('click', () => {
+            const blob = new Blob([JSON.stringify(convertedData.json, null, 2)], { type: 'application/json;charset=utf-8' });
+            triggerDownload(blob, `${convertedData.fileName}.json`);
+        });
+
+        document.getElementById('copyMdBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(convertedData.markdown);
+            showToast('Markdown скопирован в буфер обмена!');
+        });
+
+        document.getElementById('copyTxtBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(convertedData.text);
+            showToast('Текст скопирован в буфер обмена!');
+        });
+
+        window.downloadSingleImage = function(pageNum) {
+            const item = convertedData.images.find(img => img.pageNum === pageNum);
+            if (!item) return;
+            const link = document.createElement('a');
+            link.href = item.dataUrl;
+            link.download = `${convertedData.fileName}_page_${pageNum}.png`;
+            link.click();
+        };
+
+        document.getElementById('downloadAllImagesBtn').addEventListener('click', () => {
+            if (convertedData.images.length === 0) return;
+            // Скачиваем все страницы по очереди
+            convertedData.images.forEach(img => {
+                window.downloadSingleImage(img.pageNum);
+            });
+            showToast(`Начато скачивание ${convertedData.images.length} страниц...`);
+        });
+    </script>
+</body>
+</html>

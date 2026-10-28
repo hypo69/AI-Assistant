@@ -1,0 +1,260 @@
+[
+  {
+    "type": "index",
+    "name": "idx_hw_comp_cat_updated",
+    "tbl": "hardware_components",
+    "sql": "CREATE INDEX idx_hw_comp_cat_updated ON hardware_components(category, updated_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_hw_comp_status",
+    "tbl": "hardware_components",
+    "sql": "CREATE INDEX idx_hw_comp_status ON hardware_components(category, status)"
+  },
+  {
+    "type": "index",
+    "name": "idx_hw_hist_created",
+    "tbl": "hardware_component_history",
+    "sql": "CREATE INDEX idx_hw_hist_created ON hardware_component_history(created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_hw_hist_type",
+    "tbl": "hardware_component_history",
+    "sql": "CREATE INDEX idx_hw_hist_type ON hardware_component_history(component_type, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_incidents_channel",
+    "tbl": "incidents",
+    "sql": "CREATE INDEX idx_incidents_channel ON incidents(channel, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_incidents_created",
+    "tbl": "incidents",
+    "sql": "CREATE INDEX idx_incidents_created ON incidents(created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_incidents_domain",
+    "tbl": "incidents",
+    "sql": "CREATE INDEX idx_incidents_domain ON incidents(domain, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_incidents_trigger",
+    "tbl": "incidents",
+    "sql": "CREATE INDEX idx_incidents_trigger ON incidents(trigger_type, severity)"
+  },
+  {
+    "type": "index",
+    "name": "idx_inv_changes_domain_time",
+    "tbl": "inventory_changes",
+    "sql": "CREATE INDEX idx_inv_changes_domain_time ON inventory_changes(domain, detected_at)"
+  },
+  {
+    "type": "index",
+    "name": "idx_pfe_dir_time",
+    "tbl": "process_file_events",
+    "sql": "CREATE INDEX idx_pfe_dir_time ON process_file_events(target_directory, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_pfe_pid_time",
+    "tbl": "process_file_events",
+    "sql": "CREATE INDEX idx_pfe_pid_time ON process_file_events(pid, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_pls_alive",
+    "tbl": "process_lifecycle_sessions",
+    "sql": "CREATE INDEX idx_pls_alive ON process_lifecycle_sessions(is_alive, created_ts DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_pls_name_ts",
+    "tbl": "process_lifecycle_sessions",
+    "sql": "CREATE INDEX idx_pls_name_ts ON process_lifecycle_sessions(name, created_ts DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_pls_parent_ts",
+    "tbl": "process_lifecycle_sessions",
+    "sql": "CREATE INDEX idx_pls_parent_ts ON process_lifecycle_sessions(parent_name, created_ts DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_pls_pid_ts",
+    "tbl": "process_lifecycle_sessions",
+    "sql": "CREATE INDEX idx_pls_pid_ts ON process_lifecycle_sessions(pid, created_ts DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_pls_user_ts",
+    "tbl": "process_lifecycle_sessions",
+    "sql": "CREATE INDEX idx_pls_user_ts ON process_lifecycle_sessions(username, created_ts DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_proc_name_ts",
+    "tbl": "process_snapshots",
+    "sql": "CREATE INDEX idx_proc_name_ts ON process_snapshots(name, timestamp DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_proc_pid_ts",
+    "tbl": "process_snapshots",
+    "sql": "CREATE INDEX idx_proc_pid_ts ON process_snapshots(pid, timestamp DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_proc_snap_id",
+    "tbl": "process_snapshots",
+    "sql": "CREATE INDEX idx_proc_snap_id ON process_snapshots(snapshot_id)"
+  },
+  {
+    "type": "index",
+    "name": "idx_proc_type_created",
+    "tbl": "process_snapshots",
+    "sql": "CREATE INDEX idx_proc_type_created ON process_snapshots(sample_type, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_psess_boot_ts",
+    "tbl": "power_sessions",
+    "sql": "CREATE INDEX idx_psess_boot_ts ON power_sessions(boot_timestamp DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_psess_shutdown_type",
+    "tbl": "power_sessions",
+    "sql": "CREATE INDEX idx_psess_shutdown_type ON power_sessions(shutdown_type)"
+  },
+  {
+    "type": "index",
+    "name": "idx_psess_type",
+    "tbl": "power_sessions",
+    "sql": "CREATE INDEX idx_psess_type ON power_sessions(record_type, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_rollups_session",
+    "tbl": "telemetry_rollups",
+    "sql": "CREATE INDEX idx_rollups_session ON telemetry_rollups(session_id) WHERE session_id IS NOT NULL"
+  },
+  {
+    "type": "index",
+    "name": "idx_rollups_tier_bucket",
+    "tbl": "telemetry_rollups",
+    "sql": "CREATE INDEX idx_rollups_tier_bucket ON telemetry_rollups(tier, bucket_start DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_rollups_tier_epoch",
+    "tbl": "telemetry_rollups",
+    "sql": "CREATE INDEX idx_rollups_tier_epoch ON telemetry_rollups(tier, period_start_epoch DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_sensors_category",
+    "tbl": "sensor_polls",
+    "sql": "CREATE INDEX idx_sensors_category ON sensor_polls(sensor_category, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_sensors_hw_type",
+    "tbl": "sensor_polls",
+    "sql": "CREATE INDEX idx_sensors_hw_type ON sensor_polls(hardware_type, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_sensors_id_created",
+    "tbl": "sensor_polls",
+    "sql": "CREATE INDEX idx_sensors_id_created ON sensor_polls(sensor_id, created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_snapshots_created",
+    "tbl": "system_snapshots",
+    "sql": "CREATE INDEX idx_snapshots_created ON system_snapshots(created_at DESC)"
+  },
+  {
+    "type": "index",
+    "name": "idx_snapshots_ts",
+    "tbl": "system_snapshots",
+    "sql": "CREATE INDEX idx_snapshots_ts ON system_snapshots(timestamp DESC)"
+  },
+  {
+    "type": "table",
+    "name": "hardware_component_history",
+    "tbl": "hardware_component_history",
+    "sql": "CREATE TABLE hardware_component_history (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        timestamp TEXT NOT NULL,\n        created_at REAL NOT NULL,\n        component_type TEXT NOT NULL,\n        change_type TEXT NOT NULL,\n        component_name TEXT NOT NULL,\n        old_config_json TEXT,\n        new_config_json TEXT,\n        summary TEXT NOT NULL\n    )"
+  },
+  {
+    "type": "table",
+    "name": "hardware_components",
+    "tbl": "hardware_components",
+    "sql": "CREATE TABLE hardware_components (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        category TEXT NOT NULL,\n        component_key TEXT NOT NULL,\n        name TEXT,\n        vendor TEXT,\n        model TEXT,\n        serial_number TEXT,\n        status TEXT,\n        health_status TEXT,\n        temperature_c REAL,\n        capacity_bytes INTEGER,\n        free_bytes INTEGER,\n        first_seen TEXT NOT NULL,\n        last_seen TEXT NOT NULL,\n        updated_at REAL NOT NULL,\n        specs_json TEXT NOT NULL DEFAULT '{}',\n        raw_json TEXT,\n        UNIQUE(category, component_key)\n    )"
+  },
+  {
+    "type": "table",
+    "name": "incidents",
+    "tbl": "incidents",
+    "sql": "CREATE TABLE incidents (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        incident_id TEXT UNIQUE,\n        timestamp TEXT NOT NULL,\n        created_at REAL NOT NULL,\n        domain TEXT NOT NULL DEFAULT 'incident',\n        trigger_type TEXT NOT NULL DEFAULT 'event',\n        severity TEXT NOT NULL DEFAULT 'INFO',\n        title TEXT NOT NULL DEFAULT '',\n        channel TEXT,\n        event_id INTEGER,\n        event_record_id INTEGER,\n        provider_name TEXT,\n        sensor_id TEXT,\n        device_id TEXT,\n        app_name TEXT,\n        value REAL,\n        baseline_mean REAL,\n        baseline_sigma REAL,\n        deviation_factor REAL,\n        unit TEXT,\n        window_start TEXT,\n        window_end TEXT,\n        duration_sec REAL DEFAULT 0.0,\n        trigger_metrics_json TEXT,\n        suspect_processes_json TEXT,\n        related_events_json TEXT,\n        metrics_summary_json TEXT,\n        raw_window_json TEXT,\n        message TEXT,\n        details_json TEXT,\n        raw_xml TEXT,\n        resolved INTEGER DEFAULT 0\n    )"
+  },
+  {
+    "type": "table",
+    "name": "inventory_changes",
+    "tbl": "inventory_changes",
+    "sql": "CREATE TABLE inventory_changes (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        domain TEXT NOT NULL,\n        entity_key TEXT NOT NULL,\n        change_type TEXT NOT NULL,\n        detected_at TEXT NOT NULL DEFAULT '',\n        timestamp TEXT,\n        created_at REAL DEFAULT 0.0,\n        old_json TEXT,\n        new_json TEXT,\n        diff_json TEXT\n    )"
+  },
+  {
+    "type": "table",
+    "name": "inventory_state",
+    "tbl": "inventory_state",
+    "sql": "CREATE TABLE inventory_state (\n        domain TEXT NOT NULL,\n        entity_key TEXT NOT NULL,\n        attrs_json TEXT NOT NULL DEFAULT '{}',\n        attrs_hash TEXT NOT NULL DEFAULT '',\n        first_seen TEXT NOT NULL DEFAULT '',\n        last_changed TEXT NOT NULL DEFAULT '',\n        removed_at TEXT,\n        state_json TEXT,\n        updated_at REAL DEFAULT 0.0,\n        PRIMARY KEY (domain, entity_key)\n    ) WITHOUT ROWID"
+  },
+  {
+    "type": "table",
+    "name": "power_sessions",
+    "tbl": "power_sessions",
+    "sql": "CREATE TABLE power_sessions (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        session_id TEXT NOT NULL UNIQUE,\n        record_type TEXT NOT NULL DEFAULT 'session',\n        boot_time TEXT NOT NULL,\n        boot_timestamp REAL NOT NULL,\n        shutdown_time TEXT,\n        shutdown_timestamp REAL,\n        uptime_seconds REAL DEFAULT 0.0,\n        uptime_human TEXT,\n        shutdown_type TEXT NOT NULL,\n        classification TEXT,\n        confidence TEXT,\n        initiator TEXT,\n        user TEXT,\n        domain TEXT,\n        process TEXT,\n        process_id INTEGER,\n        reason TEXT,\n        reason_code TEXT,\n        comment TEXT,\n        summary TEXT,\n        clean_shutdown INTEGER DEFAULT 1,\n        unexpected_shutdown INTEGER DEFAULT 0,\n        bugcheck TEXT,\n        bugcheck_code TEXT,\n        bugcheck_params_json TEXT,\n        dump_file TEXT,\n        boot_event_id INTEGER DEFAULT 12,\n        shutdown_event_id INTEGER,\n        event_id INTEGER,\n        provider TEXT,\n        channel TEXT,\n        initiator_chain_json TEXT,\n        events_json TEXT,\n        evidence_json TEXT,\n        details_json TEXT,\n        raw_xml TEXT,\n        created_at REAL NOT NULL\n    )"
+  },
+  {
+    "type": "table",
+    "name": "process_file_events",
+    "tbl": "process_file_events",
+    "sql": "CREATE TABLE process_file_events (\n        event_id INTEGER PRIMARY KEY AUTOINCREMENT,\n        instance_id INTEGER,\n        pid INTEGER NOT NULL DEFAULT 0,\n        process_name TEXT,\n        timestamp TEXT NOT NULL,\n        created_at REAL NOT NULL,\n        operation_type TEXT NOT NULL,\n        file_path TEXT NOT NULL,\n        target_directory TEXT,\n        bytes_transferred INTEGER DEFAULT 0,\n        io_rate_bytes_sec REAL DEFAULT 0.0,\n        details_json TEXT\n    )"
+  },
+  {
+    "type": "table",
+    "name": "process_lifecycle_sessions",
+    "tbl": "process_lifecycle_sessions",
+    "sql": "CREATE TABLE process_lifecycle_sessions (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        instance_id TEXT NOT NULL UNIQUE,\n        definition_id INTEGER DEFAULT 1,\n        parent_instance_id INTEGER,\n        pid INTEGER NOT NULL,\n        ppid INTEGER,\n        name TEXT NOT NULL,\n        friendly_name TEXT,\n        exe_path TEXT,\n        binary_hash TEXT,\n        icon_base64 TEXT,\n        cmdline TEXT,\n        username TEXT,\n        sid TEXT,\n        session_id INTEGER DEFAULT 1,\n        integrity_level TEXT,\n        parent_name TEXT,\n        parent_exe TEXT,\n        parent_guid TEXT,\n        initiator_type TEXT,\n        status TEXT DEFAULT 'RUNNING',\n        created_at TEXT NOT NULL,\n        created_ts REAL NOT NULL,\n        terminated_at TEXT,\n        terminated_ts REAL,\n        is_alive INTEGER NOT NULL DEFAULT 1,\n        lifetime_sec REAL DEFAULT 0.0,\n        exit_code INTEGER,\n        cpu_time_user_sec REAL DEFAULT 0.0,\n        cpu_time_kernel_sec REAL DEFAULT 0.0,\n        cpu_time_total_sec REAL DEFAULT 0.0,\n        cpu_cycles INTEGER,\n        peak_working_set_mb REAL DEFAULT 0.0,\n        peak_private_mb REAL DEFAULT 0.0,\n        io_read_bytes INTEGER DEFAULT 0,\n        io_write_bytes INTEGER DEFAULT 0,\n        io_read_ops INTEGER DEFAULT 0,\n        io_write_ops INTEGER DEFAULT 0,\n        files_accessed_json TEXT,\n        remote_endpoints_json TEXT,\n        raw_json TEXT\n    )"
+  },
+  {
+    "type": "table",
+    "name": "process_snapshots",
+    "tbl": "process_snapshots",
+    "sql": "CREATE TABLE process_snapshots (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        snapshot_id INTEGER,\n        sample_type TEXT NOT NULL DEFAULT 'snapshot',\n        instance_id TEXT,\n        timestamp TEXT NOT NULL,\n        created_at REAL,\n        pid INTEGER NOT NULL,\n        name TEXT NOT NULL,\n        status TEXT,\n        cpu_percent REAL,\n        memory_mb REAL,\n        memory_percent REAL,\n        working_set_mb REAL,\n        private_mb REAL,\n        peak_working_set_mb REAL,\n        commit_size_mb REAL,\n        page_faults INTEGER,\n        num_threads INTEGER,\n        num_handles INTEGER,\n        gdi_objects INTEGER DEFAULT 0,\n        user_objects INTEGER DEFAULT 0,\n        username TEXT,\n        read_bytes_sec REAL,\n        write_bytes_sec REAL,\n        read_bytes INTEGER,\n        write_bytes INTEGER,\n        read_operations INTEGER,\n        write_operations INTEGER,\n        integrity_level TEXT,\n        elevation INTEGER,\n        ppid INTEGER,\n        parent_name TEXT,\n        executable TEXT,\n        cmdline TEXT,\n        sid TEXT,\n        session_id INTEGER,\n        creation_time REAL,\n        exit_time REAL,\n        is_alive INTEGER DEFAULT 1,\n        process_guid TEXT,\n        ancestor_chain TEXT,\n        launch_reason TEXT,\n        user_time_sec REAL,\n        kernel_time_sec REAL,\n        total_cpu_time_sec REAL,\n        total_context_switches INTEGER,\n        cpu_cycles INTEGER,\n        open_files_count INTEGER DEFAULT 0,\n        tcp_connections_count INTEGER DEFAULT 0,\n        udp_sockets_count INTEGER DEFAULT 0,\n        sockets_json TEXT,\n        open_files_json TEXT,\n        leak_risk_score TEXT,\n        is_outlier INTEGER DEFAULT 0,\n        raw_json TEXT,\n        FOREIGN KEY (snapshot_id) REFERENCES system_snapshots (id) ON DELETE CASCADE\n    )"
+  },
+  {
+    "type": "table",
+    "name": "sensor_polls",
+    "tbl": "sensor_polls",
+    "sql": "CREATE TABLE sensor_polls (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        sensor_id TEXT NOT NULL,\n        timestamp TEXT NOT NULL,\n        created_at REAL NOT NULL,\n        hardware_name TEXT,\n        hardware_type TEXT,\n        sensor_category TEXT,\n        sensor_type TEXT,\n        sensor_name TEXT,\n        value REAL,\n        value_numeric REAL,\n        min_val REAL,\n        max_val REAL,\n        unit TEXT,\n        status TEXT DEFAULT 'OK',\n        raw_json TEXT\n    )"
+  },
+  {
+    "type": "table",
+    "name": "system_snapshots",
+    "tbl": "system_snapshots",
+    "sql": "CREATE TABLE system_snapshots (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        timestamp TEXT NOT NULL,\n        created_at REAL NOT NULL,\n        hostname TEXT,\n        username TEXT,\n        uptime_seconds REAL,\n        os_name TEXT,\n        os_build TEXT,\n        os_install_date TEXT,\n        system_language TEXT,\n        os_install_language TEXT,\n        user_locale TEXT,\n        system_locale TEXT,\n        timezone TEXT,\n        codepage TEXT,\n        input_languages_json TEXT,\n        disks_json TEXT,\n        physical_disks_json TEXT,\n        monitors_json TEXT,\n        updates_json TEXT,\n        office_json TEXT,\n        onedrive_json TEXT,\n        battery_json TEXT,\n        ram_sticks_json TEXT,\n        listening_ports_json TEXT,\n        alerts_json TEXT,\n        cpu_total_percent REAL,\n        cpu_frequency_mhz REAL,\n        cpu_temp_c REAL,\n        cpu_power_w REAL,\n        memory_total_gb REAL,\n        memory_used_gb REAL,\n        memory_percent REAL,\n        swap_percent REAL,\n        gpu_load_percent REAL,\n        gpu_temp_c REAL,\n        gpu_vram_used_mb REAL,\n        disk_read_bytes_sec REAL,\n        disk_write_bytes_sec REAL,\n        disk_read_count_sec REAL,\n        disk_write_count_sec REAL,\n        network_sent_bytes_sec REAL,\n        network_recv_bytes_sec REAL,\n        throttling_json TEXT,\n        vss_snapshots_count INTEGER DEFAULT 0,\n        hardware_audit TEXT,\n        raw_json TEXT\n    )"
+  },
+  {
+    "type": "table",
+    "name": "telemetry_rollups",
+    "tbl": "telemetry_rollups",
+    "sql": "CREATE TABLE telemetry_rollups (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        tier TEXT NOT NULL,\n        sensor_id TEXT NOT NULL DEFAULT '__system__',\n        bucket_start REAL NOT NULL DEFAULT 0.0,\n        bucket_end REAL,\n        period_start TEXT,\n        period_end TEXT,\n        period_start_epoch REAL,\n        period_end_epoch REAL,\n        hardware_type TEXT,\n        sensor_category TEXT,\n        sensor_name TEXT,\n        unit TEXT,\n        sample_count INTEGER DEFAULT 1,\n        value_min REAL,\n        value_max REAL,\n        value_avg REAL,\n        value_sum REAL,\n        value_sum_sq REAL,\n        value_stddev REAL,\n        value_first REAL,\n        value_last REAL,\n        min_val REAL,\n        max_val REAL,\n        avg_val REAL,\n        p95_val REAL,\n        sum_val REAL,\n        last_val REAL,\n        cpu_avg REAL,\n        cpu_max REAL,\n        cpu_p95 REAL,\n        ram_avg REAL,\n        ram_max REAL,\n        ram_used_gb_avg REAL,\n        disk_read_bps_avg REAL,\n        disk_write_bps_avg REAL,\n        disk_read_bps_max REAL,\n        disk_write_bps_max REAL,\n        net_sent_bps_avg REAL,\n        net_recv_bps_avg REAL,\n        gpu_load_avg REAL,\n        gpu_temp_max REAL,\n        session_id TEXT,\n        payload_json TEXT,\n        created_at REAL NOT NULL DEFAULT 0.0,\n        UNIQUE(tier, sensor_id, bucket_start)\n    )"
+  }
+]

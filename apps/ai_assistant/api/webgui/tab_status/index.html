@@ -1,0 +1,63 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Status Tab
+=============================================================================
+Description:
+  Интерфейс общего статуса подсистем микросервиса AI Assistant.
+  Панель panel-system-status подключена к GET /v1/panel/panel-system-status.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_status
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="container-fluid p-3">
+<div class="d-flex align-items-center justify-content-between mb-3">
+<div>
+<h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+<span class="fs-5">📊</span>
+<span data-i18n="tabs.status" id="tab-status-heading-text">Статус системы и подсистем</span>
+</h4>
+<div class="small text-muted" data-i18n="ui.stat.txt_a347bdf8" id="stat-div-a347bdf8">Диагностическая готовность компонентов Git, WikiLLM, темпорального графа и векторного RAG</div>
+</div>
+<div class="d-flex align-items-center gap-2">
+<button class="btn btn-sm btn-primary d-flex align-items-center gap-1" id="status-refresh-btn">
+<i class="bi bi-arrow-clockwise"></i>
+<span data-i18n="common.refresh" id="tab-status-refresh-btn-text">Проверить статус</span>
+</button>
+</div>
+</div>
+<div class="card shadow-sm border mb-3" data-panel-id="panel-system-status" id="panel-system-status">
+<div class="card-header bg-body-tertiary d-flex align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<i class="bi bi-heart-pulse-fill text-danger"></i>
+<span data-i18n="ui.stat.txt_a06e3102" id="stat-span-a06e3102">Здоровье подсистем (REST: /v1/panel/panel-system-status)</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border" data-i18n="ui.stat.txt_df6e1531" id="status-summary-badge">Диагностика...</span>
+</div>
+<div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0 font-size-85">
+<thead class="table-light">
+<tr>
+<th class="col-w-220" data-i18n="ui.stat.txt_acdf24f9" id="stat-th-acdf24f9" scope="col">Подсистема</th>
+<th class="col-w-110" data-i18n="ui.stat.txt_23bdac65" id="stat-th-23bdac65" scope="col">Состояние</th>
+<th data-i18n="ui.stat.txt_3df1a115" id="stat-th-3df1a115" scope="col">Сведения о конфигурации и путях</th>
+<th class="col-w-170 text-end" data-i18n="ui.stat.txt_dd3de177" id="stat-th-dd3de177" scope="col">Последний опрос</th>
+</tr>
+</thead>
+<tbody id="status-table-body">
+<tr>
+<td class="text-center py-4 text-muted" colspan="4">
+<div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+<div data-i18n="ui.stat.txt_59945656" id="stat-div-59945656">Загрузка состояния через универсальный загрузчик панелей...</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>

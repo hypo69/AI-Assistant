@@ -1,0 +1,226 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Tab Create Workspace
+=============================================================================
+Description:
+  Интерфейс создания нового рабочего пространства:
+  - Ввод имени и описания пространства
+  - Указание рабочей директории (инициализация локального Git-репозитория)
+  - Выбор директорий и файлов для слежения за их изменениями
+  - Все объекты остаются на своих исходных местах без перемещения и копирования.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_create_workspace
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-28 18:44:00
+=============================================================================
+-->
+<div class="container-fluid p-3">
+<!-- Заголовок страницы -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+<div>
+<h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+<i class="bi bi-folder-plus text-success"></i>
+<span data-i18n="ui.cws.txt_2231746c" id="cws-span-2231746c">Создать новое пространство</span>
+</h4>
+<div class="small text-muted" data-i18n="ui.cws.txt_26021120" id="cws-div-26021120">
+        Инициализация репозитория Git, привязка директорий и файлов на диске для мониторинга изменений без их перемещения.
+      </div>
+</div>
+<div class="d-flex align-items-center gap-2">
+<span class="badge bg-success-subtle text-success border px-2.5 py-1.5 d-flex align-items-center gap-1 font-size-80" id="create-ws-git-status-badge">
+<i class="bi bi-git"></i>
+<span data-i18n="ui.cws.txt_dd25bfb1" id="cws-span-dd25bfb1">Git Engine Ready</span>
+</span>
+<button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" data-i18n-title="titles.cws.title_01c37831" id="btn-back-to-workspaces" title="Вернуться к списку рабочих областей" type="button">
+<i class="bi bi-arrow-left"></i>
+<span data-i18n="ui.cws.txt_704daeb5" id="cws-span-704daeb5">К рабочей области</span>
+</button>
+</div>
+</div>
+<!-- Статус-баннер уведомлений -->
+<div class="alert alert-info d-none d-flex align-items-center gap-2 py-2 px-3 mb-3 small shadow-sm" id="create-ws-alert-banner"></div>
+<!-- БЛОК 1: Параметры пространства и инициализация Git -->
+<div class="card bg-body border-secondary-subtle shadow-sm mb-3">
+<div class="card-header bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<span class="badge bg-primary rounded-pill" data-i18n="ui.cws.txt_de59a272" id="cws-span-de59a272">Шаг 1</span>
+<span data-i18n="ui.cws.txt_3a420c17" id="cws-span-3a420c17">Параметры пространства и рабочая директория (Git Init)</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border font-monospace small" data-i18n="ui.cws.txt_4835f679" id="create-ws-active-id-badge">
+        ID: не создано
+      </span>
+</div>
+<div class="card-body p-3">
+<div class="row g-3">
+<!-- Имя пространства -->
+<div class="col-md-4">
+<label class="form-label small fw-semibold mb-1" data-i18n="ui.cws.txt_1bdf99bc" for="create-ws-name-input" id="cws-label-1bdf99bc">
+            Имя пространства <span class="text-danger">*</span>:
+          </label>
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.cws.ph_e1bf53f6" id="create-ws-name-input" placeholder="например: project_documentation или my_codebase" type="text"/>
+<div class="form-text small font-size-75" data-i18n="ui.cws.txt_4b89833b" id="cws-div-4b89833b">
+            Уникальное человекочитаемое имя для выбора в интерфейсе.
+          </div>
+</div>
+<!-- Язык пространства -->
+<div class="col-md-4">
+<label class="form-label small fw-semibold mb-1" data-i18n="workspace.workspaceLanguageLabel" for="create-ws-lang-select" id="cws-label-lang">
+            Язык пространства (по умолчанию):
+          </label>
+<select class="form-select form-select-sm" id="create-ws-lang-select">
+  <option value="he">עברית (Hebrew)</option>
+  <option value="ru" selected>Русский (Russian)</option>
+  <option value="en">English</option>
+  <option value="ua">Українська (Ukrainian)</option>
+</select>
+<div class="form-text small font-size-75" data-i18n="workspace.workspaceLanguageHint" id="cws-div-lang-hint">
+            Язык виртуальных категорий, таксономии и рекомендаций ИИ.
+          </div>
+</div>
+<!-- Рабочая директория -->
+<div class="col-md-4">
+<label class="form-label small fw-semibold mb-1" data-i18n="ui.cws.txt_7d47516a" for="create-ws-path-input" id="cws-label-7d47516a">
+            Рабочая директория (путь к Git-репозиторию):
+          </label>
+<div class="input-group input-group-sm">
+<input class="form-control font-monospace" data-i18n-placeholder="placeholders.cws.ph_4b1b3452" id="create-ws-path-input" placeholder="например: C:\Projects\MyRepo или оставьте пустым" type="text"/>
+<button class="btn btn-outline-secondary d-flex align-items-center gap-1.5 px-2.5" data-i18n-title="titles.cws.title_29ffed95" id="btn-browse-ws-path" title="Выбрать рабочую директорию на компьютере" type="button">
+<i class="bi bi-folder2-open text-primary"></i>
+<span data-i18n="ui.cws.txt_503b2cca" id="cws-span-503b2cca">Обзор...</span>
+</button>
+</div>
+<input class="d-none" directory="" id="picker-create-ws-path" type="file" webkitdirectory=""/>
+<div class="form-text small font-size-75" data-i18n="ui.cws.txt_f555a289" id="cws-div-f555a289">
+            Если путь не указан, автоматически создаётся папка в <code>data/workspaces/</code>. В директории инициализируется <code>git init</code> и каталог <code>assets/</code>.
+          </div>
+</div>
+<!-- Описание пространства -->
+<div class="col-12">
+<label class="form-label small fw-semibold mb-1" data-i18n="ui.cws.txt_a1528e91" for="create-ws-desc-input" id="cws-label-a1528e91">
+            Описание пространства:
+          </label>
+<textarea class="form-control form-control-sm" data-i18n-placeholder="placeholders.cws.ph_2a14ddbb" id="create-ws-desc-input" placeholder="Краткое описание назначения пространства, архитектурных задач или заметок..." rows="2"></textarea>
+</div>
+</div>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 pt-2 border-top border-secondary-subtle">
+<div class="small text-muted d-flex align-items-center gap-1.5 font-size-80">
+<i class="bi bi-info-circle text-primary"></i>
+<span data-i18n="ui.cws.txt_1a80632a" id="cws-span-1a80632a">При создании будет сформирован репозиторий Git и начальный коммит.</span>
+</div>
+<button class="btn btn-primary btn-sm fw-semibold d-flex align-items-center gap-1.5" id="btn-create-ws-submit" type="button">
+<i class="bi bi-check2-circle"></i>
+<span data-i18n="ui.cws.txt_38b2024b" id="cws-span-38b2024b">Создать пространство и инициализировать Git</span>
+</button>
+</div>
+</div>
+</div>
+<!-- БЛОК 2: Выбор директорий и файлов для слежения (на месте, без перемещения) -->
+<div class="card bg-body border-secondary-subtle shadow-sm mb-3 d-none" id="create-ws-tracking-card">
+<div class="card-header bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<span class="badge bg-success rounded-pill" data-i18n="ui.cws.txt_144fa97c" id="cws-span-144fa97c">Шаг 2</span>
+<span data-i18n="ui.cws.txt_70ed1380" id="cws-span-70ed1380">Выбор директорий и файлов для слежения за изменениями</span>
+</div>
+<div class="d-flex align-items-center gap-2 small">
+<span class="badge bg-info-subtle text-info border" data-i18n="ui.cws.txt_13ea0390" id="create-ws-tracked-count-badge">0 объектов</span>
+<span class="badge bg-secondary-subtle text-secondary border font-monospace" data-i18n="ui.cws.txt_f9371cf6" id="create-ws-git-head-badge">HEAD: ---</span>
+</div>
+</div>
+<div class="card-body p-3">
+<!-- Пояснительный баннер: без перемещения -->
+<div class="alert alert-light border border-secondary-subtle d-flex align-items-start gap-2.5 p-2.5 mb-3 small">
+<i class="bi bi-pin-angle-fill text-warning fs-5 flex-shrink-0 mt-0.5"></i>
+<div>
+<strong class="text-body" data-i18n="ui.cws.txt_49f40b98" id="cws-strong-49f40b98">Файлы и директории остаются на своих местах:</strong>
+<div class="text-muted" data-i18n="ui.cws.txt_78e3c092" id="cws-div-78e3c092">
+            Перемещать и дублировать их не требуется. Git-движок и модуль умного версионирования подключают указанные пути напрямую и отслеживают появление новых версий, правок и коммитов непосредственно по их исходным адресам на диске.
+          </div>
+</div>
+</div>
+<div class="row g-3">
+<!-- Добавление директории -->
+<div class="col-lg-6">
+<div class="p-2.5 rounded border bg-body-tertiary h-100 d-flex flex-column justify-content-between">
+<div>
+<label class="form-label small fw-semibold d-flex align-items-center gap-1.5 mb-1" for="input-watch-directory-path">
+<i class="bi bi-folder2-open text-warning"></i>
+<span data-i18n="ui.cws.txt_68a213c2" id="cws-span-68a213c2">Директория (папка) для отслеживания:</span>
+</label>
+<div class="input-group input-group-sm mb-2">
+<input class="form-control font-monospace" data-i18n-placeholder="placeholders.cws.ph_e149f935" id="input-watch-directory-path" placeholder="C:\Projects\my_service\docs" type="text"/>
+<button class="btn btn-outline-secondary d-flex align-items-center gap-1 px-2" data-i18n-title="titles.cws.title_faf6b1ab" id="btn-browse-watch-dir" title="Выбрать папку на компьютере" type="button">
+<i class="bi bi-folder2-open text-warning"></i>
+<span data-i18n="ui.cws.txt_503b2cca" id="cws-span-503b2cca-1">Обзор...</span>
+</button>
+</div>
+<input class="d-none" directory="" id="picker-watch-dir" type="file" webkitdirectory=""/>
+<div class="small text-muted font-size-78 mb-2" data-i18n="ui.cws.txt_858c5e1a" id="cws-div-858c5e1a">
+                Все вложенные файлы (md, txt, pdf, docx, xlsx, py и др.) будут сканироваться и ставиться на версионный учёт.
+              </div>
+</div>
+<button class="btn btn-sm btn-outline-primary fw-semibold w-100 d-flex align-items-center justify-content-center gap-1.5 mt-2" id="btn-add-watch-directory" type="button">
+<i class="bi bi-folder-check"></i>
+<span data-i18n="ui.cws.txt_86c483df" id="cws-span-86c483df">Добавить директорию в слежение</span>
+</button>
+</div>
+</div>
+<!-- Добавление файла -->
+<div class="col-lg-6">
+<div class="p-2.5 rounded border bg-body-tertiary h-100 d-flex flex-column justify-content-between">
+<div>
+<label class="form-label small fw-semibold d-flex align-items-center gap-1.5 mb-1" for="input-watch-file-path">
+<i class="bi bi-file-earmark-code text-info"></i>
+<span data-i18n="ui.cws.txt_a7db7b12" id="cws-span-a7db7b12">Отдельный файл для отслеживания:</span>
+</label>
+<div class="input-group input-group-sm mb-2">
+<input class="form-control font-monospace" data-i18n-placeholder="placeholders.cws.ph_025dbb3b" id="input-watch-file-path" placeholder="C:\Work\notes.md или D:\Configs\settings.json" type="text"/>
+<button class="btn btn-outline-secondary d-flex align-items-center gap-1 px-2" data-i18n-title="titles.cws.title_771266c7" id="btn-browse-watch-file" title="Выбрать файл на компьютере" type="button">
+<i class="bi bi-file-earmark-plus text-info"></i>
+<span data-i18n="ui.cws.txt_503b2cca" id="cws-span-503b2cca-2">Обзор...</span>
+</button>
+</div>
+<input class="d-none" id="picker-watch-file" type="file"/>
+<div class="small text-muted font-size-78 mb-2" data-i18n="ui.cws.txt_e6d366ea" id="cws-div-e6d366ea">
+                Файл остаётся на своём месте. Каждое сохранение изменений регистрируется в темпоральной истории Git.
+              </div>
+</div>
+<button class="btn btn-sm btn-outline-success fw-semibold w-100 d-flex align-items-center justify-content-center gap-1.5 mt-2" id="btn-add-watch-file" type="button">
+<i class="bi bi-file-earmark-plus"></i>
+<span data-i18n="ui.cws.txt_5c3af4b3" id="cws-span-5c3af4b3">Добавить файл в слежение</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Таблица/список отслеживаемых объектов на месте -->
+<div class="mt-3">
+<div class="d-flex align-items-center justify-content-between mb-2">
+<div class="small fw-semibold text-muted d-flex align-items-center gap-1.5">
+<i class="bi bi-shield-check text-success"></i>
+<span data-i18n="ui.cws.txt_60a35f09" id="cws-span-60a35f09">Объекты, находящиеся под наблюдением в этом пространстве:</span>
+</div>
+<button class="btn btn-sm btn-outline-secondary py-0 px-2 font-size-75" data-i18n="ui.cws.txt_d208f03c" id="btn-refresh-tracked-sources" type="button">
+<i class="bi bi-arrow-clockwise me-1"></i>Обновить статус
+          </button>
+</div>
+<div class="list-group list-group-flush border rounded overflow-auto font-size-80 max-h-220" id="create-ws-sources-list">
+<div class="p-3 text-center text-muted small bg-body-tertiary" data-i18n="ui.cws.txt_fa42174b" id="cws-div-fa42174b">
+            Директории и файлы пока не добавлены. Введите путь выше и нажмите кнопку добавления.
+          </div>
+</div>
+</div>
+<!-- Завершающие действия -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 pt-2.5 border-top border-secondary-subtle">
+<div class="small text-success d-flex align-items-center gap-1.5 font-size-80" id="create-ws-sync-status-msg">
+<i class="bi bi-check-circle-fill"></i>
+<span data-i18n="ui.cws.txt_427c78fe" id="cws-span-427c78fe">Пространство настроено. Вы можете сразу перейти к работе с ним.</span>
+</div>
+<button class="btn btn-success btn-sm fw-semibold d-flex align-items-center gap-1.5 px-3 py-1.5 shadow-sm" id="btn-go-to-workspace" type="button">
+<span data-i18n="ui.cws.txt_d26799e8" id="cws-span-d26799e8">Перейти в рабочую область</span>
+<i class="bi bi-arrow-right-circle"></i>
+</button>
+</div>
+</div>
+</div>
+</div>

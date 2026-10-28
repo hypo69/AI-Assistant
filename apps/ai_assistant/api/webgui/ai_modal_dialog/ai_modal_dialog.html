@@ -1,0 +1,30 @@
+<!--
+=============================================================================
+Process Name: Windows WebGUI - AI Modal Dialog HTML Template
+=============================================================================
+Description:
+  HTML-шаблон модального диалога ИИ-Ассистента (01_FRONTEND.md).
+
+File: ai_modal_dialog.html
+Project: ai-windows-admin
+Package: apps.windows.api.webgui.ai_modal_dialog
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="ai-modal-overlay d-none" id="ai-modal-overlay">
+<div class="ai-modal-card shadow-lg p-3">
+<div class="ai-modal-header d-flex justify-content-between align-items-center pb-2 border-bottom">
+<h5 class="mb-0 text-info fw-bold" data-i18n="ui.aim.txt_ca69ed07" id="ai-modal-header-title">🤖 Паспорт процесса</h5>
+<button aria-label="Close" class="btn-close" id="btn-close-ai-modal" type="button"></button>
+</div>
+<div class="ai-modal-body py-3" id="ai-modal-body-content">
+<!-- Динамический контент заполняется через AIModalDialog.open() -->
+</div>
+<div class="ai-modal-footer d-flex justify-content-between pt-2 border-top">
+<div class="d-flex gap-2" id="ai-modal-actions"></div>
+<button class="btn btn-sm btn-secondary" data-i18n="ui.aim.txt_dd9463bd" id="btn-dismiss-ai-modal" type="button">Закрыть</button>
+</div>
+</div>
+</div>

@@ -1,0 +1,71 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Diff Tab
+=============================================================================
+Description:
+  Интерфейс просмотра построчного Diff, Smart Blame и ИИ-анализа изменений.
+  Панель panel-diff-stats подключена к GET /v1/panel/panel-diff-stats.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_diff
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="container-fluid p-3">
+<div class="d-flex align-items-center justify-content-between mb-3">
+<div>
+<h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+<span class="fs-5">⚖️</span>
+<span data-i18n="tabs.diff" id="tab-diff-heading-text">Diff &amp; Smart Blame</span>
+</h4>
+<div class="small text-muted" data-i18n="ui.diff.txt_f00b92bd" id="diff-div-f00b92bd">Построчный анализ изменений, инспекция ревизий и ИИ-суммаризация последствий</div>
+</div>
+<div class="d-flex align-items-center gap-2">
+<input class="form-control form-control-sm min-w-180" data-i18n-placeholder="placeholders.diff.ph_b1260988" id="diff-commit-input" placeholder="Хэш коммита (например HEAD)" type="text" value="HEAD"/>
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" id="diff-load-btn">
+<i class="bi bi-file-earmark-diff"></i>
+<span data-i18n="ui.diff.txt_1bca034f" id="diff-span-1bca034f">Загрузить Diff</span>
+</button>
+<button class="btn btn-sm btn-warning d-flex align-items-center gap-1" id="diff-ai-insights-btn">
+<i class="bi bi-robot"></i>
+<span data-i18n="ui.diff.txt_42b34c89" id="diff-span-42b34c89">ИИ-Инсайты</span>
+</button>
+</div>
+</div>
+<!-- Панель статистики диффа -->
+<div class="card shadow-sm border mb-3" data-panel-id="panel-diff-stats" id="panel-diff-stats">
+<div class="card-header bg-body-tertiary d-flex align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<i class="bi bi-bar-chart-steps text-info"></i>
+<span data-i18n="ui.diff.txt_3af9e925" id="diff-span-3af9e925">Статистика измененных файлов (REST: /v1/panel/panel-diff-stats)</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border" data-i18n="ui.diff.txt_e9e5145e" id="diff-stats-count-badge">0 файлов</span>
+</div>
+<div class="card-body p-2" id="diff-stats-body">
+<div class="text-center py-2 text-muted small" data-i18n="ui.diff.txt_c8a11502" id="diff-div-c8a11502">Ожидание загрузки данных панели...</div>
+</div>
+</div>
+<!-- Карточка ИИ-инсайтов -->
+<div class="card shadow-sm border border-warning-subtle mb-3 d-none" id="diff-ai-card">
+<div class="card-header bg-warning-subtle text-warning-emphasis fw-semibold small d-flex align-items-center gap-2 py-2 px-3">
+<i class="bi bi-stars"></i>
+<span data-i18n="ui.diff.txt_7cd8b0fa" id="diff-span-7cd8b0fa">ИИ-суммаризация архитектурных последствий коммита</span>
+</div>
+<div class="card-body p-3">
+<div class="small mb-2" id="diff-ai-summary-text"></div>
+<div class="d-flex flex-wrap gap-1" id="diff-ai-entities-box"></div>
+</div>
+</div>
+<!-- Область отображения Diff кода -->
+<div class="card shadow-sm border mb-3">
+<div class="card-header bg-dark text-light d-flex align-items-center justify-content-between py-2 px-3">
+<span class="small font-monospace" data-i18n="ui.diff.txt_95e4aae4" id="diff-header-title">HEAD :: Все файлы</span>
+<span class="badge bg-primary-subtle text-primary border" data-i18n="ui.diff.txt_a4377dac" id="diff-status-indicator">Готов</span>
+</div>
+<div class="card-body p-0">
+<pre class="m-0 p-3 bg-body-tertiary text-body font-monospace border-0 pre-scrollable-480" id="diff-code-pre">Выберите коммит или нажмите «Загрузить Diff» для просмотра изменений.</pre>
+</div>
+</div>
+</div>

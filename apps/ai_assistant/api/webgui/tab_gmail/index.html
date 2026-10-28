@@ -1,0 +1,571 @@
+<!--
+
+=============================================================================
+
+Process Name: AI Assistant WebGUI - Gmail Management Tab
+
+=============================================================================
+
+Description:
+
+  Интерфейс управления электронной почтой Gmail пользователя через Google OAuth 2.0.
+
+  Обеспечивает просмотр папок и меток (Входящие, Помеченные, Отправленные, Корзина),
+
+  поиск и фильтрацию сообщений, чтение полного тела письма и вложений,
+
+  отметку о прочтении, перемещение в корзину и отправку новых сообщений.
+
+
+
+File: index.html
+
+Package: apps/ai_assistant/api/webgui/tab_gmail
+
+Author: hypo69
+
+Copyright: © 2026 hypo69
+
+Updated: 2026-10-27 21:25:00
+
+=============================================================================
+
+-->
+
+<div class="container-fluid p-3" id="tab-gmail-container">
+
+<!-- Верхняя строка заголовка и действий -->
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+
+<div>
+
+<h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+
+<span class="fs-4">📧</span>
+
+<span data-i18n="ui.gmail.txt_97e9b1d0" id="gmail-span-97e9b1d0">Управление почтой (Gmail)</span>
+
+</h4>
+
+<div class="small text-muted" data-i18n="ui.gmail.txt_eeaa14b8" id="gmail-div-eeaa14b8">
+
+        Чтение, поиск, фильтрация и отправка писем через авторизованный профиль Google OAuth 2.0
+
+      </div>
+
+</div>
+
+<div class="d-flex flex-wrap align-items-center gap-2">
+
+<!-- Статус аккаунта -->
+
+<span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 shadow-sm d-flex align-items-center gap-1.5" id="gmail-account-badge">
+
+<i class="bi bi-google"></i>
+
+<span data-i18n="ui.gmail.txt_43e40d49" id="gmail-account-email">Загрузка...</span>
+
+</span>
+
+<!-- Кнопка написания письма -->
+
+<button class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 shadow-sm fw-semibold" id="btn-gmail-compose" type="button">
+
+<i class="bi bi-pencil-square"></i>
+
+<span data-i18n="ui.gmail.txt_c40f46a1" id="gmail-span-c40f46a1">Написать письмо</span>
+
+</button>
+
+<!-- Кнопка обновления -->
+
+<button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1.5 shadow-sm" data-i18n-title="titles.gmail.title_271a9d99" id="btn-gmail-refresh" title="Обновить список писем" type="button">
+
+<i class="bi bi-arrow-clockwise"></i>
+
+<span class="d-none d-sm-inline" data-i18n="ui.gmail.txt_dbe5444a" id="gmail-span-dbe5444a">Обновить</span>
+
+</button>
+
+</div>
+
+</div>
+
+<!-- Поисковая панель и быстрые фильтры -->
+
+<div class="card shadow-sm border mb-3">
+
+<div class="card-body py-2 px-3">
+
+<div class="row g-2 align-items-center">
+
+<div class="col-12 col-md-6 col-lg-7">
+
+<div class="input-group input-group-sm">
+
+<span class="input-group-text bg-body-tertiary border-end-0">
+
+<i class="bi bi-search text-muted"></i>
+
+</span>
+
+<input class="form-control border-start-0" data-i18n-placeholder="placeholders.gmail.ph_8f56b6b7" id="gmail-search-input" placeholder="Поиск в почте (например, from:google, subject:важно, is:unread)..." type="text"/>
+
+<button class="btn btn-outline-primary" data-i18n="ui.gmail.txt_d28c17c0" id="btn-gmail-search" type="button">Найти</button>
+<button class="btn btn-outline-info d-flex align-items-center gap-1" data-i18n-title="titles.gmail.title_semantic_search" id="btn-gmail-semantic-search" title="Семантический RAG-поиск писем по смыслу" type="button"><i class="bi bi-stars"></i> <span class="d-none d-sm-inline" id="lbl-gmail-semantic-search" data-i18n="ui.gmail.txt_semantic_search">ИИ-поиск</span></button>
+
+<button class="btn btn-outline-secondary" data-i18n-title="titles.gmail.title_fd209100" id="btn-gmail-search-clear" title="Сбросить поиск" type="button">
+
+<i class="bi bi-x-lg"></i>
+
+</button>
+
+</div>
+
+</div>
+
+<div class="col-12 col-md-6 col-lg-5">
+
+<div class="d-flex flex-wrap gap-1 justify-content-md-end" id="gmail-quick-filters">
+
+<button class="btn btn-xs btn-outline-secondary btn-sm active" data-filter="" data-i18n="ui.gmail.txt_984bf149" id="gmail-button-984bf149" type="button">Все</button>
+
+<button class="btn btn-xs btn-outline-secondary btn-sm" data-filter="is:unread" data-i18n="ui.gmail.txt_b574fc4a" id="gmail-button-b574fc4a" type="button">Непрочитанные</button>
+
+<button class="btn btn-xs btn-outline-secondary btn-sm" data-filter="is:starred" data-i18n="ui.gmail.txt_017a2a2e" id="gmail-button-017a2a2e" type="button">Помеченные</button>
+
+<button class="btn btn-xs btn-outline-secondary btn-sm" data-filter="has:attachment" data-i18n="ui.gmail.txt_05957d95" id="gmail-button-05957d95" type="button">С вложениями</button>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- Основная рабочая область: Папки слева и Список писем справа -->
+
+<div class="row g-3">
+
+<!-- Левая колонка: Папки и статистика -->
+
+<div class="col-12 col-lg-3 col-xl-2">
+
+<!-- Список системных папок -->
+
+<div class="list-group shadow-sm border rounded mb-3" id="gmail-folders-list">
+
+<button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3 active" data-folder="INBOX" type="button">
+
+<div class="d-flex align-items-center gap-2">
+
+<i class="bi bi-inbox-fill text-primary"></i>
+
+<span data-i18n="ui.gmail.txt_b24c1679" id="gmail-span-b24c1679">Входящие</span>
+
+</div>
+
+<span class="badge bg-primary rounded-pill font-size-75" id="badge-unread-inbox">0</span>
+
+</button>
+
+<button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3" data-folder="STARRED" type="button">
+
+<div class="d-flex align-items-center gap-2">
+
+<i class="bi bi-star-fill text-warning"></i>
+
+<span data-i18n="ui.gmail.txt_017a2a2e" id="gmail-span-017a2a2e">Помеченные</span>
+
+</div>
+
+</button>
+
+<button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3" data-folder="SENT" type="button">
+
+<div class="d-flex align-items-center gap-2">
+
+<i class="bi bi-send-fill text-success"></i>
+
+<span data-i18n="ui.gmail.txt_a59f0da1" id="gmail-span-a59f0da1">Отправленные</span>
+
+</div>
+
+</button>
+
+<button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3" data-folder="DRAFT" type="button">
+
+<div class="d-flex align-items-center gap-2">
+
+<i class="bi bi-file-earmark-text text-secondary"></i>
+
+<span data-i18n="ui.gmail.txt_25e27cb6" id="gmail-span-25e27cb6">Черновики</span>
+
+</div>
+
+</button>
+
+<button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3" data-folder="SPAM" type="button">
+
+<div class="d-flex align-items-center gap-2">
+
+<i class="bi bi-exclamation-octagon text-danger"></i>
+
+<span data-i18n="ui.gmail.txt_bb3d0681" id="gmail-span-bb3d0681">Спам</span>
+
+</div>
+
+</button>
+
+<button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3" data-folder="TRASH" type="button">
+
+<div class="d-flex align-items-center gap-2">
+
+<i class="bi bi-trash text-muted"></i>
+
+<span data-i18n="ui.gmail.txt_b7697b96" id="gmail-span-b7697b96">Корзина</span>
+
+</div>
+
+</button>
+
+</div>
+
+<!-- Карточка статистики ящика -->
+
+<div class="card shadow-sm border">
+
+<div class="card-header bg-body-tertiary py-2 px-3 fw-semibold small d-flex align-items-center gap-1.5">
+
+<i class="bi bi-info-circle text-info"></i>
+
+<span data-i18n="ui.gmail.txt_81402f5f" id="gmail-span-81402f5f">Сводка ящика</span>
+
+</div>
+
+<div class="card-body p-2 font-size-80">
+
+<div class="d-flex justify-content-between py-1 border-bottom">
+
+<span class="text-muted" data-i18n="ui.gmail.txt_7a0bb064" id="gmail-span-7a0bb064">Всего писем:</span>
+
+<strong id="gmail-stat-messages">—</strong>
+
+</div>
+
+<div class="d-flex justify-content-between py-1 border-bottom">
+
+<span class="text-muted" data-i18n="ui.gmail.txt_296ce977" id="gmail-span-296ce977">Всего цепочек:</span>
+
+<strong id="gmail-stat-threads">—</strong>
+
+</div>
+
+<div class="d-flex justify-content-between py-1">
+
+<span class="text-muted" data-i18n="ui.gmail.txt_25068fca" id="gmail-span-25068fca">Провайдер:</span>
+
+<span class="badge bg-secondary-subtle text-secondary" data-i18n="ui.gmail.txt_b2d72e78" id="gmail-span-b2d72e78">Google OAuth 2.0</span>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- Правая колонка: Панель инструментов и Таблица сообщений -->
+
+<div class="col-12 col-lg-9 col-xl-10">
+
+<div class="card shadow-sm border">
+
+<!-- Тулбар над таблицей -->
+
+<div class="card-header bg-body-tertiary py-2 px-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+
+<div class="d-flex align-items-center gap-2">
+
+<div class="form-check m-0">
+
+<input class="form-check-input" data-i18n-title="titles.gmail.title_4d09821e" id="gmail-select-all" title="Выбрать все" type="checkbox"/>
+
+</div>
+
+<div class="btn-group btn-group-sm" role="group">
+
+<button class="btn btn-outline-secondary" data-i18n-title="titles.gmail.title_6ebf3853" disabled="" id="btn-batch-mark-read" title="Отметить как прочитанное" type="button">
+
+<i class="bi bi-envelope-open"></i>
+
+</button>
+
+<button class="btn btn-outline-secondary" data-i18n-title="titles.gmail.title_dd9bb062" disabled="" id="btn-batch-mark-unread" title="Отметить как непрочитанное" type="button">
+
+<i class="bi bi-envelope"></i>
+
+</button>
+
+<button class="btn btn-outline-danger" data-i18n-title="titles.gmail.title_f4aaa668" disabled="" id="btn-batch-trash" title="Переместить в корзину" type="button">
+
+<i class="bi bi-trash"></i>
+
+</button>
+
+</div>
+
+<span class="small text-muted ms-2" data-i18n="ui.gmail.txt_b24c1679" id="gmail-current-folder-title">Входящие</span>
+
+</div>
+
+<!-- Пагинация и счетчики -->
+
+<div class="d-flex align-items-center gap-2">
+
+<span class="small text-muted font-size-80" data-i18n="ui.gmail.txt_36193c2f" id="gmail-pagination-info">0 из 0</span>
+
+<div class="btn-group btn-group-sm">
+
+<button class="btn btn-outline-secondary" data-i18n-title="titles.gmail.title_c884a049" disabled="" id="btn-gmail-prev-page" title="Предыдущая страница" type="button">
+
+<i class="bi bi-chevron-left"></i>
+
+</button>
+
+<button class="btn btn-outline-secondary" data-i18n-title="titles.gmail.title_ab93ccfa" disabled="" id="btn-gmail-next-page" title="Следующая страница" type="button">
+
+<i class="bi bi-chevron-right"></i>
+
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- Контейнер списка писем -->
+
+<div class="table-responsive" style="min-height: 420px; max-height: 640px; overflow-y: auto;">
+
+<table class="table table-hover align-middle mb-0 font-size-85" id="gmail-messages-table">
+
+<tbody id="gmail-messages-tbody">
+
+<tr>
+
+<td class="text-center py-5 text-muted" colspan="5" id="gmail-td-9679ff38">
+
+<span class="spinner-border spinner-border-sm me-2"></span>
+
+<span data-i18n="ui.gmail.txt_9679ff38" id="gmail-span-9679ff38">Загрузка сообщений из Gmail...</span>
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- Модальное окно просмотра письма -->
+
+<div aria-hidden="true" aria-labelledby="gmailMessageViewModalLabel" class="modal fade" id="gmailMessageViewModal" tabindex="-1">
+
+<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+
+<div class="modal-content shadow border-secondary-subtle">
+
+<div class="modal-header border-secondary-subtle py-2 px-3">
+
+<div class="min-w-0 flex-grow-1 me-2">
+
+<h6 class="modal-title fw-bold text-truncate" data-i18n="ui.gmail.txt_86470257" id="gmail-view-subject">Тема письма</h6>
+
+<div class="small text-muted text-truncate" data-i18n="ui.gmail.txt_9bc590d8" id="gmail-view-from">От кого: —</div>
+
+</div>
+
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+
+</div>
+
+<div class="modal-body p-3">
+
+<!-- Метаданные сообщения -->
+
+<div class="card bg-body-tertiary border p-2 mb-3 font-size-80">
+
+<div class="d-flex flex-wrap justify-content-between gap-1">
+
+<div><span class="text-muted" data-i18n="ui.gmail.txt_cac4bb65" id="gmail-span-cac4bb65">Кому:</span> <span id="gmail-view-to">—</span></div>
+
+<div><span class="text-muted" data-i18n="ui.gmail.txt_5c790abe" id="gmail-span-5c790abe">Дата:</span> <span id="gmail-view-date">—</span></div>
+
+</div>
+
+<div class="mt-1 d-flex flex-wrap gap-1" id="gmail-view-labels"></div>
+
+</div>
+
+<!-- Список вложений (если есть) -->
+
+<div class="mb-3 d-none" id="gmail-view-attachments-container">
+
+<div class="small fw-semibold text-muted mb-1 d-flex align-items-center gap-1">
+
+<i class="bi bi-paperclip"></i>
+
+<span data-i18n="ui.gmail.txt_5cb0c10a" id="gmail-span-5cb0c10a">Вложения:</span>
+
+</div>
+
+<div class="d-flex flex-wrap gap-1.5" id="gmail-view-attachments-list"></div>
+
+</div>
+
+<!-- Тело письма -->
+
+<div class="border rounded p-3 bg-body" id="gmail-view-body-wrapper" style="min-height: 200px; max-height: 480px; overflow-y: auto;">
+
+<div data-i18n="ui.gmail.txt_c76e7fb8" id="gmail-view-body-content">Загрузка содержимого...</div>
+
+</div>
+
+</div>
+
+<div class="modal-footer border-secondary-subtle py-2 px-3 d-flex justify-content-between">
+
+<div>
+
+<button class="btn btn-sm btn-outline-danger" id="btn-view-trash-message" type="button">
+
+<i class="bi bi-trash me-1"></i><span data-i18n="ui.gmail.txt_5aa28eac" id="gmail-span-5aa28eac">В корзину</span>
+
+            </button>
+
+<button class="btn btn-sm btn-outline-secondary" id="btn-view-toggle-unread" type="button">
+
+<i class="bi bi-envelope me-1"></i><span data-i18n="ui.gmail.txt_7641651a" id="gmail-span-7641651a">Сделать непрочитанным</span>
+
+            </button>
+
+</div>
+
+<div class="d-flex gap-2">
+
+<button class="btn btn-sm btn-primary" id="btn-view-reply" type="button">
+
+<i class="bi bi-reply-fill me-1"></i><span data-i18n="ui.gmail.txt_e5681e27" id="gmail-span-e5681e27">Ответить</span>
+
+            </button>
+
+<button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" data-i18n="ui.gmail.txt_dd9463bd" id="gmail-button-dd9463bd" type="button">Закрыть</button>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- Модальное окно написания письма (Compose) -->
+
+<div aria-hidden="true" aria-labelledby="gmailComposeModalLabel" class="modal fade" id="gmailComposeModal" tabindex="-1">
+
+<div class="modal-dialog modal-dialog-centered modal-lg">
+
+<div class="modal-content shadow border-secondary-subtle">
+
+<div class="modal-header border-secondary-subtle py-2 px-3">
+
+<h5 class="modal-title fs-6 fw-bold d-flex align-items-center gap-2" id="gmailComposeModalLabel">
+
+<i class="bi bi-pencil-square text-primary"></i>
+
+<span data-i18n="ui.gmail.txt_1d497d26" id="gmail-span-1d497d26">Новое сообщение</span>
+
+</h5>
+
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+
+</div>
+
+<div class="modal-body p-3">
+
+<form id="gmail-compose-form">
+
+<div class="mb-2">
+
+<label class="form-label small fw-semibold text-muted mb-0" data-i18n="ui.gmail.txt_103c91a9" for="gmail-compose-to" id="gmail-label-103c91a9">Кому (Email):</label>
+
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.gmail.ph_1621db76" id="gmail-compose-to" placeholder="recipient@example.com" required="" type="email"/>
+
+</div>
+
+<div class="mb-2">
+
+<label class="form-label small fw-semibold text-muted mb-0" data-i18n="ui.gmail.txt_4fc863bd" for="gmail-compose-subject" id="gmail-label-4fc863bd">Тема:</label>
+
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.gmail.ph_86470257" id="gmail-compose-subject" placeholder="Тема письма" required="" type="text"/>
+
+</div>
+
+<div class="mb-2">
+
+<label class="form-label small fw-semibold text-muted mb-0" data-i18n="ui.gmail.txt_f600e595" for="gmail-compose-body" id="gmail-label-f600e595">Текст сообщения:</label>
+
+<textarea class="form-control form-control-sm font-monospace font-size-85" data-i18n-placeholder="placeholders.gmail.ph_eb2047d4" id="gmail-compose-body" placeholder="Введите текст письма..." required="" rows="9"></textarea>
+
+</div>
+
+<div class="form-check form-switch mb-0">
+
+<input class="form-check-input" id="gmail-compose-is-html" type="checkbox"/>
+
+<label class="form-check-label small text-muted" data-i18n="ui.gmail.txt_d79fe690" for="gmail-compose-is-html" id="gmail-label-d79fe690">Отправить как HTML-разметку</label>
+
+</div>
+
+</form>
+
+</div>
+
+<div class="modal-footer border-secondary-subtle py-2 px-3 d-flex justify-content-between">
+
+<button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" data-i18n="ui.gmail.txt_987b33c6" id="gmail-button-987b33c6" type="button">Отмена</button>
+
+<button class="btn btn-sm btn-primary px-3 fw-semibold d-flex align-items-center gap-1.5" id="btn-gmail-send-submit" type="button">
+
+<i class="bi bi-send-fill"></i>
+
+<span data-i18n="ui.gmail.txt_6da0f0ae" id="gmail-span-6da0f0ae">Отправить</span>
+
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+

@@ -1,0 +1,133 @@
+/*
+=============================================================================
+Process Name: AI Assistant WebGUI - Custom Context Menu Styles
+=============================================================================
+Description:
+  Стили нативного кастомного контекстного меню (ПКМ) и модального окна
+  обслуживания Git (git gc). Поддерживает системную тему, темную,
+  светлую, кирпичную и терминальную темы без жесткого кодирования цветов.
+
+File: context-menu.css
+Package: apps/ai_assistant/api/webgui/css
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-22 14:34:00
+=============================================================================
+*/
+
+.custom-context-menu {
+  position: fixed;
+  z-index: 10050;
+  min-width: 260px;
+  max-width: 340px;
+  background-color: var(--surface-card, var(--bs-body-bg, #1e1e2e));
+  color: var(--text-primary, var(--bs-body-color, #cdd6f4));
+  border: 1px solid var(--border-color, var(--bs-border-color, rgba(128, 128, 128, 0.25)));
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  padding: 6px 0;
+  font-size: 13.5px;
+  user-select: none;
+  backdrop-filter: blur(8px);
+  animation: contextMenuFadeIn 0.12s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.custom-context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  color: inherit;
+  text-decoration: none;
+  outline: none;
+}
+
+.custom-context-menu-item:hover,
+.custom-context-menu-item:focus {
+  background-color: var(--surface-hover, var(--bs-tertiary-bg, rgba(128, 128, 128, 0.15)));
+  color: var(--primary-color, var(--bs-primary, #89b4fa));
+}
+
+.custom-context-menu-item.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: default;
+}
+
+.custom-context-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  margin-right: 8px;
+  font-size: 15px;
+  color: var(--text-muted, var(--bs-secondary-color, #a6adc8));
+}
+
+.custom-context-menu-item:hover .custom-context-menu-icon {
+  color: var(--primary-color, var(--bs-primary, #89b4fa));
+}
+
+.custom-context-menu-label {
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-context-menu-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.custom-context-menu-divider {
+  height: 1px;
+  margin: 5px 0;
+  background-color: var(--border-color, var(--bs-border-color, rgba(128, 128, 128, 0.2)));
+}
+
+.custom-context-menu-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 14px;
+  color: var(--text-muted, var(--bs-secondary-color, #a6adc8));
+}
+
+/* Модальное окно Git GC */
+#gitMaintenanceModal .modal-content {
+  background-color: var(--surface-card, var(--bs-body-bg, #1e1e2e));
+  color: var(--text-primary, var(--bs-body-color, #cdd6f4));
+  border: 1px solid var(--border-color, var(--bs-border-color, rgba(128, 128, 128, 0.25)));
+}
+
+#gitMaintenanceModal .card {
+  background-color: var(--surface-card, var(--bs-body-bg, #1e1e2e));
+  border: 1px solid var(--border-color, var(--bs-border-color, rgba(128, 128, 128, 0.25)));
+}
+
+#gitMaintenanceModal pre {
+  background-color: var(--surface-dark, rgba(0, 0, 0, 0.3));
+  color: var(--text-primary, var(--bs-body-color, #cdd6f4));
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.2));
+  border-radius: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 12px;
+}

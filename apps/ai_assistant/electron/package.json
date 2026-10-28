@@ -1,0 +1,14 @@
+{
+  "name": "ai-assistant-electron-shell",
+  "version": "1.0.0",
+  "description": "Самостоятельная десктопная оболочка Electron (Chromium + Node.js) для AI Assistant, Git и компактного Obsidian Vault",
+  "main": "main.js",
+  "author": "hypo69",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

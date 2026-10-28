@@ -1,0 +1,89 @@
+{
+  "name": "ai_assistant",
+  "version": "1.0.0",
+  "enabled": true,
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8002,
+    "mode": "dedicated",
+    "on_occupied": "prompt"
+  },
+  "storage": {
+    "workspaces_dir": "data/workspaces",
+    "data_dir": "data"
+  },
+  "converters": {
+    "pdf_mode": "local",
+    "ocr_mode": "model",
+    "audio_mode": "model",
+    "preferred_audio_model": "gemini-2.5-flash",
+    "preferred_vision_model": "gemini-2.5-flash"
+  },
+  "git": {
+    "workspaces_dir": "data/workspaces",
+    "repo_path": "data/workspaces",
+    "default_branch": "master",
+    "max_commits_history": 200,
+    "max_diff_lines": 500
+  },
+  "rag": {
+    "chunk_size": 400,
+    "chunk_overlap": 50,
+    "dimension": 3072,
+    "incremental_indexing": true
+  },
+  "llm": {
+    "default_provider": "gemini",
+    "default_model": "gemini-3.5-flash-lite",
+    "temperature": 0.2
+  },
+  "chromium": {
+    "profile_dir": "data/chromium/profiles",
+    "cache_dir": "data/chromium/cache"
+  },
+  "engine": {
+    "preferred": "electron",
+    "supported": [
+      "electron",
+      "webview2"
+    ]
+  },
+  "obsidian": {
+    "mode": "compact",
+    "auto_sync_on_the_fly": true,
+    "knowledge_base_file": "_Knowledge_Base.md",
+    "topics_dir": "_Topics"
+  },
+  "git_maintenance": {
+    "auto_gc_enabled": true,
+    "gc_interval_hours": 48,
+    "aggressive": false,
+    "auto_prune": true,
+    "last_gc_run": "2026-10-28T19:04:37.933333",
+    "last_gc_status": "Успешно завершено за 0.0 сек (2026-10-28T19:04:37.933333)"
+  },
+  "scenarios": {
+    "david_moshe_telegram": {
+      "enabled": true,
+      "workspace_id": "דוד_משה",
+      "workspace_name": "דוד משה",
+      "workspace_aliases": [
+        "דוד משה",
+        "דוד_משה",
+        "דוד מושה",
+        "דוד_מושה"
+      ],
+      "trigger_file_names": [
+        "שיחה בין דוד משה לשמוליק",
+        "שיחה_בין_דוד_משה_לשמוליק",
+        "שיחה בין דוד מושה לשמוליק",
+        "שיחה_בין_דוד_מושה_לשמוליק"
+      ],
+      "target_file_path": "C:\\Users\\onela\\Desktop\\דוד מושה — רשימת מסמכים\\שיחה בין דוד משה לשמוליק.md",
+      "delay_seconds": 10
+    }
+  },
+  "app_name": "AI-Assistant",
+  "active_workspace": "דוד_משה",
+  "last_active_workspace": "דוד_משה"
+}

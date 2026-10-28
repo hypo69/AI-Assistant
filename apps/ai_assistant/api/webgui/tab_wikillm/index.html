@@ -1,0 +1,68 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - WikiLLM Tab
+=============================================================================
+Description:
+  Интерфейс базы знаний WikiLLM и архитектурных сущностей.
+  Панель panel-wikillm-entities подключена к GET /v1/panel/panel-wikillm-entities.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_wikillm
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="container-fluid p-3">
+<div class="d-flex align-items-center justify-content-between mb-3">
+<div>
+<h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+<span class="fs-5">🧠</span>
+<span data-i18n="tabs.wikillm" id="tab-wikillm-heading-text">База знаний WikiLLM</span>
+</h4>
+<div class="small text-muted" data-i18n="ui.wiki.txt_2fc800e3" id="wiki-div-2fc800e3">Архитектурные сущности, решения, документация модулей и связанные ошибки</div>
+</div>
+<div class="d-flex align-items-center gap-2">
+<button class="btn btn-sm btn-outline-success d-flex align-items-center gap-1" data-bs-target="#annotateModal" data-bs-toggle="modal">
+<i class="bi bi-plus-circle"></i>
+<span data-i18n="ui.wiki.txt_0dc2281d" id="wiki-span-0dc2281d">2-Step Аннотация</span>
+</button>
+<button class="btn btn-sm btn-primary d-flex align-items-center gap-1" id="wikillm-refresh-btn">
+<i class="bi bi-arrow-clockwise"></i>
+<span data-i18n="common.refresh" id="tab-wikillm-refresh-btn-text">Обновить</span>
+</button>
+</div>
+</div>
+<div class="card shadow-sm border mb-3" data-panel-id="panel-wikillm-entities" id="panel-wikillm-entities">
+<div class="card-header bg-body-tertiary d-flex align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<i class="bi bi-diagram-3-fill text-success"></i>
+<span data-i18n="ui.wiki.txt_2a585a1e" id="wiki-span-2a585a1e">Реестр сущностей WikiLLM (REST: /v1/panel/panel-wikillm-entities)</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border" data-i18n="ui.wiki.txt_6e20f823" id="wikillm-count-badge">0 связей</span>
+</div>
+<div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0 font-size-85">
+<thead class="table-light">
+<tr>
+<th class="col-w-140" data-i18n="ui.wiki.txt_7a112053" id="wiki-th-7a112053" scope="col">Источник</th>
+<th class="col-w-130" data-i18n="ui.wiki.txt_a5fb6c35" id="wiki-th-a5fb6c35" scope="col">Тип связи</th>
+<th class="col-w-180" data-i18n="ui.wiki.txt_55ea7d29" id="wiki-th-55ea7d29" scope="col">Цель</th>
+<th class="col-w-100" data-i18n="ui.wiki.txt_e83083a0" id="wiki-th-e83083a0" scope="col">Доверие</th>
+<th data-i18n="ui.wiki.txt_fbd499aa" id="wiki-th-fbd499aa" scope="col">Провенанс / Дата</th>
+</tr>
+</thead>
+<tbody id="wikillm-table-body">
+<tr>
+<td class="text-center py-4 text-muted" colspan="5">
+<div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+<div data-i18n="ui.wiki.txt_ff755b17" id="wiki-div-ff755b17">Загрузка сущностей через универсальный загрузчик панелей...</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>

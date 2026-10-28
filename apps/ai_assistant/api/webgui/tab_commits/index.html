@@ -1,0 +1,65 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Commits Tab
+=============================================================================
+Description:
+  Интерфейс истории коммитов Git репозитория.
+  Включает панель panel-commits, связанную с GET /v1/panel/panel-commits.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_commits
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="container-fluid p-3">
+<div class="d-flex align-items-center justify-content-between mb-3">
+<div>
+<h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+<span class="fs-5">📜</span>
+<span data-i18n="tabs.commits" id="tab-commits-heading-text">История коммитов репозитория</span>
+</h4>
+<div class="small text-muted" data-i18n="ui.commits.txt_a8e8fb68" id="commits-div-a8e8fb68">Полный аудит коммитов, хешей, авторов и описаний изменений</div>
+</div>
+<div class="d-flex align-items-center gap-2">
+<input class="form-control form-control-sm min-w-220" data-i18n-placeholder="placeholders.commits.ph_ef75ffc3" id="commits-search-input" placeholder="Поиск по коммитам..." type="text"/>
+<button class="btn btn-sm btn-primary d-flex align-items-center gap-1" id="commits-refresh-btn">
+<i class="bi bi-arrow-clockwise"></i>
+<span data-i18n="common.refresh" id="tab-commits-refresh-btn-text">Обновить</span>
+</button>
+</div>
+</div>
+<div class="card shadow-sm border mb-3" data-panel-id="panel-commits" id="panel-commits">
+<div class="card-header bg-body-tertiary d-flex align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-2">
+<i class="bi bi-git text-primary"></i>
+<span data-i18n="ui.commits.txt_b7ca8395" id="commits-span-b7ca8395">Таблица коммитов (REST: /v1/panel/panel-commits)</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border" data-i18n="ui.commits.txt_8f8e2027" id="commits-count-badge">0 коммитов</span>
+</div>
+<div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0 small">
+<thead class="table-light">
+<tr>
+<th class="col-w-100" data-i18n="ui.commits.txt_59d5b10c" id="commits-th-59d5b10c">Commit</th>
+<th class="col-w-170" data-i18n="ui.commits.txt_8cdd8bb7" id="commits-th-8cdd8bb7">Дата</th>
+<th class="col-w-160" data-i18n="ui.commits.txt_7c7d054b" id="commits-th-7c7d054b">Автор</th>
+<th data-i18n="ui.commits.txt_37157665" id="commits-th-37157665">Сообщение</th>
+<th class="col-w-80 text-end" data-i18n="ui.commits.txt_fb3df31b" id="commits-th-fb3df31b">Действия</th>
+</tr>
+</thead>
+<tbody id="commits-table-body">
+<tr>
+<td class="text-center py-4 text-muted" colspan="5">
+<div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+<div data-i18n="ui.commits.txt_f079b253" id="commits-div-f079b253">Загрузка списка коммитов...</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>

@@ -1,0 +1,141 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Google Calendar Tab
+=============================================================================
+Description:
+  Интерфейс управления Google Календарем: просмотр предстоящих событий,
+  фильтрация по диапазонам дат, планирование встреч с участниками и удаление.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_calendar
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-28 19:00:00
+=============================================================================
+-->
+<div class="container-fluid p-3" id="tab-calendar-container">
+  <!-- Верхняя строка заголовка и действий -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+        <span class="fs-4">📅</span>
+        <span data-i18n="ui.calendar.title" id="calendar-span-title">Google Календарь</span>
+      </h4>
+      <div class="small text-muted" data-i18n="ui.calendar.subtitle" id="calendar-div-subtitle">
+        Просмотр расписания, планирование встреч и управление событиями через Google Calendar API
+      </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 shadow-sm d-flex align-items-center gap-1.5" id="calendar-account-badge">
+        <i class="bi bi-google"></i>
+        <span data-i18n="ui.calendar.connected" id="calendar-account-email">Google Calendar</span>
+      </span>
+      <button class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 shadow-sm fw-semibold" id="btn-calendar-create" type="button">
+        <i class="bi bi-calendar-plus"></i>
+        <span data-i18n="ui.calendar.btn_create" id="calendar-span-create">Создать событие</span>
+      </button>
+      <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1.5 shadow-sm" id="btn-calendar-refresh" title="Обновить расписание" type="button">
+        <i class="bi bi-arrow-clockwise"></i>
+        <span class="d-none d-sm-inline" data-i18n="ui.calendar.btn_refresh" id="calendar-span-refresh">Обновить</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Панель фильтрации и выбора периода -->
+  <div class="card shadow-sm border mb-3">
+    <div class="card-body py-2 px-3">
+      <div class="row g-2 align-items-center justify-content-between">
+        <div class="col-12 col-md-6">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-body-tertiary border-end-0">
+              <i class="bi bi-search text-muted"></i>
+            </span>
+            <input class="form-control border-start-0" id="calendar-search-input" placeholder="Поиск по названию или описанию..." type="text"/>
+            <button class="btn btn-outline-secondary" id="btn-calendar-search-clear" title="Сбросить" type="button">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 d-flex justify-content-md-end gap-1">
+          <div class="btn-group btn-group-sm" role="group">
+            <input type="radio" class="btn-check" name="calendar-days" id="cal-days-7" value="7" checked>
+            <label class="btn btn-outline-primary" for="cal-days-7" data-i18n="ui.calendar.days_7" id="cal-label-days-7">7 дней</label>
+
+            <input type="radio" class="btn-check" name="calendar-days" id="cal-days-14" value="14">
+            <label class="btn btn-outline-primary" for="cal-days-14" data-i18n="ui.calendar.days_14" id="cal-label-days-14">14 дней</label>
+
+            <input type="radio" class="btn-check" name="calendar-days" id="cal-days-30" value="30">
+            <label class="btn btn-outline-primary" for="cal-days-30" data-i18n="ui.calendar.days_30" id="cal-label-days-30">30 дней</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Список событий -->
+  <div id="calendar-events-container">
+    <div class="d-flex justify-content-center py-5" id="calendar-loading-spinner">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Загрузка...</span>
+      </div>
+    </div>
+    <div class="row g-3" id="calendar-events-list"></div>
+    <div class="text-center py-5 d-none" id="calendar-empty-state">
+      <i class="bi bi-calendar-x fs-1 text-muted d-block mb-2"></i>
+      <h6 class="text-muted" data-i18n="ui.calendar.no_events" id="cal-h6-no-events">Нет предстоящих событий в выбранном периоде</h6>
+      <p class="small text-muted mb-0" data-i18n="ui.calendar.create_hint" id="cal-p-create-hint">Нажмите кнопку «Создать событие», чтобы запланировать встречу.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно создания события -->
+<div class="modal fade" id="modal-calendar-create" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+          <i class="bi bi-calendar-plus text-primary"></i>
+          <span data-i18n="ui.calendar.modal_create_title" id="cal-span-modal-create-title">Новое событие</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-calendar-create">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" data-i18n="ui.calendar.label_summary" id="cal-label-summary">Название / Тема *</label>
+            <input type="text" class="form-control form-control-sm" id="cal-create-summary" required placeholder="Например: Обсуждение архитектуры">
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold" data-i18n="ui.calendar.label_start" id="cal-label-start">Начало *</label>
+              <input type="datetime-local" class="form-control form-control-sm" id="cal-create-start" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold" data-i18n="ui.calendar.label_end" id="cal-label-end">Окончание *</label>
+              <input type="datetime-local" class="form-control form-control-sm" id="cal-create-end" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" data-i18n="ui.calendar.label_location" id="cal-label-location">Место / Ссылка на встречу</label>
+            <input type="text" class="form-control form-control-sm" id="cal-create-location" placeholder="Google Meet / Офис">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" data-i18n="ui.calendar.label_attendees" id="cal-label-attendees">Участники (email через запятую)</label>
+            <input type="text" class="form-control form-control-sm" id="cal-create-attendees" placeholder="colleague@example.com, manager@example.com">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold" data-i18n="ui.calendar.label_desc" id="cal-label-desc">Описание встречи</label>
+            <textarea class="form-control form-control-sm" id="cal-create-desc" rows="3" placeholder="Повестка дня, заметки..."></textarea>
+          </div>
+          <div class="alert alert-danger d-none py-1 small mb-0 mt-2" id="cal-create-error"></div>
+        </form>
+      </div>
+      <div class="modal-footer border-top">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" data-i18n="ui.calendar.btn_cancel" id="cal-btn-modal-cancel">Отмена</button>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-calendar-save-event">
+          <i class="bi bi-check-lg me-1"></i> <span data-i18n="ui.calendar.btn_save" id="cal-span-btn-save">Сохранить</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

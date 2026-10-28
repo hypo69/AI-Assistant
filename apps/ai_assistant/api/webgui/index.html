@@ -1,0 +1,1281 @@
+<!--
+
+=============================================================================
+
+Process Name: AI Assistant Web Interface - Index View
+
+=============================================================================
+
+Description:
+
+  Главный веб-интерфейс модуля умного версионирования и верификации (Smart Version History).
+
+  Полностью воспроизводит структуру apps/windows/api/webgui: навигация, оффканвас,
+
+  табы, темы оформления (светлая/тёмная/кирпичная/терминал/системная), переключатели
+
+  и стандарт интернационализации i18n BCP 47.
+
+  Каждая панель подключена к универсальному роутеру /v1/panel/<panel_id>.
+
+File: index.html
+
+Package: apps/ai_assistant/api/webgui
+
+Author: hypo69
+
+Copyright: © 2026 hypo69
+
+Updated: 2026-10-28 19:05:00
+
+=============================================================================
+
+-->
+<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Assistant — Smart Version History &amp; Knowledge QA</title>
+<script>
+
+    (function() {
+
+      try {
+
+        // Определение языка и RTL до первого рендеринга страницы
+        try {
+          var p = new URLSearchParams(window.location.search);
+          var qLang = p.get('lang') || p.get('locale') || p.get('region') || '';
+          var sLang = qLang || localStorage.getItem('app_language') || localStorage.getItem('app_locale') || '';
+          if (sLang) {
+            var cLang = sLang.toLowerCase().slice(0, 2);
+            if (cLang === 'he' || cLang === 'ar') {
+              document.documentElement.setAttribute('dir', 'rtl');
+              document.documentElement.setAttribute('lang', cLang);
+            }
+          }
+        } catch (_) {}
+
+        var mode = localStorage.getItem('theme') || 'system';
+
+        var resolved = mode;
+
+        if (mode === 'system') {
+
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+          resolved = prefersDark ? 'dark' : 'light';
+
+        }
+
+        var isLight = resolved === 'light' || resolved === 'brick' || resolved === 'theme-light-enterprise' || resolved === 'nightview';
+
+        document.documentElement.setAttribute('data-theme', resolved);
+
+        document.documentElement.setAttribute('data-bs-theme', isLight ? 'light' : 'dark');
+
+        document.documentElement.setAttribute('data-theme-mode', mode);
+
+        var savedLang = localStorage.getItem('app_language') || localStorage.getItem('app_locale') || 'ru';
+        var isRtl = savedLang.startsWith('he') || savedLang.startsWith('ar');
+        document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
+        document.documentElement.setAttribute('lang', savedLang);
+
+        if (resolved === 'dark' || resolved === 'theme-dark-slate') {
+
+          document.documentElement.classList.add('theme-dark-slate');
+
+        } else if (resolved === 'theme-light-enterprise' || resolved === 'light') {
+
+          document.documentElement.classList.add('theme-light-enterprise');
+
+        } else if (resolved === 'nightview' || resolved === 'theme-nightview') {
+
+          document.documentElement.classList.add('theme-nightview');
+
+        } else if (resolved) {
+
+          document.documentElement.classList.add(resolved);
+
+        }
+
+      } catch (e) {}
+
+    })();
+
+  </script>
+<link href="/html/assets/favicon.ico?v=20261022_v1" rel="icon" type="image/x-icon"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet"/>
+<link href="/html/css/main.css?v=20261025_v4" rel="stylesheet"/>
+<link href="/html/css/themes.css?v=20261025_v4" rel="stylesheet"/>
+<link href="/html/css/context-menu.css?v=20261026_v1" rel="stylesheet"/>
+<link href="/html/components/system_tour/system_tour.css?v=20261017_v1" rel="stylesheet"/>
+<link href="/html/ai_modal_dialog/style.css?v=20261017_v1" rel="stylesheet"/>
+<script src="/html/js/toast.js?v=20261017_v1"></script>
+<script src="/html/js/panel-loader.js?v=20261025_v4" type="module"></script>
+<script src="https://cdn.jsdelivr.net/npm/i18next@23.11.5/i18next.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="/html/js/global-i18n.js?v=20261025_v2"></script>
+<script src="/html/js/global-tooltips-i18n.js?v=20261017_v1"></script>
+</head>
+<body>
+<!-- Вертикальная панель навигации в стиле стандартных IDE (Activity Bar: VS Code / JetBrains / Cursor) -->
+<nav aria-label="Панель навигации IDE" class="ide-activity-bar" id="ide-activity-bar">
+<!-- Верхняя группа: ключевые инструменты IDE -->
+<div class="ide-activity-top">
+<!-- Переключение бокового меню (Side Bar Toggle) -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_b8b77740" id="ide-nav-toggle-sidebar" title="Переключить боковое меню (Side Bar) [Ctrl+B]" type="button">
+<i class="bi bi-layout-sidebar-inset fs-5"></i>
+</button>
+<div class="ide-activity-divider"></div>
+<!-- 1. Проводник рабочих пространств и файлов (Explorer) -->
+<button class="ide-activity-item active" data-i18n-title="titles.ide.title_cbf933c4" data-tab="tab-workspace" id="ide-nav-workspace" title="Проводник рабочих пространств и документов (Explorer) [Alt+1]" type="button">
+<i class="bi bi-folder2-open"></i>
+</button>
+<!-- 2. Контроль версий и коммиты Git (Source Control) -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_34464b6e" data-tab="tab-commits" id="ide-nav-commits" title="История коммитов и контроль версий Git (Source Control) [Alt+2]" type="button">
+<i class="bi bi-git"></i>
+</button>
+<!-- 3. Анализ изменений и Diff (Smart Blame) -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_72e8a76a" data-tab="tab-diff" id="ide-nav-diff" title="Сравнение файлов и Smart Blame (Diff) [Alt+3]" type="button">
+<i class="bi bi-file-earmark-diff"></i>
+</button>
+<!-- 4. Временная шкала версий (Timeline) -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_d2212b41" data-tab="tab-timeline" id="ide-nav-timeline" title="Шкала времени и хронология версий (Timeline) [Alt+4]" type="button">
+<i class="bi bi-clock-history"></i>
+</button>
+<!-- 5. База знаний WikiLLM & Obsidian Vault -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_41e7350a" data-tab="tab-wikillm" id="ide-nav-wikillm" title="База знаний WikiLLM &amp; Obsidian Vault [Alt+5]" type="button">
+<i class="bi bi-journal-richtext"></i>
+</button>
+<!-- 6. Интерактивный граф знаний (Graph View) -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_18727fff" data-tab="tab-graph" id="ide-nav-graph" title="Темпоральный граф знаний и зависимостей (Graph) [Alt+6]" type="button">
+<i class="bi bi-diagram-3"></i>
+</button>
+<!-- 7. Каталог ИИ-моделей и провайдеров -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_d0dd2aa9" data-tab="tab-models" id="ide-nav-models" title="Каталог ИИ-моделей и провайдеров (AI Models) [Alt+7]" type="button">
+<i class="bi bi-cpu"></i>
+</button>
+<!-- 8. 5-этапный поиск RAG -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_75187948" data-tab="tab-rag" id="ide-nav-rag" title="Глобальный 5-этапный поиск RAG (Search) [Alt+8]" type="button">
+<i class="bi bi-search"></i>
+</button>
+<!-- 9. Контур верификации -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_f62e0775" data-tab="tab-verification" id="ide-nav-verification" title="Контур верификации и целостности [Alt+9]" type="button">
+<i class="bi bi-shield-check"></i>
+</button>
+<!-- 10. Плагины и расширения (Extensions) -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_ee74eec5" data-tab="tab-plugins" id="ide-nav-plugins" title="Менеджер плагинов и модулей (Extensions Hub)" type="button">
+<i class="bi bi-puzzle"></i>
+</button>
+<!-- 11. Почта Gmail -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_5a463f93" data-tab="tab-gmail" id="ide-nav-gmail" title="Управление почтой Gmail" type="button">
+<i class="bi bi-envelope"></i>
+</button>
+<!-- 12. Google Календарь -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.calendar" data-tab="tab-calendar" id="ide-nav-calendar" title="Google Календарь и расписание" type="button">
+<i class="bi bi-calendar3"></i>
+</button>
+<!-- 13. Google Диск -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.drive" data-tab="tab-drive" id="ide-nav-drive" title="Google Диск и файлы" type="button">
+<i class="bi bi-cloud-check"></i>
+</button>
+<!-- 14. Google Контакты -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.contacts" data-tab="tab-contacts" id="ide-nav-contacts" title="Телефонная книга и контакты" type="button">
+<i class="bi bi-person-lines-fill"></i>
+</button>
+<!-- 15. Универсальный редактор файлов (Rust + WebAssembly) -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.fileEditor" data-tab="tab-file-editor" id="ide-nav-file-editor" title="Универсальный редактор файлов (Rust + Wasm)" type="button">
+<i class="bi bi-code-square"></i>
+</button>
+</div>
+<!-- Нижняя группа: статус Electron, темы, гид-тур, настройки -->
+<div class="ide-activity-bottom">
+<div class="ide-activity-divider"></div>
+<!-- Статус рантайма Electron Shell -->
+<button class="ide-activity-item position-relative" data-i18n-title="titles.ide.title_673efe98" id="ide-nav-electron-btn" title="Статус среды: Electron Shell" type="button">
+<i class="bi bi-lightning-charge-fill"></i>
+<span class="ide-status-dot"></span>
+</button>
+<!-- Редактор тем / Оформление -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_38086b54" data-tab="tab-theme-editor" id="ide-nav-theme-btn" title="Оформление и темы интерфейса" type="button">
+<i class="bi bi-palette"></i>
+</button>
+<!-- Интерактивный тур -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_977dd067" id="ide-nav-tour-btn" title="Интерактивный гид-тур" type="button">
+<i class="bi bi-compass"></i>
+</button>
+<!-- Параметры и настройки (Settings) -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_105e23ac" id="ide-nav-settings" title="Параметры и настройки [Ctrl+,]" type="button">
+<i class="bi bi-gear"></i>
+</button>
+</div>
+</nav>
+<!-- Стандартная боковая панель слева (Primary Side Bar: File Explorer & Extensions Marketplace) -->
+<aside aria-label="Боковая панель IDE" class="ide-file-sidebar" id="ide-file-navigator">
+<!-- 1. Представление Проводника файлов (VS Code Explorer) -->
+<div class="d-flex flex-column h-100" id="ide-sidebar-view-explorer">
+<!-- Шапка навигатора по файлам -->
+<div class="ide-explorer-header">
+<div class="d-flex align-items-center gap-1.5">
+<i class="bi bi-files text-primary"></i>
+<span data-i18n="ui.ide.txt_b55b1f12" id="ide-span-b55b1f12">Проводник</span>
+</div>
+<div class="ide-explorer-actions">
+<button class="ide-explorer-btn-icon" data-i18n-title="titles.ide.title_5b462ec6" id="ide-btn-new-file" title="Новый файл" type="button">
+<i class="bi bi-file-earmark-plus"></i>
+</button>
+<button class="ide-explorer-btn-icon" data-i18n-title="titles.ide.title_fd93d441" id="ide-btn-refresh-explorer" title="Обновить дерево файлов" type="button">
+<i class="bi bi-arrow-clockwise"></i>
+</button>
+<button class="ide-explorer-btn-icon" data-i18n-title="titles.ide.title_cd76bdfa" id="ide-btn-open-explorer-folder" title="Открыть папку в проводнике" type="button">
+<i class="bi bi-folder2-open"></i>
+</button>
+<button class="ide-explorer-btn-icon" data-i18n-title="titles.ide.title_e3241394" id="ide-btn-collapse-explorer" title="Свернуть навигатор (Ctrl+B)" type="button">
+<i class="bi bi-chevron-left"></i>
+</button>
+</div>
+</div>
+<!-- Заголовок активного рабочего пространства -->
+<div class="ide-explorer-section-title">
+<div class="d-flex align-items-center gap-1.5 text-truncate">
+<i class="bi bi-chevron-down small text-muted"></i>
+<i class="bi bi-folder-check text-success"></i>
+<span class="text-truncate" data-i18n="ui.ide.txt_fe01ce2a" id="ide-explorer-ws-title">demo</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border font-size-75" data-i18n="ui.ide.txt_eb0a1917" id="ide-explorer-ws-branch">master</span>
+</div>
+<!-- Интерактивное дерево файлов и папок (Tree View) -->
+<div class="ide-tree-view" id="ide-file-tree-container">
+<!-- Заполняется динамически через ide_file_explorer.js -->
+</div>
+<!-- Подвал проводника -->
+<div class="p-1.5 px-2 border-top border-secondary-subtle d-flex align-items-center justify-content-between font-size-75 text-muted bg-body-tertiary">
+<span data-i18n="ui.ide.txt_e9e5145e" id="ide-explorer-summary-badge">0 файлов</span>
+<span class="d-flex align-items-center gap-1 text-success">
+<i class="bi bi-git"></i>
+<span data-i18n="ui.ide.txt_949d91c8" id="ide-span-949d91c8">Git Synced</span>
+</span>
+</div>
+</div>
+<!-- 2. Представление Расширений IDE (VS Code Extensions Marketplace View) -->
+<div class="ide-extensions-sidebar-view d-none" id="ide-sidebar-view-extensions">
+<!-- Шапка расширений -->
+<div class="ide-explorer-header">
+<div class="d-flex align-items-center gap-1.5">
+<i class="bi bi-puzzle text-primary"></i>
+<span data-i18n="ui.ide.txt_ecbb4e70" id="ide-span-ecbb4e70">Расширения: Marketplace</span>
+</div>
+<div class="ide-explorer-actions">
+<button class="ide-explorer-btn-icon" data-i18n-title="titles.ide.title_2df29703" id="ide-btn-refresh-extensions" title="Обновить каталог плагинов" type="button">
+<i class="bi bi-arrow-clockwise"></i>
+</button>
+<button class="ide-explorer-btn-icon" data-i18n-title="titles.ide.title_17a110d9" id="ide-btn-collapse-extensions" title="Свернуть панель (Ctrl+B)" type="button">
+<i class="bi bi-chevron-left"></i>
+</button>
+</div>
+</div>
+<!-- Поле поиска по маркетплейсу расширений -->
+<div class="ide-ext-search-container">
+<div class="input-group input-group-sm">
+<span class="input-group-text bg-body-tertiary border-end-0 py-1">
+<i class="bi bi-search text-secondary small"></i>
+</span>
+<input class="form-control ide-ext-search-input border-start-0 py-1" data-i18n-placeholder="placeholders.ide.ph_12b7cdc5" id="ide-ext-search-input" placeholder="Поиск в Marketplace..." type="text"/>
+</div>
+</div>
+<!-- Скроллируемый список расширений (Установленные + Каталог Marketplace) -->
+<div class="ide-ext-list-container" id="ide-ext-list-container">
+<div class="text-center py-4 text-secondary">
+<div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+<div class="small" data-i18n="ui.ide.txt_f4922a36" id="ide-div-f4922a36">Загрузка расширений...</div>
+</div>
+</div>
+</div>
+</aside>
+<div class="container-fluid ide-main-viewport mt-1">
+<!-- Верхняя навигационная панель -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1 main-nav-container rounded px-2 py-1">
+<!-- Левая часть: кнопка меню, брендинг и быстрые вкладки -->
+<div class="d-flex flex-wrap align-items-center gap-2">
+<button aria-controls="leftSideNavOffcanvas" class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 px-2 py-1 rounded shadow-sm" data-ai-tooltip="true" data-bs-target="#leftSideNavOffcanvas" data-bs-toggle="offcanvas" data-i18n-title="titles.ide.title_c13990e0" data-term="workspace" id="left-drawer-toggle-btn" title="Открыть меню разделов" type="button">
+<i class="bi bi-list fs-6"></i>
+<span class="d-none d-md-inline" data-i18n="nav.menu" id="top-nav-menu-label">Меню</span>
+</button>
+<a class="fw-bold d-flex align-items-center gap-1.5 text-primary text-decoration-none fs-6 me-2" data-i18n-title="titles.ide.title_c21ce32d" href="/" id="app-brand-link" title="Главная страница — AI Assistant">
+<i class="bi bi-cpu-fill fs-5" id="app-brand-icon"></i>
+<span class="d-none d-sm-inline" data-i18n="app.title" id="app-title">AI Assistant — Умное Версионирование</span>
+</a>
+</div>
+<!-- Центр: Раскрывающееся окно выбора рабочего пространства как в Command Center VS Code -->
+<div class="ide-command-center d-none d-md-flex" id="ide-command-center">
+<button class="ide-command-center-btn shadow-sm" data-i18n-title="titles.ide.title_d7853526" id="ide-workspace-picker-btn" title="Выбрать рабочее пространство Git (Ctrl+O / Клик для раскрытия окна)" type="button">
+<i class="bi bi-folder2-open text-primary me-2"></i>
+<span class="ide-ws-title fw-bold" data-i18n="ui.ide.txt_fe01ce2a" id="ide-command-center-ws-name">demo</span>
+<span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-2 font-size-75" data-i18n="ui.ide.txt_eb0a1917" id="ide-command-center-branch">master</span>
+<i class="bi bi-chevron-down ms-2 text-muted small"></i>
+</button>
+</div>
+<!-- Правая часть: бейджи, кеш, справка, настройки профиля -->
+<div class="d-flex align-items-center gap-1.5 flex-shrink-0 ms-auto nav-actions-right">
+<span class="badge rounded-pill bg-success-subtle text-success border px-3 py-1 shadow-sm d-flex align-items-center gap-1 font-size-80" data-ai-tooltip="true" data-i18n-title="titles.ide.title_b89dc149" data-term="status" id="head-commit-badge" title="Статус ядра версионирования">
+<i class="bi bi-git"></i>
+<span class="d-none d-xl-inline" data-i18n="app.serviceOnline" id="head-commit-badge-service-status">Git Tree Ready</span>
+</span>
+
+<!-- Google OAuth Кнопка (когда не авторизован) -->
+<button class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1.5 px-2.5 py-1 rounded shadow-sm btn-google-login" data-i18n-title="auth.googleSignInTitle" id="nav-google-btn" title="Войти через Google OAuth" type="button">
+<i class="bi bi-google"></i>
+<span class="d-none d-xxl-inline" data-i18n="auth.googleSignIn" id="top-nav-google-signin-label">Войти через Google</span>
+</button>
+<!-- Меню авторизованного пользователя Google (когда авторизован) -->
+<div class="dropdown d-none" id="user-menu-dropdown-wrapper">
+<button aria-expanded="false" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 px-2 py-1 rounded shadow-sm dropdown-toggle" data-bs-toggle="dropdown" data-i18n-title="titles.ide.title_5edb8455" id="user-settings-btn" title="Аккаунт Google" type="button">
+<img class="rounded-circle d-none object-fit-cover" height="22" id="nav-user-avatar" src="" width="22"/>
+<i class="bi bi-person-circle" id="nav-user-icon"></i>
+<span class="small fw-semibold" data-i18n="ui.ide.txt_f154d6cc" id="nav-user-label">Пользователь</span>
+</button>
+<ul class="dropdown-menu dropdown-menu-end shadow border-secondary-subtle font-size-85 py-1">
+<li class="px-3 py-1.5 border-bottom border-secondary-subtle">
+<div class="fw-bold text-truncate" data-i18n="ui.ide.txt_f154d6cc" id="user-menu-display-name">Пользователь</div>
+<div class="small text-muted text-truncate" data-i18n="ui.ide.txt_1919bfc4" id="user-menu-display-email">email@gmail.com</div>
+</li>
+<li>
+<button class="dropdown-item d-flex align-items-center gap-2 py-1.5" data-bs-target="#userSettingsModal" data-bs-toggle="modal" id="user-menu-item-settings" type="button">
+<i class="bi bi-gear text-primary"></i>
+<span data-i18n="ui.ide.txt_a50505d1" id="ide-span-a50505d1">Настройки аккаунта</span>
+</button>
+</li>
+<li><hr class="dropdown-divider my-1"/></li>
+<li>
+<button class="dropdown-item d-flex align-items-center gap-2 py-1.5 text-danger btn-user-logout" id="user-menu-item-logout" type="button">
+<i class="bi bi-box-arrow-right"></i>
+<span data-i18n="ui.ide.txt_6d4183b7" id="ide-span-6d4183b7">Выйти из аккаунта</span>
+</button>
+</li>
+</ul>
+</div>
+<!-- Кнопка справки -->
+<button class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center rounded-circle btn-icon-circle-28" data-bs-target="#help-modal" data-bs-toggle="modal" data-i18n-title="titles.ide.title_77265ac0" id="top-nav-help-btn" title="Справка">
+<i class="bi bi-question-circle"></i>
+</button>
+<!-- Кнопка настроек интерфейса (Тема и Язык) -->
+<button class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center rounded-circle btn-icon-circle-28" data-bs-target="#userSettingsModal" data-bs-toggle="modal" data-i18n-title="userSettings.title" id="user-settings-gear-btn" title="Настройки">
+<i class="bi bi-gear-fill"></i>
+</button>
+</div>
+</div>
+<!-- Плавающий боковой ярлычок (вкладка) слева -->
+<button aria-controls="leftSideNavOffcanvas" class="left-drawer-tab-trigger btn shadow" data-bs-target="#leftSideNavOffcanvas" data-bs-toggle="offcanvas" data-i18n-title="titles.ide.title_b1d272a2" id="left-drawer-floating-trigger" title="Открыть меню навигации" type="button">
+<i class="bi bi-list fs-6"></i>
+<span class="left-drawer-tab-text" data-i18n="ui.ide.txt_6c875652" id="ide-span-6c875652">МЕНЮ</span>
+</button>
+<!-- Левая выдвижная панель навигации (Offcanvas) -->
+<div aria-labelledby="leftSideNavOffcanvasLabel" class="offcanvas offcanvas-start left-drawer-nav" id="leftSideNavOffcanvas" tabindex="-1">
+<div class="offcanvas-header border-bottom py-2 px-3">
+<h5 class="offcanvas-title d-flex align-items-center gap-2 fs-6 fw-bold" id="leftSideNavOffcanvasLabel">
+<i class="bi bi-grid-fill text-primary"></i>
+<span data-i18n="nav.sections" id="drawer-sections-heading">Навигация и разделы</span>
+</h5>
+<button aria-label="Close" class="btn-close text-reset" data-bs-dismiss="offcanvas" id="left-drawer-close-btn" type="button"></button>
+</div>
+<div class="offcanvas-body p-3 d-flex flex-column justify-content-between" id="mainTabs">
+<div class="drawer-sections-wrapper">
+<!-- Блок переключения программ (Программы / Services) деактивирован в сценарии assist.ps1 -->
+<div class="nav-drawer-group mb-3 d-none" id="appSwitcherGroup">
+<div class="nav-drawer-group-title d-flex align-items-center gap-1.5 mb-2">
+<i class="bi bi-arrow-left-right text-primary"></i>
+<span data-i18n="ui.ide.txt_0aa42bbc" id="ide-span-0aa42bbc">Программы</span>
+</div>
+<div class="list-group list-group-flush rounded border" id="appSwitcherNav">
+<a class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3" data-i18n-title="titles.ide.title_c8053d9a" href="/tc#tab-about-system" id="btn-switch-to-tc" onclick="switchToApp('tc', event)" target="_top" title="Перейти в приложение: AI Windows Admin (Test Computer)">
+<div class="d-flex align-items-center gap-2">
+<i class="bi bi-window-desktop text-primary fs-6"></i>
+<span class="fw-medium" data-i18n="ui.ide.txt_1fc2d3b3" id="ide-span-1fc2d3b3">AI Windows Admin</span>
+</div>
+<i class="bi bi-box-arrow-up-right text-muted small"></i>
+</a>
+<a class="list-group-item list-group-item-action active d-flex align-items-center justify-content-between py-2 px-3" data-i18n-title="titles.ide.title_57627ff7" href="/ai_assistant" id="btn-switch-to-ai-assistant" target="_top" title="Текущее приложение: Умная история файлов (Smart Version History &amp; WikiLLM)">
+<div class="d-flex align-items-center gap-2">
+<i class="bi bi-clock-history text-success fs-6"></i>
+<span class="fw-semibold" data-i18n="ui.ide.txt_3adad3ce" id="ide-span-3adad3ce">Умная история файлов</span>
+</div>
+<span class="badge bg-success-subtle text-success border border-success-subtle small font-size-80" data-i18n="ui.ide.txt_87a4286b" id="ide-span-87a4286b">Активно</span>
+</a>
+</div>
+</div>
+<!-- Группа: Рабочие пространства -->
+<div class="nav-drawer-group mb-3" id="drawer-workspaces-group">
+<div class="nav-drawer-group-title d-flex align-items-center justify-content-between mb-2">
+<div class="d-flex align-items-center gap-1.5">
+<i class="bi bi-folder2-open text-primary"></i>
+<span class="fw-semibold" data-i18n="ui.ide.txt_9adf73bb" id="ide-span-9adf73bb">Рабочие пространства</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border font-size-75" id="drawer-ws-count-badge">2</span>
+</div>
+<div class="list-group list-group-flush rounded border" id="drawer-workspaces-list">
+<!-- Динамический список рабочих пространств из data -->
+<div id="drawer-workspaces-dynamic-items">
+<button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3 drawer-ws-item active" data-i18n-title="titles.ide.title_c5b49b06" data-ws-id="demo" id="ide-title-c5b49b06" title="Рабочее пространство: demo" type="button">
+<div class="d-flex align-items-center gap-2 overflow-hidden text-truncate">
+<i class="bi bi-folder-check text-success fs-6 flex-shrink-0 drawer-ws-icon"></i>
+<div class="text-truncate text-start">
+<div class="fw-medium text-truncate" data-i18n="ui.ide.txt_fe01ce2a" id="ide-div-fe01ce2a">demo</div>
+<div class="small text-muted text-truncate font-size-75" data-i18n="ui.ide.txt_090f7c40" id="ide-div-090f7c40">первый опыт работы с workspace</div>
+</div>
+</div>
+<span class="badge bg-success-subtle text-success border font-size-75 drawer-ws-status-badge" data-i18n="ui.ide.txt_ee69127b" id="ide-span-ee69127b">готов</span>
+</button>
+</div>
+<!-- Кнопка: Создать новое рабочее пространство -->
+<button class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 px-3 text-success fw-semibold border-top" data-bs-target="#tab-create-workspace" data-tab="tab-create-workspace" id="menu-btn-nav-create-workspace" type="button">
+<i class="bi bi-folder-plus text-success fs-6"></i>
+<span data-i18n="ui.ide.txt_ef293092" id="ide-span-ef293092">+ Создать рабочее пространство</span>
+</button>
+<button class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-1.5 px-3 text-muted small" data-bs-target="#modal-create-workspace-wizard" data-bs-toggle="modal" id="menu-btn-create-workspace" type="button">
+<span class="fs-6">⚙️</span>
+<span data-i18n="ui.ide.txt_53be1f12" id="ide-span-53be1f12">Мастер: Создать рабочую область. Дать ей имя</span>
+</button>
+</div>
+</div>
+<!-- Группа: Статус и Диагностика (разделы, не представленные на панели Activity Bar) -->
+<div class="nav-drawer-group mb-3" id="drawer-system-group">
+<div class="nav-drawer-group-title d-flex align-items-center gap-1 mb-2">
+<i class="bi bi-activity text-info"></i>
+<span data-i18n="tabs.status" id="drawer-group-status-label">Статус и Диагностика</span>
+</div>
+<div class="list-group list-group-flush rounded border">
+<button class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 px-3" data-bs-target="#tab-status" data-tab="tab-status" id="drawer-nav-tab-status" type="button">
+<span class="fs-6">📊</span>
+<span class="fw-medium" data-i18n="tabs.status" id="drawer-nav-status-label">Статус системы</span>
+</button>
+<button class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 px-3" data-bs-target="#tab-git-maintenance" data-tab="tab-git-maintenance" id="drawer-nav-tab-git-maintenance" type="button">
+<span class="fs-6">🧹</span>
+<span class="fw-medium" data-i18n="ui.ide.txt_1db129d2" id="ide-span-1db129d2">Диагностика Git (GC)</span>
+</button>
+<button class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 px-3" data-bs-target="#tab-file-editor" data-tab="tab-file-editor" id="drawer-nav-tab-file-editor" type="button">
+<span class="fs-6">💻</span>
+<span class="fw-medium" data-i18n="tabs.fileEditor" id="drawer-nav-file-editor-label">Редактор файлов (Rust + Wasm)</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Основной контейнер содержимого вкладок -->
+<div class="tab-content" id="mainTabContent">
+<div class="tab-pane fade show active" id="tab-workspace"></div>
+<div class="tab-pane fade" id="tab-create-workspace"></div>
+<div class="tab-pane fade" id="tab-timeline"></div>
+<div class="tab-pane fade" id="tab-commits"></div>
+<div class="tab-pane fade" id="tab-diff"></div>
+<div class="tab-pane fade" id="tab-wikillm"></div>
+<div class="tab-pane fade" id="tab-graph"></div>
+<div class="tab-pane fade" id="tab-rag"></div>
+<div class="tab-pane fade" id="tab-verification"></div>
+<div class="tab-pane fade" id="tab-status"></div>
+<div class="tab-pane fade" id="tab-theme-editor"></div>
+<div class="tab-pane fade" id="tab-models"></div>
+<div class="tab-pane fade" id="tab-git-maintenance"></div>
+<div class="tab-pane fade" id="tab-gmail"></div>
+<div class="tab-pane fade" id="tab-calendar"></div>
+<div class="tab-pane fade" id="tab-drive"></div>
+<div class="tab-pane fade" id="tab-contacts"></div>
+<div class="tab-pane fade" id="tab-plugins"></div>
+<div class="tab-pane fade" id="tab-file-editor"></div>
+</div>
+</div>
+<!-- Модальное окно настроек пользователя (Тема и Язык) -->
+<div aria-hidden="true" aria-labelledby="userSettingsModalLabel" class="modal fade" id="userSettingsModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle">
+<h5 class="modal-title d-flex align-items-center gap-2" id="userSettingsModalLabel">
+<i class="bi bi-sliders text-primary"></i>
+<span data-i18n="userSettings.title" id="user-settings-modal-header-title">Параметры интерфейса</span>
+</h5>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<!-- Тело модального окна настроек интерфейса -->
+<div class="modal-body p-3" id="modal-user-settings-body">
+<!-- Карточка авторизованного пользователя Google OAuth -->
+<div class="card bg-body-tertiary border-secondary-subtle mb-3 p-3 d-none" id="user-settings-auth-card">
+<!-- Строка профиля с аватаром и информацией о пользователе -->
+<div class="d-flex align-items-center gap-3" id="user-settings-profile-row">
+<!-- Фото профиля пользователя Google -->
+<img class="rounded-circle border border-2 border-primary d-none object-fit-cover" height="48" id="user-settings-avatar" src="" width="48"/>
+<!-- Резервная иконка аватара при отсутствии фото -->
+<div class="rounded-circle bg-primary-subtle text-primary p-2 d-flex align-items-center justify-content-center avatar-48" id="user-settings-avatar-fallback">
+<i class="bi bi-person-fill fs-4" id="user-settings-avatar-icon"></i>
+</div>
+<!-- Колонка сведений о пользователе -->
+<div class="flex-grow-1 min-w-0" id="user-settings-info-col">
+<!-- Строка имени пользователя и бейджа роли -->
+<div class="d-flex align-items-center gap-2" id="user-settings-name-badge-row">
+<!-- Отображаемое имя пользователя -->
+<strong class="text-truncate" data-i18n="userSettings.userDefault" id="user-settings-name">Пользователь</strong>
+<!-- Бейдж системной роли пользователя -->
+<span class="badge bg-primary" data-i18n="ui.ide.txt_e3afed00" id="user-settings-role-badge">Admin</span>
+</div>
+<!-- Электронная почта пользователя -->
+<div class="small text-muted text-truncate" data-i18n="ui.ide.txt_1919bfc4" id="user-settings-email">email@gmail.com</div>
+<!-- Индикатор статуса синхронизации с Google OAuth -->
+<div class="small mt-1 text-muted" id="user-settings-google-badge">
+<i class="bi bi-google text-danger me-1"></i><span data-i18n="userSettings.googleOAuth" id="user-settings-google-oauth-label">Google OAuth:</span> <span class="text-success fw-bold" data-i18n="userSettings.googleSynced" id="user-settings-google-status">Синхронизирован</span>
+</div>
+</div>
+<!-- Кнопка выхода из учётной записи -->
+<button class="btn btn-outline-danger btn-sm btn-user-logout" data-i18n-title="userSettings.logout" id="user-settings-logout-btn" title="Выйти" type="button">
+<i class="bi bi-box-arrow-right"></i>
+</button>
+</div>
+</div>
+<!-- Карточка гостевого режима и входа через Google OAuth -->
+<div class="card bg-body-tertiary border-secondary-subtle mb-3 p-3 text-center" id="user-settings-guest-card">
+<!-- Описание авторизации и доступа к сервисам Google -->
+<div class="text-muted small mb-2" id="user-settings-auth-desc">
+<i class="bi bi-shield-lock me-1"></i> <span data-i18n="userSettings.authDesc" id="user-settings-auth-desc-text">Авторизация и доступ к сервисам Google</span>
+</div>
+<!-- Кнопка входа через Google OAuth 2.0 -->
+<button class="btn btn-outline-danger btn-sm w-100 d-flex align-items-center justify-content-center gap-2 btn-google-login" id="user-settings-google-btn" type="button">
+<i class="bi bi-google"></i>
+<span data-i18n="userSettings.signInGoogle" id="user-settings-google-btn-text">Войти через Google (OAuth 2.0)</span>
+</button>
+</div>
+<!-- Контейнер выбора языка интерфейса (i18n) -->
+<div class="mb-3" id="modal-lang-container">
+<!-- Заголовок поля выбора языка интерфейса -->
+<label class="form-label fw-semibold small d-flex align-items-center gap-2" for="modal-lang-selector" id="modal-lang-selector-label">
+<i class="bi bi-translate text-info"></i>
+<span data-i18n="userSettings.language" id="modal-lang-selector-text">Язык интерфейса</span>
+</label>
+<!-- Выпадающий список выбора языка интерфейса -->
+<select class="form-select lang-selector" data-i18n-title="userSettings.languageSelectTitle" id="modal-lang-selector" title="Выбор языка интерфейса">
+<!-- Опция русского языка (ru-RU) -->
+<option data-i18n="ui.ide.txt_051d7ea9" id="opt-lang-ru" value="ru-RU">Русский (ru-RU)</option>
+<!-- Опция английского языка (en-US) -->
+<option data-i18n="ui.ide.txt_a44c7293" id="opt-lang-en" value="en-US">English (en-US)</option>
+<!-- Опция иврита (he-IL) -->
+<option data-i18n="ui.ide.txt_da0ae119" id="opt-lang-he" value="he-IL">עברית (he-IL)</option>
+<!-- Опция украинского языка (uk-UA) -->
+<option data-i18n="ui.ide.txt_ceae3e80" id="opt-lang-uk" value="uk-UA">Українська (uk-UA)</option>
+</select>
+</div>
+<!-- Контейнер выбора темы оформления интерфейса -->
+<div class="mb-2" id="modal-theme-container">
+<!-- Заголовок поля выбора темы оформления -->
+<label class="form-label fw-semibold small d-flex align-items-center gap-2" for="modal-theme-selector" id="modal-theme-selector-label">
+<i class="bi bi-palette text-warning"></i>
+<span data-i18n="userSettings.theme" id="modal-theme-selector-text">Тема оформления</span>
+</label>
+<!-- Выпадающий список тем оформления -->
+<select class="form-select theme-selector" data-i18n-title="userSettings.themeSelectTitle" id="modal-theme-selector" title="Выбор темы оформления">
+<!-- Системная адаптивная тема -->
+<option data-i18n="userSettings.themeSystem" id="opt-theme-system" value="system">🌓 Системная</option>
+<!-- Группа тёмных тем интерфейса -->
+<optgroup data-i18n-label="userSettings.themeGroupDark" id="optgroup-themes-dark" label="🌙 Тёмные темы">
+<!-- Стандартная тёмная тема -->
+<option data-i18n="userSettings.themeDark" id="opt-theme-dark" value="dark">🌙 Стандартная тёмная</option>
+<!-- Тёмная сланцевая тема Dark Slate -->
+<option data-i18n="userSettings.themeDarkSlate" id="opt-theme-dark-slate" selected="" value="theme-dark-slate">🌑 Dark Slate (Тёмный сланец)</option>
+<!-- Неоновая киберпанк тема Cyberpunk Neon -->
+<option data-i18n="userSettings.themeCyberpunk" id="opt-theme-cyberpunk" value="theme-cyberpunk">⚡ Cyberpunk Neon (Киберпанк неон)</option>
+<!-- Консольная тема Terminal (Matrix / CRT) -->
+<option data-i18n="userSettings.themeTerminal" id="opt-theme-terminal" value="terminal">📟 Терминал (Matrix / CRT)</option>
+<!-- Скандинавская морозная тема Nordic Frost -->
+<option data-i18n="userSettings.themeNordicFrost" id="opt-theme-nordic-frost" value="nordic-frost">❄️ Nordic Frost (Скандинавский морозный)</option>
+<!-- Тема высокой контрастности High Contrast -->
+<option data-i18n="userSettings.themeHighContrast" id="opt-theme-high-contrast" value="theme-high-contrast">👁️ High Contrast (Высокая контрастность)</option>
+</optgroup>
+<!-- Группа светлых тем интерфейса -->
+<optgroup data-i18n-label="userSettings.themeGroupLight" id="optgroup-themes-light" label="☀️ Светлые темы">
+<!-- Кирпичная тема Terracotta Brick -->
+<option data-i18n="userSettings.themeBrick" id="opt-theme-brick" value="brick">🧱 Кирпичная (Терракота)</option>
+<!-- Стандартная светлая тема Light / NightView -->
+<option data-i18n="userSettings.themeLight" id="opt-theme-light" value="light">☀️ Стандартная светлая (NightView)</option>
+<!-- Корпоративная светлая тема Light Enterprise -->
+<option data-i18n="userSettings.themeLightEnterprise" id="opt-theme-light-enterprise" value="theme-light-enterprise">🏢 Light Enterprise (Светлый корпоративный)</option>
+</optgroup>
+</select>
+</div>
+<!-- Секция навигации в Редактор тем оформления -->
+<div class="pt-2 border-top border-secondary-subtle mt-3" id="modal-theme-editor-section">
+<!-- Кнопка перехода в Редактор тем оформления -->
+<button class="btn btn-outline-primary btn-sm w-100 d-flex align-items-center justify-content-center gap-2" data-bs-dismiss="modal" data-tab="tab-theme-editor" id="modal-btn-open-theme-editor" type="button">
+<i class="bi bi-palette2 text-primary"></i>
+<span data-i18n="userSettings.themeEditorBtn" id="modal-btn-open-theme-editor-label">Редактор тем оформления</span>
+</button>
+<!-- Описание возможностей редактора тем -->
+<div class="text-muted small text-center mt-1 font-size-75" data-i18n="userSettings.themeEditorDesc" id="modal-theme-editor-desc">
+              Размеры, цвета, скругления, типографика и элементы
+            </div>
+</div>
+<!-- Секция диспетчера кеша браузера -->
+<div class="pt-2 border-top border-secondary-subtle mt-3" id="modal-cache-manager-section">
+<!-- Кнопка открытия диалога управления кешем браузера -->
+<button class="btn btn-outline-secondary btn-sm w-100 d-flex align-items-center justify-content-center gap-2" data-ai-tooltip="true" data-bs-target="#cacheManagerModal" data-bs-toggle="modal" data-i18n-title="cacheManager.title" data-term="clear_cache" id="btn-open-cache-manager" title="Кеш браузера" type="button">
+<i class="bi bi-hdd-stack text-secondary"></i>
+<span data-i18n="userSettings.cacheManagerBtn" id="modal-cache-manager-btn-label">Кеш браузера и хранилище данных</span>
+</button>
+<!-- Описание функций управления локальными данными и дисковой квотой -->
+<div class="text-muted small text-center mt-1 font-size-75" data-i18n="userSettings.cacheManagerDesc" id="modal-cache-manager-desc">
+              Управление локальными данными, IndexedDB и дисковой квотой
+            </div>
+</div>
+</div>
+<!-- Подвал модального окна настроек с кнопкой закрытия -->
+<div class="modal-footer border-secondary-subtle py-2" id="modal-user-settings-footer">
+<!-- Кнопка закрытия модального окна настроек -->
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="userSettings.close" id="modal-user-settings-close-btn" type="button">Закрыть</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно управления браузерным кешем -->
+<div aria-hidden="true" aria-labelledby="cacheManagerModalLabel" class="modal fade" id="cacheManagerModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered modal-lg">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle">
+<div class="d-flex align-items-center gap-2">
+<div class="rounded-circle bg-primary-subtle text-primary p-2 d-flex align-items-center justify-content-center icon-box-36">
+<i class="bi bi-hdd-stack fs-5"></i>
+</div>
+<div>
+<h5 class="modal-title mb-0" data-i18n="cacheManager.title" id="cacheManagerModalLabel">Управление браузерным кешем</h5>
+<div class="small text-muted font-size-78" data-i18n="cacheManager.subtitle" id="cache-manager-modal-subtitle">Хранилище больших данных (IndexedDB + Memory Cache) для ускорения работы и офлайн-доступа.</div>
+</div>
+</div>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3">
+<div class="card bg-body-tertiary border-secondary-subtle p-3 mb-3">
+<div class="d-flex align-items-center justify-content-between mb-2">
+<div class="fw-semibold small d-flex align-items-center gap-1.5">
+<i class="bi bi-pie-chart-fill text-primary"></i>
+<span data-i18n="cacheManager.quotaTitle" id="cache-manager-quota-label">Дисковая квота браузера</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border" data-i18n="ui.ide.txt_13bcee5b" id="cache-persist-badge">Проверка...</span>
+</div>
+<div class="progress mb-2 progress-h-10">
+<div class="progress-bar bg-primary" id="cache-usage-progressbar" role="progressbar"></div>
+</div>
+<div class="d-flex justify-content-between align-items-center small text-muted font-size-78">
+<span data-i18n="ui.ide.txt_a1ec59aa" id="ide-span-a1ec59aa">Использование памяти:</span>
+<span class="fw-semibold text-body" data-i18n="ui.ide.txt_43e40d49" id="cache-usage-text">Загрузка...</span>
+</div>
+</div>
+<div class="mb-3">
+<div class="d-flex align-items-center justify-content-between mb-2">
+<h6 class="fw-bold small text-uppercase text-muted mb-0" data-i18n="cacheManager.storesTitle" id="cache-manager-stores-heading">Хранилища данных</h6>
+<button class="btn btn-sm btn-outline-primary py-0 px-2 rounded-pill small font-size-75" id="cache-btn-cleanup-expired">
+<i class="bi bi-magic me-1"></i><span data-i18n="cacheManager.btnCleanExpired" id="cache-manager-btn-clean-expired-label">Очистить просроченное</span>
+</button>
+</div>
+<div id="cache-stores-list"></div>
+</div>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top border-secondary-subtle">
+<div class="d-flex align-items-center gap-2">
+<button class="btn btn-outline-secondary btn-sm" data-i18n="cacheManager.btnRequestPersist" id="cache-btn-request-persist" type="button">
+<i class="bi bi-shield-lock me-1"></i>Сделать постоянным
+
+              </button>
+<button class="btn btn-outline-secondary btn-sm" data-i18n="cacheManager.btnExport" id="cache-btn-export" type="button">
+<i class="bi bi-download me-1"></i>Экспорт JSON
+
+              </button>
+</div>
+<button class="btn btn-outline-danger btn-sm" data-i18n="cacheManager.btnClearAll" id="cache-btn-clear-all" type="button">
+<i class="bi bi-trash3 me-1"></i>Очистить всё
+
+            </button>
+</div>
+</div>
+<div class="modal-footer border-secondary-subtle py-2">
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="userSettings.close" id="modal-cache-manager-close-btn" type="button">Закрыть</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно помощи -->
+<div aria-hidden="true" aria-labelledby="help-modal-label" class="modal fade" id="help-modal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle">
+<h5 class="modal-title d-flex align-items-center gap-2" id="help-modal-label">
+<i class="bi bi-question-circle text-info"></i>
+<span data-i18n="helpModal.title" id="help-modal-header-title">Справка AI Assistant</span>
+</h5>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3 small">
+<p data-i18n="ui.ide.txt_e017bb83" id="ide-p-e017bb83">Модуль <strong data-i18n="ui.ide.txt_b21872e8" id="ide-strong-b21872e8">AI Assistant (Smart Version History)</strong> предоставляет интеллектуальную историю изменений кодовой базы:</p>
+<ul>
+<li data-i18n="ui.ide.txt_7a83410a" id="ide-li-7a83410a"><strong data-i18n="ui.ide.txt_86833505" id="ide-strong-86833505">Git Adapter:</strong> Точные diff'ы, снимки ревизий и коммиты без галлюцинаций.</li>
+<li data-i18n="ui.ide.txt_d01aff6b" id="ide-li-d01aff6b"><strong data-i18n="ui.ide.txt_b53852ab" id="ide-strong-b53852ab">WikiLLM:</strong> Архитектурные связи <code>modifies</code>, <code>fixes</code>, <code>documents</code>.</li>
+<li data-i18n="ui.ide.txt_877c432b" id="ide-li-877c432b"><strong data-i18n="ui.ide.txt_22383f8c" id="ide-strong-22383f8c">RAG FAISS:</strong> Векторный и лексический поиск по diff-фрагментам с хешированием SHA-256.</li>
+<li data-i18n="ui.ide.txt_e0202922" id="ide-li-e0202922"><strong data-i18n="ui.ide.txt_f56340bd" id="ide-strong-f56340bd">2-Step Verification:</strong> Защита от prompt-инъекций и утечки секретов перед фиксацией связей.</li>
+<li data-i18n="ui.ide.txt_7cac9162" id="ide-li-7cac9162"><strong data-i18n="ui.ide.txt_98915877" id="ide-strong-98915877">Universal Panels:</strong> Все панели загружаются через <code>GET /v1/panel/{panel_id}</code>.</li>
+</ul>
+<div class="pt-2 border-top border-secondary-subtle mt-2">
+<button class="btn btn-outline-info btn-sm w-100 d-flex align-items-center justify-content-center gap-1.5" id="help-btn-start-tour" type="button">
+<i class="bi bi-compass-fill"></i>
+<span data-i18n="ui.ide.txt_f4fcb773" id="ide-span-f4fcb773">Запустить интерактивный гид-тур</span>
+</button>
+</div>
+</div>
+<div class="modal-footer border-secondary-subtle py-2">
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="helpModal.close" id="modal-help-close-btn" type="button">Закрыть</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно 2-Step аннотации факта -->
+<div aria-hidden="true" aria-labelledby="annotateModalLabel" class="modal fade" id="annotateModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle">
+<h5 class="modal-title d-flex align-items-center gap-2" id="annotateModalLabel">
+<i class="bi bi-shield-check text-success"></i>
+<span data-i18n="ui.ide.txt_db789792" id="ide-span-db789792">2-Step Аннотация факта (Candidate Proposal)</span>
+</h5>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3">
+<div class="mb-2">
+<label class="form-label small fw-semibold" data-i18n="ui.ide.txt_8a2cb436" for="modal-source-id" id="ide-label-8a2cb436">Источник (Source ID - Commit / File):</label>
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.ide.ph_6e2dc5d3" id="modal-source-id" placeholder="HEAD или hash коммита" type="text" value="HEAD"/>
+</div>
+<div class="mb-2">
+<label class="form-label small fw-semibold" data-i18n="ui.ide.txt_8d116e4b" for="modal-target-id" id="ide-label-8d116e4b">Целевая сущность (Target ID - Fact / Error):</label>
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.ide.ph_10729198" id="modal-target-id" placeholder="hardware_sensors / telemetry_db" type="text"/>
+</div>
+<div class="mb-2">
+<label class="form-label small fw-semibold" data-i18n="ui.ide.txt_cff7df6b" for="modal-relation-type" id="ide-label-cff7df6b">Тип отношения:</label>
+<select class="form-select form-select-sm" id="modal-relation-type">
+<option data-i18n="ui.ide.txt_53ea82a8" id="ide-option-53ea82a8" value="modifies">modifies (модифицирует логику)</option>
+<option data-i18n="ui.ide.txt_09732603" id="ide-option-09732603" value="fixes">fixes (исправляет сбой)</option>
+<option data-i18n="ui.ide.txt_d16a8fbe" id="ide-option-d16a8fbe" value="documents">documents (документирует архитектуру)</option>
+<option data-i18n="ui.ide.txt_ada0a4eb" id="ide-option-ada0a4eb" value="caused_by">caused_by (вызвано изменением)</option>
+</select>
+</div>
+<div class="mb-2">
+<label class="form-label small fw-semibold" data-i18n="ui.ide.txt_fbc5d7bd" for="modal-summary-desc" id="ide-label-fbc5d7bd">Архитектурный факт / Описание:</label>
+<textarea class="form-control form-control-sm" data-i18n-placeholder="placeholders.ide.ph_6a0c5dda" id="modal-summary-desc" placeholder="Краткое описание подтвержденного факта без конфиденциальных данных..." rows="3"></textarea>
+</div>
+<div class="small p-2 rounded bg-body-tertiary border" data-i18n="ui.ide.txt_f9b13934" id="modal-validation-preview">
+
+            Шаг 1: Контур проверит отсутствие инъекций и секретов перед фиксацией в графе знаний.
+
+          </div>
+</div>
+<div class="modal-footer border-secondary-subtle py-2">
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="ui.ide.txt_987b33c6" id="ide-button-987b33c6" type="button">Отмена</button>
+<button class="btn btn-primary btn-sm" data-i18n="ui.ide.txt_018e7bee" id="btn-submit-annotation" type="button">Пройти верификацию и сохранить</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно: Мастер создания рабочей области и добавления файлов под контроль Git -->
+<div aria-hidden="true" aria-labelledby="wsWizardModalLabel" class="modal fade" id="modal-create-workspace-wizard" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered modal-lg">
+<div class="modal-content shadow-lg border">
+<div class="modal-header bg-body-tertiary border-bottom py-2.5 px-3">
+<div class="d-flex align-items-center gap-2">
+<span class="fs-5 text-primary">📂</span>
+<div>
+<h5 class="modal-title fs-6 fw-bold mb-0" data-i18n="ui.ide.txt_3beb19a5" id="wsWizardModalLabel">
+
+                Создать рабочую область. Дать ей имя
+
+              </h5>
+<div class="small text-muted" data-i18n="ui.ide.txt_f83057b0" id="ide-div-f83057b0">
+
+                Изолированный Git-репозиторий и мгновенное отслеживание добавленных файлов и папок
+
+              </div>
+</div>
+</div>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3">
+<!-- Статус-баннер действий -->
+<div class="alert alert-info d-none d-flex align-items-center gap-2 py-2 px-3 mb-3 small shadow-sm" id="ws-wizard-status-banner"></div>
+<!-- ШАГ 1: Создание рабочей области -->
+<div class="card bg-body border-secondary-subtle mb-3" id="ws-wizard-step1-block">
+<div class="card-header bg-body-tertiary py-1.5 px-3 d-flex align-items-center gap-2">
+<span class="badge bg-primary rounded-pill" data-i18n="ui.ide.txt_de59a272" id="ide-span-de59a272">Шаг 1</span>
+<span class="fw-semibold small" data-i18n="ui.ide.txt_3beb19a5" id="ide-span-3beb19a5">Создать рабочую область. Дать ей имя</span>
+</div>
+<div class="card-body p-3">
+<div class="row g-2 align-items-end">
+<div class="col-md-5">
+<label class="form-label small fw-semibold mb-1" data-i18n="ui.ide.txt_4c03d816" for="ws-wizard-name-input" id="ide-label-4c03d816">Имя рабочей области <span class="text-danger">*</span>:</label>
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.ide.ph_6acef132" id="ws-wizard-name-input" placeholder="например: project_documentation" type="text"/>
+</div>
+<div class="col-md-3">
+<label class="form-label small fw-semibold mb-1" data-i18n="workspace.workspaceLanguageLabel" for="ws-wizard-lang-select" id="ide-label-lang">Язык пространства:</label>
+<select class="form-select form-select-sm" id="ws-wizard-lang-select">
+  <option value="he">עברית (Hebrew)</option>
+  <option value="ru" selected>Русский (Russian)</option>
+  <option value="en">English</option>
+  <option value="uk">Українська (Ukrainian)</option>
+</select>
+</div>
+<div class="col-md-4">
+<label class="form-label small fw-semibold mb-1" data-i18n="ui.ide.txt_37764dad" for="ws-wizard-path-input" id="ide-label-37764dad">Путь на диске (опционально):</label>
+<input class="form-control form-control-sm" data-i18n-placeholder="placeholders.ide.ph_3eba407a" id="ws-wizard-path-input" placeholder="авто-папка data/ai_assistant/workspaces/..." type="text"/>
+</div>
+</div>
+<div class="d-flex justify-content-end mt-2.5">
+<button class="btn btn-primary btn-sm fw-semibold" data-i18n="ui.ide.txt_74224b16" id="ws-wizard-create-btn" type="button">
+<i class="bi bi-check-circle me-1"></i>Создать область (Git Init)
+
+                </button>
+</div>
+</div>
+</div>
+<!-- ШАГ 2: Добавить директории и / или файлы в рабочую область -->
+<div class="card bg-body border-secondary-subtle mb-3 d-none" id="ws-wizard-step2-block">
+<div class="card-header bg-body-tertiary py-1.5 px-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+<div class="d-flex align-items-center gap-2">
+<span class="badge bg-success rounded-pill" data-i18n="ui.ide.txt_144fa97c" id="ide-span-144fa97c">Шаг 2</span>
+<span class="fw-semibold small" data-i18n="ui.ide.txt_7c0728fd" id="ide-span-7c0728fd">Добавить директории и / или файлы в рабочую область</span>
+</div>
+<div class="d-flex align-items-center gap-2 small">
+<span class="badge bg-secondary-subtle text-secondary border font-monospace" data-i18n="ui.ide.txt_3987123d" id="ws-wizard-git-head-badge">Git commit: ---</span>
+<span class="badge bg-info-subtle text-info border" data-i18n="ui.ide.txt_e9e5145e" id="ws-wizard-files-count-badge">0 файлов</span>
+</div>
+</div>
+<div class="card-body p-3">
+<div class="small text-muted mb-2" data-i18n="ui.ide.txt_06c6e1c9" id="ide-div-06c6e1c9">
+<i class="bi bi-info-circle text-primary me-1"></i>
+
+                Как только вы добавляете директорию или файлы — Git начинает немедленно следить за ними и фиксирует коммит.
+
+              </div>
+<!-- Вкладки способов добавления -->
+<ul class="nav nav-tabs nav-tabs-sm mb-3" id="wsWizardAddTabs" role="tablist">
+<li class="nav-item" role="presentation">
+<button class="nav-link active small py-1.5 px-3" data-bs-target="#tab-opt-path" data-bs-toggle="tab" data-i18n="ui.ide.txt_ad683500" id="tab-opt-path-btn" role="tab" type="button">
+<i class="bi bi-hdd-network me-1"></i>Путь на диске ПК (папка или файл)
+
+                  </button>
+</li>
+<li class="nav-item" role="presentation">
+<button class="nav-link small py-1.5 px-3" data-bs-target="#tab-opt-files" data-bs-toggle="tab" data-i18n="ui.ide.txt_01ec4c64" id="tab-opt-files-btn" role="tab" type="button">
+<i class="bi bi-files me-1"></i>Выбрать файлы
+
+                  </button>
+</li>
+<li class="nav-item" role="presentation">
+<button class="nav-link small py-1.5 px-3" data-bs-target="#tab-opt-folder" data-bs-toggle="tab" data-i18n="ui.ide.txt_0ba82210" id="tab-opt-folder-btn" role="tab" type="button">
+<i class="bi bi-folder-symlink me-1"></i>Выбрать папку целиком
+
+                  </button>
+</li>
+</ul>
+<div class="tab-content" id="wsWizardAddTabsContent">
+<!-- Вкладка А: По локальному пути к папке или файлу -->
+<div class="tab-pane fade show active" id="tab-opt-path" role="tabpanel">
+<div class="row g-2 align-items-end">
+<div class="col-md-8">
+<label class="form-label small fw-semibold mb-1" data-i18n="ui.ide.txt_29b2831c" for="ws-wizard-target-path-input" id="ide-label-29b2831c">Абсолютный путь к папке или файлу на диске:</label>
+<input class="form-control form-control-sm font-monospace" data-i18n-placeholder="placeholders.ide.ph_87e39357" id="ws-wizard-target-path-input" placeholder="например: C:\MyProject\docs или D:\Archive\file.txt" type="text"/>
+</div>
+<div class="col-md-4 d-grid">
+<button class="btn btn-sm btn-success fw-semibold" data-i18n="ui.ide.txt_ac6de42f" id="ws-wizard-add-path-btn" type="button">
+<i class="bi bi-git me-1"></i>Добавить и начать отслеживание Git
+
+                      </button>
+</div>
+</div>
+<div class="form-check mt-2 small">
+<input class="form-check-input" id="ws-wizard-copy-checkbox" type="checkbox"/>
+<label class="form-check-label text-muted" data-i18n="ui.ide.txt_31e7a73a" for="ws-wizard-copy-checkbox" id="ide-label-31e7a73a">
+
+                      Скопировать файлы в локальный Git-репозиторий рабочей области (иначе привязать внешний источник)
+
+                    </label>
+</div>
+</div>
+<!-- Вкладка Б: Загрузка файлов через проводник браузера -->
+<div class="tab-pane fade" id="tab-opt-files" role="tabpanel">
+<div class="row g-2 align-items-end">
+<div class="col-md-8">
+<label class="form-label small fw-semibold mb-1" data-i18n="ui.ide.txt_b126cedd" for="ws-wizard-files-input" id="ide-label-b126cedd">Выберите файлы с диска (любые форматы: txt, md, pdf, xlsx, docx, csv):</label>
+<input class="form-control form-control-sm" id="ws-wizard-files-input" multiple="" type="file"/>
+</div>
+<div class="col-md-4 d-grid">
+<button class="btn btn-sm btn-success fw-semibold" data-i18n="ui.ide.txt_c9e44795" id="ws-wizard-upload-files-btn" type="button">
+<i class="bi bi-cloud-arrow-up me-1"></i>Загрузить и начать отслеживание Git
+
+                      </button>
+</div>
+</div>
+</div>
+<!-- Вкладка В: Загрузка всей директории через браузер -->
+<div class="tab-pane fade" id="tab-opt-folder" role="tabpanel">
+<div class="row g-2 align-items-end">
+<div class="col-md-8">
+<label class="form-label small fw-semibold mb-1" data-i18n="ui.ide.txt_38ed9a8e" for="ws-wizard-folder-input" id="ide-label-38ed9a8e">Выберите каталог на диске (браузер передаст все вложенные файлы):</label>
+<input class="form-control form-control-sm" directory="" id="ws-wizard-folder-input" multiple="" type="file" webkitdirectory=""/>
+</div>
+<div class="col-md-4 d-grid">
+<button class="btn btn-sm btn-success fw-semibold" data-i18n="ui.ide.txt_c65ce69c" id="ws-wizard-upload-folder-btn" type="button">
+<i class="bi bi-folder-check me-1"></i>Загрузить папку и начать отслеживание Git
+
+                      </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Список отслеживаемых Git файлов -->
+<div class="mt-3">
+<div class="small fw-semibold text-muted mb-1 d-flex align-items-center gap-1">
+<i class="bi bi-list-check text-success"></i>
+<span data-i18n="ui.ide.txt_fdcd37e3" id="ide-span-fdcd37e3">Файлы под контролем Git в этой рабочей области:</span>
+</div>
+<div class="list-group list-group-flush border rounded overflow-auto max-h-180" id="ws-wizard-tracked-list"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="modal-footer border-secondary-subtle py-2">
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="ui.ide.txt_dd9463bd" id="ide-button-dd9463bd" type="button">Закрыть</button>
+<button class="btn btn-primary btn-sm fw-semibold" data-i18n="ui.ide.txt_d26799e8" id="ws-wizard-done-btn" type="button">
+<i class="bi bi-arrow-right-circle me-1"></i>Перейти в рабочую область
+
+          </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальное окно статуса среды Electron и Obsidian Vault -->
+<div aria-hidden="true" aria-labelledby="electronStatusModalLabel" class="modal fade" id="electronStatusModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle py-2.5 px-3">
+<h5 class="modal-title d-flex align-items-center gap-2 fs-6 fw-bold" id="electronStatusModalLabel">
+<i class="bi bi-cpu-fill text-primary"></i>
+<span data-i18n="ui.ide.txt_9346f811" id="ide-span-9346f811">Десктопная оболочка Electron &amp; Obsidian Vault</span>
+</h5>
+<button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body p-3" id="electron-status-content">
+<!-- Динамическое наполнение из ide_navigation.js -->
+</div>
+<div class="modal-footer border-secondary-subtle py-2 px-3">
+<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="ui.ide.txt_dd9463bd" id="ide-button-dd9463bd-1" type="button">Закрыть</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Раскрывающееся окно выбора рабочего пространства как в Command Center VS Code -->
+<div aria-hidden="true" aria-labelledby="ideWorkspacePickerModalLabel" class="modal fade" id="ideWorkspacePickerModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+<div class="modal-content shadow border-secondary-subtle">
+<div class="modal-header border-secondary-subtle py-2 px-3 bg-body-tertiary">
+<div class="input-group input-group-sm w-100">
+<span class="input-group-text bg-transparent border-end-0 text-muted">
+<i class="bi bi-search"></i>
+</span>
+<input autocomplete="off" class="form-control border-start-0" data-i18n-placeholder="placeholders.ide.ph_76a117ba" id="ide-ws-quick-search" placeholder="Поиск рабочих пространств с Git (введите имя)..." type="text"/>
+</div>
+</div>
+<div class="modal-body p-0">
+<div class="list-group list-group-flush" id="ide-ws-picker-list">
+<!-- Динамический список из ide_file_explorer.js -->
+</div>
+</div>
+<div class="modal-footer border-secondary-subtle py-2 px-3 justify-content-between">
+<button class="btn btn-sm btn-outline-primary" data-bs-dismiss="modal" data-i18n="ui.ide.txt_f2795b10" data-tab="tab-create-workspace" id="ide-button-f2795b10" type="button">
+<i class="bi bi-folder-plus me-1"></i>+ Создать пространство
+          </button>
+<button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="ui.ide.txt_dd9463bd" id="ide-button-dd9463bd-2" type="button">Закрыть</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Модальные окна контекстного меню проводника: Добавить, Редактировать, Версии, Удалить -->
+<!-- 1. Модальное окно создания файла или папки -->
+<div aria-hidden="true" aria-labelledby="ideCreateItemModalLabel" class="modal fade" id="modal-ide-create-item" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow border-secondary-subtle">
+      <div class="modal-header border-secondary-subtle py-2 px-3 bg-body-tertiary">
+        <h5 class="modal-title fs-6 fw-bold mb-0 d-flex align-items-center gap-2" id="ideCreateItemModalLabel">
+          <i class="bi bi-folder-plus text-success"></i>
+          <span>Добавить файл или папку</span>
+        </h5>
+        <button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+      </div>
+      <div class="modal-body p-3">
+        <div class="mb-2 text-muted small">
+          <span>Целевой каталог:</span>
+          <span class="fw-semibold text-body ms-1 font-monospace" id="ide-create-parent-path">/</span>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Тип объекта:</label>
+          <div class="d-flex gap-3">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="ideCreateItemType" id="ide-create-type-file" value="file" checked>
+              <label class="form-check-label small" for="ide-create-type-file">
+                <i class="bi bi-file-earmark me-1 text-primary"></i>Файл
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="ideCreateItemType" id="ide-create-type-folder" value="folder">
+              <label class="form-check-label small" for="ide-create-type-folder">
+                <i class="bi bi-folder-fill me-1 text-warning"></i>Папка
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" for="ide-create-item-name">Имя объекта (с расширением):</label>
+          <input type="text" class="form-control form-control-sm font-monospace" id="ide-create-item-name" placeholder="например: notes.md или script.py" autocomplete="off" required>
+        </div>
+        <div class="mb-2" id="ide-create-content-group">
+          <label class="form-label small fw-semibold" for="ide-create-item-content">Начальное содержимое (необязательно):</label>
+          <textarea class="form-control form-control-sm font-monospace" id="ide-create-item-content" rows="4" placeholder="# Заголовок документа..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary-subtle py-2 px-3 justify-content-between">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" type="button">Отмена</button>
+        <button class="btn btn-sm btn-success d-flex align-items-center gap-1" id="ide-btn-submit-create" type="button">
+          <i class="bi bi-check2"></i> Создать и зафиксировать в Git
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Модальное окно редактирования текстового файла -->
+<div aria-hidden="true" aria-labelledby="ideFileEditorModalLabel" class="modal fade" id="modal-ide-file-editor" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content shadow-lg border-secondary-subtle">
+      <div class="modal-header border-secondary-subtle py-2 px-3 bg-body-tertiary">
+        <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+          <i class="bi bi-pencil-square text-primary fs-5"></i>
+          <div>
+            <h5 class="modal-title fs-6 fw-bold mb-0 text-truncate" id="ideFileEditorModalLabel">Редактирование файла</h5>
+            <div class="font-size-75 text-muted font-monospace text-truncate" id="ide-editor-file-path">path/to/file</div>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-1.5 ms-auto me-2" id="ide-editor-header-actions">
+          <div class="btn-group btn-group-sm d-none" id="ide-editor-view-mode-group" role="group" aria-label="Режимы отображения">
+            <button type="button" class="btn btn-sm btn-outline-primary active py-0.5 px-2" id="ide-editor-tab-code">
+              <i class="bi bi-pencil me-1"></i>Редактор
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-primary py-0.5 px-2" id="ide-editor-tab-preview">
+              <i class="bi bi-eye me-1"></i>Предпросмотр
+            </button>
+          </div>
+          <button class="btn btn-xs btn-outline-secondary" id="ide-editor-btn-system-open" title="Открыть в системном редакторе" type="button">
+            <i class="bi bi-box-arrow-up-right me-1"></i>В системе
+          </button>
+        </div>
+        <button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+      </div>
+      <div class="modal-body p-0 d-flex flex-column" style="min-height: 480px;">
+        <div id="ide-editor-binary-notice" class="p-4 text-center text-muted d-none">
+          <i class="bi bi-file-earmark-binary text-secondary fs-1 d-block mb-2"></i>
+          <h6>Бинарный файл</h6>
+          <p class="small text-muted mb-3">Данный файл не является текстовым и не может редактироваться в веб-редакторе.</p>
+          <button class="btn btn-sm btn-primary" id="ide-editor-btn-binary-open" type="button">Открыть в ассоциированном приложении</button>
+        </div>
+        <div id="ide-editor-text-container" class="d-flex flex-column flex-grow-1 p-2">
+          <div class="d-flex align-items-center justify-content-between mb-1 px-1 font-size-75 text-muted">
+            <span id="ide-editor-stats">Строк: 0 | Символов: 0</span>
+            <span>Горячая клавиша: <kbd class="px-1">Ctrl+S</kbd> для сохранения</span>
+          </div>
+          <textarea class="form-control font-monospace flex-grow-1 border-secondary-subtle" id="ide-editor-textarea" style="resize: none; font-size: 13px; line-height: 1.5; min-height: 400px; tab-size: 2;" spellcheck="false"></textarea>
+          <div id="ide-editor-markdown-preview" class="border rounded p-3 bg-body overflow-auto flex-grow-1 d-none" style="min-height: 400px; font-size: 14px; line-height: 1.6;"></div>
+          <div class="mt-2">
+            <input type="text" class="form-control form-control-sm" id="ide-editor-commit-msg" placeholder="Сообщение коммита Git (опционально)..." autocomplete="off">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary-subtle py-2 px-3 justify-content-between">
+        <span class="small text-muted" id="ide-editor-save-status"></span>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" type="button">Закрыть</button>
+          <button class="btn btn-sm btn-primary d-flex align-items-center gap-1" id="ide-editor-btn-save" type="button">
+            <i class="bi bi-floppy me-1"></i>Сохранить изменения
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Модальное окно истории версий Git для файла -->
+<div aria-hidden="true" aria-labelledby="ideFileVersionsModalLabel" class="modal fade" id="modal-ide-file-versions" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content shadow-lg border-secondary-subtle">
+      <div class="modal-header border-secondary-subtle py-2 px-3 bg-body-tertiary">
+        <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+          <i class="bi bi-clock-history text-info fs-5"></i>
+          <div>
+            <h5 class="modal-title fs-6 fw-bold mb-0 text-truncate" id="ideFileVersionsModalLabel">История версий файла</h5>
+            <div class="font-size-75 text-muted font-monospace text-truncate" id="ide-versions-file-path">path/to/file</div>
+          </div>
+        </div>
+        <button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+      </div>
+      <div class="modal-body p-3">
+        <!-- Таблица версий (коммитов) -->
+        <div class="table-responsive mb-3 border rounded border-secondary-subtle" style="max-height: 250px;">
+          <table class="table table-sm table-hover align-middle mb-0 font-size-80">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 90px;">Хэш</th>
+                <th style="width: 140px;">Дата</th>
+                <th style="width: 140px;">Автор</th>
+                <th>Сообщение</th>
+                <th class="text-end" style="width: 150px;">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="ide-versions-table-body">
+              <tr><td colspan="5" class="text-center py-3 text-muted">Загрузка коммитов...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Область предпросмотра выбранной версии или diff -->
+        <div class="card border-secondary-subtle" id="ide-versions-preview-card">
+          <div class="card-header py-1.5 px-3 bg-body-tertiary border-secondary-subtle d-flex align-items-center justify-content-between">
+            <span class="small fw-semibold" id="ide-versions-preview-title">Предпросмотр версии</span>
+            <span class="badge bg-secondary-subtle text-secondary border font-monospace" id="ide-versions-preview-badge">HEAD</span>
+          </div>
+          <div class="card-body p-2">
+            <pre class="font-monospace small mb-0 p-2 rounded bg-body-tertiary border overflow-auto" id="ide-versions-preview-content" style="max-height: 280px; tab-size: 2; white-space: pre-wrap; font-size: 12px;">Выберите коммит в таблице выше для предпросмотра</pre>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary-subtle py-2 px-3 justify-content-end">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" type="button">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. Модальное окно подтверждения удаления -->
+<div aria-hidden="true" aria-labelledby="ideDeleteModalLabel" class="modal fade" id="modal-ide-confirm-delete" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content shadow border-danger-subtle">
+      <div class="modal-header border-secondary-subtle py-2 px-3 bg-danger-subtle">
+        <h5 class="modal-title fs-6 fw-bold mb-0 text-danger d-flex align-items-center gap-1.5" id="ideDeleteModalLabel">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>Удаление объекта</span>
+        </h5>
+        <button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+      </div>
+      <div class="modal-body p-3">
+        <p class="small mb-2">Вы действительно хотите удалить <span class="fw-bold" id="ide-delete-item-type">объект</span>?</p>
+        <div class="p-2 rounded bg-body-tertiary border font-monospace small text-truncate text-danger fw-semibold" id="ide-delete-target-path">file.txt</div>
+        <p class="font-size-75 text-muted mt-2 mb-0">Файл будет удален с диска и зафиксирован в Git как удаленный.</p>
+      </div>
+      <div class="modal-footer border-secondary-subtle py-2 px-3 justify-content-between">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" type="button">Отмена</button>
+        <button class="btn btn-sm btn-danger d-flex align-items-center gap-1" id="ide-btn-confirm-delete" type="button">
+          <i class="bi bi-trash"></i> Удалить
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Скрипты приложения -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/html/ai_modal_dialog/main.js?v=20261020_v1"></script>
+<script src="/html/components/system_tour/system_tour.js?v=20261020_v1"></script>
+<script src="/html/js/workspace_wizard.js?v=20261020_v1" type="module"></script>
+<script src="/html/js/ide_file_explorer.js?v=20261028_v2" type="module"></script>
+<script src="/html/js/main.js?v=20261028_v2" type="module"></script>
+<script>
+
+    function switchToApp(appName, event) {
+
+      if (event) {
+
+        try { event.preventDefault(); } catch (_) {}
+
+      }
+
+      try {
+
+        const ocEl = document.getElementById('leftSideNavOffcanvas');
+
+        if (ocEl && window.bootstrap) {
+
+          const oc = bootstrap.Offcanvas.getInstance(ocEl);
+
+          if (oc) oc.hide();
+
+        }
+
+      } catch (_) {}
+
+      // 1. Если внутри iframe родительского окна TC
+
+      if (window !== window.top) {
+
+        try {
+
+          if (typeof window.parent.switchAppTab === 'function') {
+
+            window.parent.switchAppTab('tab-about-system');
+
+            window.parent.location.hash = 'tab-about-system';
+
+            return;
+
+          }
+
+          if (typeof window.parent.switchTab === 'function') {
+
+            window.parent.switchTab('tab-about-system');
+
+            window.parent.location.hash = 'tab-about-system';
+
+            return;
+
+          }
+
+        } catch (e) {
+
+          console.warn('[Switcher] Ошибка родительского окна:', e);
+
+        }
+
+      }
+
+      // 2. Определение целевого хоста и порта
+
+      let targetUrl = '/tc#tab-about-system';
+
+      if (window.location.port === '8002') {
+
+        targetUrl = window.location.protocol + '//' + window.location.hostname + ':8001/tc#tab-about-system';
+
+      }
+
+      try {
+
+        window.top.location.href = targetUrl;
+
+      } catch (_) {
+
+        window.location.href = targetUrl;
+
+      }
+
+    }
+
+    window.switchToApp = switchToApp;
+
+  </script>
+</body>
+</html>

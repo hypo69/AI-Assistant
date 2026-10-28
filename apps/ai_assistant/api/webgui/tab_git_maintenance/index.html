@@ -1,0 +1,206 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Git Maintenance & Diagnostics Tab
+=============================================================================
+Description:
+  Интерфейс интеллектуальной диагностики и обслуживания Git-репозитория.
+  Отображает сведения об активном репозитории (путь, ветка, HEAD коммит, статус),
+  измеряемые показатели (loose objects, pack size, garbage, fsck),
+  вердикт (Норма / Наблюдение / Обслуживание) с обоснованием и возможностью
+  запуска штатного обслуживания git gc --auto.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_git_maintenance
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-26 00:05:00
+=============================================================================
+-->
+<div class="container-fluid p-3">
+<!-- Заголовок и панель управления -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+<div>
+<h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+<span class="fs-4">🧹</span>
+<span data-i18n="ui.gim.txt_510b0866" id="gim-span-510b0866">Диагностика и обслуживание Git-репозитория</span>
+</h4>
+<div class="small text-muted" data-i18n="ui.gim.txt_a5e0f2ed" id="gim-div-a5e0f2ed">
+        Оценка состояния по измеряемым показателям, пороги Git и штатная упаковка git gc --auto
+      </div>
+</div>
+<div class="d-flex flex-wrap align-items-center gap-2">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 shadow-sm" id="btn-git-diagnose">
+<i class="bi bi-arrow-clockwise"></i>
+<span data-i18n="ui.gim.txt_731bcb22" id="gim-span-731bcb22">Запустить диагностику</span>
+</button>
+<button class="btn btn-sm btn-warning d-flex align-items-center gap-1.5 shadow-sm text-dark fw-semibold" id="btn-git-gc-auto">
+<i class="bi bi-lightning-charge-fill"></i>
+<span data-i18n="ui.gim.txt_241ed056" id="gim-span-241ed056">Выполнить git gc --auto</span>
+</button>
+<button class="btn btn-sm btn-outline-info d-flex align-items-center gap-1.5 shadow-sm" id="btn-git-fsck">
+<i class="bi bi-shield-check"></i>
+<span data-i18n="ui.gim.txt_ccdf1dc3" id="gim-span-ccdf1dc3">Проверить целостность (fsck)</span>
+</button>
+</div>
+</div>
+<!-- Блок активного репозитория и выбора контекста -->
+<div class="card shadow-sm border mb-3">
+<div class="card-body py-2 px-3">
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+<div class="d-flex align-items-center gap-3">
+<div class="d-flex align-items-center justify-content-center rounded bg-primary-subtle text-primary p-2" style="width: 44px; height: 44px;">
+<i class="bi bi-folder2-open fs-5"></i>
+</div>
+<div>
+<div class="d-flex flex-wrap align-items-center gap-2">
+<span class="text-uppercase small fw-bold text-muted font-size-75" data-i18n="ui.gim.txt_cc17e968" id="gim-span-cc17e968">Активный репозиторий:</span>
+<strong class="fs-6 text-primary" data-i18n="ui.gim.txt_d84445b6" id="git-active-repo-name">Определение...</strong>
+<span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="git-active-repo-branch">
+<i class="bi bi-git me-1"></i><span id="git-active-repo-branch-text">—</span>
+</span>
+<span class="badge bg-secondary-subtle text-secondary font-monospace" data-i18n="ui.gim.txt_a501c089" data-i18n-title="titles.gim.title_0f6af16e" id="git-active-repo-commit" title="Хэш HEAD коммита">
+                HEAD: —
+              </span>
+<span class="badge bg-success-subtle text-success border border-success-subtle" data-i18n="ui.gim.txt_37d12e2c" id="git-active-repo-clean">
+<i class="bi bi-check2 me-0.5"></i>Clean
+              </span>
+</div>
+<div class="d-flex flex-wrap align-items-center gap-2 small text-muted font-monospace font-size-80 mt-0.5">
+<i class="bi bi-hdd text-secondary"></i>
+<span id="git-active-repo-path">—</span>
+<span class="text-muted d-none d-md-inline" data-i18n="ui.gim.txt_79443d81" id="git-active-repo-last-commit">• Последний коммит: —</span>
+</div>
+</div>
+</div>
+<div class="d-flex align-items-center gap-2" id="git-repo-selector-wrapper">
+<label class="small text-muted fw-semibold text-nowrap d-none d-sm-inline" data-i18n="ui.gim.txt_8d39af4b" for="select-git-repo" id="gim-label-8d39af4b">Контекст:</label>
+<select class="form-select form-select-sm shadow-sm" id="select-git-repo" style="min-width: 200px;">
+<option data-i18n="ui.gim.txt_38657a61" id="gim-option-38657a61" value="">Выберите рабочее пространство...</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+<!-- Главная карточка вердикта и рекомендации (Светофор) -->
+<div class="card shadow-sm border mb-3" id="git-verdict-card">
+<div class="card-body p-3">
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+<div class="d-flex align-items-center gap-3">
+<div class="fs-1 d-flex align-items-center justify-content-center p-2 rounded-circle" id="git-verdict-icon-container" style="width: 56px; height: 56px; background-color: var(--badge-success-bg); color: var(--ui-success);">
+<i class="bi bi-check-circle-fill" id="git-verdict-icon"></i>
+</div>
+<div>
+<div class="d-flex align-items-center gap-2 mb-1">
+<span class="text-uppercase small fw-bold text-muted" data-i18n="ui.gim.txt_fb0b0227" id="gim-span-fb0b0227">Состояние репозитория:</span>
+<span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 fs-6" data-i18n="ui.gim.txt_d92ae14a" id="git-verdict-badge">Норма</span>
+</div>
+<h5 class="fw-bold mb-1" data-i18n="ui.gim.txt_b560657f" id="git-recommendation-text">Рекомендация: Ничего не делать</h5>
+<div class="text-muted small" data-i18n="ui.gim.txt_745f5d07" id="git-explanation-text">
+              Выполняется диагностика показателей репозитория...
+            </div>
+</div>
+</div>
+<div class="text-end text-muted small">
+<div data-i18n="ui.gim.txt_b6cd61f1" id="gim-div-b6cd61f1">Последнее измерение:</div>
+<strong id="git-last-measured-ts">—</strong>
+</div>
+</div>
+</div>
+</div>
+<!-- Сетка из 6 измеряемых показателей -->
+<div class="row g-3 mb-3">
+<!-- 1. Loose objects -->
+<div class="col-sm-6 col-lg-4 col-xl-2">
+<div class="card shadow-sm border h-100 p-2 text-center">
+<span class="text-muted small" data-i18n="ui.gim.txt_4b1cd5dc" id="gim-span-4b1cd5dc">Loose Objects</span>
+<strong class="fs-4 my-1 text-primary" id="metric-loose-count">0</strong>
+<span class="font-size-75 text-muted" data-i18n="ui.gim.txt_49e73e17" id="gim-span-49e73e17">Штатный порог: 6700</span>
+</div>
+</div>
+<!-- 2. Размер loose -->
+<div class="col-sm-6 col-lg-4 col-xl-2">
+<div class="card shadow-sm border h-100 p-2 text-center">
+<span class="text-muted small" data-i18n="ui.gim.txt_e3ef4753" id="gim-span-e3ef4753">Объем несжатых</span>
+<strong class="fs-4 my-1 text-info" data-i18n="ui.gim.txt_5f2fef65" id="metric-loose-size">0 MiB</strong>
+<span class="font-size-75 text-muted" data-i18n="ui.gim.txt_59776ee2" id="metric-loose-kib">0 КиБ</span>
+</div>
+</div>
+<!-- 3. Pack-файлы -->
+<div class="col-sm-6 col-lg-4 col-xl-2">
+<div class="card shadow-sm border h-100 p-2 text-center">
+<span class="text-muted small" data-i18n="ui.gim.txt_796d52ef" id="gim-span-796d52ef">Pack-файлы</span>
+<strong class="fs-4 my-1 text-warning" id="metric-packs-count">0</strong>
+<span class="font-size-75 text-muted" data-i18n="ui.gim.txt_7682b7e5" id="metric-in-pack-objects">0 упаковано</span>
+</div>
+</div>
+<!-- 4. Размер Pack -->
+<div class="col-sm-6 col-lg-4 col-xl-2">
+<div class="card shadow-sm border h-100 p-2 text-center">
+<span class="text-muted small" data-i18n="ui.gim.txt_9d69523e" id="gim-span-9d69523e">Размер Pack-базы</span>
+<strong class="fs-4 my-1 text-success" data-i18n="ui.gim.txt_5f2fef65" id="metric-pack-size">0 MiB</strong>
+<span class="font-size-75 text-muted" data-i18n="ui.gim.txt_236f6c85" id="gim-span-236f6c85">Сжатые архивы Git</span>
+</div>
+</div>
+<!-- 5. Мусор и Prune -->
+<div class="col-sm-6 col-lg-4 col-xl-2">
+<div class="card shadow-sm border h-100 p-2 text-center">
+<span class="text-muted small" data-i18n="ui.gim.txt_09e971e1" id="gim-span-09e971e1">Мусор / Prune</span>
+<strong class="fs-4 my-1 text-secondary" id="metric-garbage">0</strong>
+<span class="font-size-75 text-muted" data-i18n="ui.gim.txt_54c675ea" id="metric-prune-packable">0 packable</span>
+</div>
+</div>
+<!-- 6. Целостность и Maintenance -->
+<div class="col-sm-6 col-lg-4 col-xl-2">
+<div class="card shadow-sm border h-100 p-2 text-center">
+<span class="text-muted small" data-i18n="ui.gim.txt_d6506172" id="gim-span-d6506172">Целостность базы</span>
+<strong class="fs-5 my-1 text-success d-flex align-items-center justify-content-center gap-1" data-i18n="ui.gim.txt_2b1accf6" id="metric-fsck-status">
+<i class="bi bi-shield-check"></i> ОК
+        </strong>
+<span class="font-size-75 text-muted" data-i18n="ui.gim.txt_e7bb12ec" id="metric-dangling">0 dangling</span>
+</div>
+</div>
+</div>
+<!-- Терминальный вывод консоли операций -->
+<div class="card shadow-sm border mb-3">
+<div class="card-header bg-body-tertiary d-flex align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-1.5">
+<i class="bi bi-terminal text-primary"></i>
+<span data-i18n="ui.gim.txt_e690b573" id="gim-span-e690b573">Журнал вывода команд Git (git count-objects / gc / fsck)</span>
+</div>
+<button class="btn btn-sm btn-link text-decoration-none p-0 text-muted" data-i18n="ui.gim.txt_7074366a" id="btn-clear-tab-console">Очистить</button>
+</div>
+<div class="card-body p-0">
+<pre class="p-3 mb-0 font-monospace small" id="git-maint-tab-console" style="max-height: 160px; overflow-y: auto; background-color: var(--surface-2); color: var(--text-color); border-radius: 0 0 6px 6px;">Готов к сбору метрик.</pre>
+</div>
+</div>
+<!-- Журнал истории решений и динамики -->
+<div class="card shadow-sm border">
+<div class="card-header bg-body-tertiary d-flex align-items-center justify-content-between py-2 px-3">
+<div class="fw-semibold small d-flex align-items-center gap-1.5">
+<i class="bi bi-clock-history text-info"></i>
+<span data-i18n="ui.gim.txt_f0f26219" id="gim-span-f0f26219">Журнал решений и динамики состояния репозитория</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary" data-i18n="ui.gim.txt_60951bd8" id="history-records-count">0 записей</span>
+</div>
+<div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0 font-size-85">
+<thead class="table-light">
+<tr>
+<th data-i18n="ui.gim.txt_3e729b34" id="gim-th-3e729b34" scope="col" style="width: 170px;">Время</th>
+<th data-i18n="ui.gim.txt_c8423224" id="gim-th-c8423224" scope="col" style="width: 140px;">Вердикт</th>
+<th data-i18n="ui.gim.txt_723f8e5a" id="gim-th-723f8e5a" scope="col" style="width: 180px;">Loose-объекты</th>
+<th data-i18n="ui.gim.txt_bf3ab508" id="gim-th-bf3ab508" scope="col" style="width: 140px;">Pack-база</th>
+<th data-i18n="ui.gim.txt_6bdf3e4d" id="gim-th-6bdf3e4d" scope="col">Обоснование и рекомендация</th>
+</tr>
+</thead>
+<tbody id="git-diagnostics-history-body">
+<tr>
+<td class="text-center py-3 text-muted" colspan="5" data-i18n="ui.gim.txt_a3910564" id="gim-td-a3910564">Загрузка журнала решений...</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>

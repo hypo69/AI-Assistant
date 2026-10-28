@@ -1,0 +1,405 @@
+/**
+ * =============================================================================
+ * Process Name: AI Assistant WebGUI - RTL & Controls Layout Framework
+ * =============================================================================
+ * Description:
+ *   Комплексная система стилей двунаправленного интерфейса (RTL/LTR).
+ *   Обеспечивает строгое и единообразное расположение элементов управления:
+ *     1. Модальные окна (.modal-header, .ai-modal-header, .offcanvas-header):
+ *        - LTR (русский, английский): кнопка закрытия (.btn-close) в правом углу.
+ *        - RTL (иврит): кнопка закрытия (.btn-close) в левом углу.
+ *     2. Порядок элементов управления:
+ *        - Заголовок и значки (start) -> кнопка закрытия (end).
+ *     3. Зеркалирование отступов и позиционирования:
+ *        - Инверсия утилит me-*/ms-*, pe-*/ps-*, text-start/text-end.
+ *        - Корректное направление выпадающих списков, групп полей ввода и offcanvas.
+ *
+ * File: rtl.css
+ * Package: apps.ai_assistant.api.webgui.css
+ * Author: hypo69
+ * Copyright: © 2026 hypo69
+ * Updated: 2026-10-25 23:10:00
+ * =============================================================================
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. БАЗОВАЯ ПОДДЕРЖКА НАПРАВЛЕНИЯ ТЕКСТА (RTL / LTR)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[dir="rtl"],
+html[dir="rtl"],
+body[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="ltr"],
+html[dir="ltr"],
+body[dir="ltr"] {
+  direction: ltr;
+  text-align: left;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. ШАПКИ МОДАЛЬНЫХ ОКОН И OFFCANVAS (.btn-close В УГЛАХ)
+   - В LTR: заголовок слева, .btn-close в правом углу (margin-left: auto)
+   - В RTL: заголовок справа, .btn-close в левом углу (margin-right: auto)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.modal-header,
+.ai-modal-header,
+.offcanvas-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+/* Порядок элементов: Заголовок всегда первый (start), кнопка закрытия - вторая (end) */
+.modal-header > :first-child,
+.ai-modal-header > :first-child,
+.offcanvas-header > :first-child {
+  order: 1 !important;
+}
+
+.modal-header > .btn-close,
+.modal-header .btn-close,
+.ai-modal-header > .btn-close,
+.ai-modal-header .btn-close,
+.offcanvas-header > .btn-close,
+.offcanvas-header .btn-close {
+  order: 2 !important;
+  flex-shrink: 0 !important;
+  margin-inline-start: auto;
+  margin-inline-end: calc(-.5 * var(--bs-modal-header-padding-x, 1rem));
+}
+
+/* 2.1 Позиционирование кнопки в LTR (по умолчанию и явно) */
+:root:not([dir="rtl"]) .modal-header .btn-close,
+:root:not([dir="rtl"]) .ai-modal-header .btn-close,
+:root:not([dir="rtl"]) .offcanvas-header .btn-close,
+[dir="ltr"] .modal-header .btn-close,
+[dir="ltr"] .ai-modal-header .btn-close,
+[dir="ltr"] .offcanvas-header .btn-close,
+html[dir="ltr"] .modal-header .btn-close,
+html[dir="ltr"] .ai-modal-header .btn-close,
+html[dir="ltr"] .offcanvas-header .btn-close,
+body[dir="ltr"] .modal-header .btn-close,
+body[dir="ltr"] .ai-modal-header .btn-close,
+body[dir="ltr"] .offcanvas-header .btn-close {
+  margin-left: auto !important;
+  margin-right: calc(-.5 * var(--bs-modal-header-padding-x, 1rem)) !important;
+}
+
+/* 2.2 Позиционирование кнопки в RTL (иврит): строго в левом углу */
+[dir="rtl"] .modal-header,
+[dir="rtl"] .ai-modal-header,
+[dir="rtl"] .offcanvas-header,
+html[dir="rtl"] .modal-header,
+html[dir="rtl"] .ai-modal-header,
+html[dir="rtl"] .offcanvas-header,
+body[dir="rtl"] .modal-header,
+body[dir="rtl"] .ai-modal-header,
+body[dir="rtl"] .offcanvas-header {
+  flex-direction: row !important;
+}
+
+[dir="rtl"] .modal-header .btn-close,
+[dir="rtl"] .modal-header > .btn-close,
+[dir="rtl"] .ai-modal-header .btn-close,
+[dir="rtl"] .ai-modal-header > .btn-close,
+[dir="rtl"] .offcanvas-header .btn-close,
+[dir="rtl"] .offcanvas-header > .btn-close,
+html[dir="rtl"] .modal-header .btn-close,
+html[dir="rtl"] .modal-header > .btn-close,
+html[dir="rtl"] .ai-modal-header .btn-close,
+html[dir="rtl"] .ai-modal-header > .btn-close,
+html[dir="rtl"] .offcanvas-header .btn-close,
+html[dir="rtl"] .offcanvas-header > .btn-close,
+body[dir="rtl"] .modal-header .btn-close,
+body[dir="rtl"] .ai-modal-header .btn-close,
+body[dir="rtl"] .offcanvas-header .btn-close {
+  margin-right: auto !important;
+  margin-left: calc(-.5 * var(--bs-modal-header-padding-x, 1rem)) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. УВЕДОМЛЕНИЯ TOAST (.btn-close)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[dir="rtl"] .toast .btn-close {
+  margin-right: auto !important;
+  margin-left: 0.5rem !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. БОКОВАЯ ПАНЕЛЬ НАВИГАЦИИ (OFFCANVAS) В RTL
+   ═══════════════════════════════════════════════════════════════════════════ */
+[dir="rtl"] .offcanvas.offcanvas-start {
+  top: 0;
+  right: 0 !important;
+  left: auto !important;
+  border-left: var(--bs-offcanvas-border-width, 1px) solid var(--bs-offcanvas-border-color, var(--border-color)) !important;
+  border-right: none !important;
+  transform: translateX(100%) !important;
+}
+
+[dir="rtl"] .offcanvas.offcanvas-start.show,
+[dir="rtl"] .offcanvas.offcanvas-start.showing {
+  transform: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. ПОДВАЛЫ МОДАЛЬНЫХ ОКОН (.modal-footer)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[dir="rtl"] .modal-footer {
+  justify-content: flex-start !important;
+}
+
+[dir="rtl"] .modal-footer.justify-content-between {
+  justify-content: space-between !important;
+}
+
+[dir="rtl"] .modal-footer > * {
+  margin-left: 0.5rem !important;
+  margin-right: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. ЗЕРКАЛИРОВАНИЕ ОТСТУПОВ (MARGIN / PADDING UTILITIES)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[dir="rtl"] .me-0 { margin-left: 0 !important; margin-right: 0 !important; }
+[dir="rtl"] .me-1 { margin-left: 0.25rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-2 { margin-left: 0.5rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-3 { margin-left: 1rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-4 { margin-left: 1.5rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-5 { margin-left: 3rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-auto { margin-left: auto !important; margin-right: 0 !important; }
+
+[dir="rtl"] .ms-0 { margin-right: 0 !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-1 { margin-right: 0.25rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-2 { margin-right: 0.5rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-3 { margin-right: 1rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-4 { margin-right: 1.5rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-5 { margin-right: 3rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-auto { margin-right: auto !important; margin-left: 0 !important; }
+
+[dir="rtl"] .pe-0 { padding-left: 0 !important; padding-right: 0 !important; }
+[dir="rtl"] .pe-1 { padding-left: 0.25rem !important; padding-right: 0 !important; }
+[dir="rtl"] .pe-2 { padding-left: 0.5rem !important; padding-right: 0 !important; }
+[dir="rtl"] .pe-3 { padding-left: 1rem !important; padding-right: 0 !important; }
+[dir="rtl"] .pe-4 { padding-left: 1.5rem !important; padding-right: 0 !important; }
+[dir="rtl"] .pe-5 { padding-left: 3rem !important; padding-right: 0 !important; }
+
+[dir="rtl"] .ps-0 { padding-right: 0 !important; padding-left: 0 !important; }
+[dir="rtl"] .ps-1 { padding-right: 0.25rem !important; padding-left: 0 !important; }
+[dir="rtl"] .ps-2 { padding-right: 0.5rem !important; padding-left: 0 !important; }
+[dir="rtl"] .ps-3 { padding-right: 1rem !important; padding-left: 0 !important; }
+[dir="rtl"] .ps-4 { padding-right: 1.5rem !important; padding-left: 0 !important; }
+[dir="rtl"] .ps-5 { padding-right: 3rem !important; padding-left: 0 !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. ВЫРАВНИВАНИЕ ТЕКСТА И ПЛАВАЮЩИХ ЭЛЕМЕНТОВ
+   ═══════════════════════════════════════════════════════════════════════════ */
+[dir="rtl"] .text-start { text-align: right !important; }
+[dir="rtl"] .text-end { text-align: left !important; }
+[dir="rtl"] .float-start { float: right !important; }
+[dir="rtl"] .float-end { float: left !important; }
+[dir="rtl"] .border-start { border-right: var(--bs-border-width, 1px) solid var(--bs-border-color, var(--border-color)) !important; border-left: none !important; }
+[dir="rtl"] .border-end { border-left: var(--bs-border-width, 1px) solid var(--bs-border-color, var(--border-color)) !important; border-right: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8. ЭЛЕМЕНТЫ УПРАВЛЕНИЯ ФОРМ И ВЫПАДАЮЩИЕ СПИСКИ
+   ═══════════════════════════════════════════════════════════════════════════ */
+[dir="rtl"] .form-select {
+  padding-left: 2.25rem !important;
+  padding-right: 0.75rem !important;
+  background-position: left 0.75rem center !important;
+}
+
+[dir="rtl"] .input-group > :not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(.valid-feedback):not(.invalid-tooltip):not(.invalid-feedback) {
+  margin-right: -1px;
+  margin-left: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-top-left-radius: var(--bs-border-radius, 6px);
+  border-bottom-left-radius: var(--bs-border-radius, 6px);
+}
+
+[dir="rtl"] .input-group > :first-child:not(:last-child):not(.dropdown-menu) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: var(--bs-border-radius, 6px);
+  border-bottom-right-radius: var(--bs-border-radius, 6px);
+}
+
+[dir="rtl"] .dropdown-menu {
+  text-align: right;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9. ВЕРТИКАЛЬНАЯ ПАНЕЛЬ НАВИГАЦИИ IDE (ACTIVITY BAR & FILE SIDEBAR) В RTL
+   - В LTR: Activity Bar слева (left: 0), Side Bar (left: 48px), Viewport margin-left: 308px
+   - В RTL: Activity Bar справа (right: 0), Side Bar (right: 48px), Viewport margin-right: 308px
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 9.1 Activity Bar в RTL */
+[dir="rtl"] .ide-activity-bar,
+html[dir="rtl"] .ide-activity-bar,
+body[dir="rtl"] .ide-activity-bar {
+  right: 0 !important;
+  left: auto !important;
+  border-left: 1px solid var(--border-color) !important;
+  border-right: none !important;
+}
+
+/* Индикатор активного пункта Activity Bar в RTL (полоска справа от пункта, у края экрана) */
+[dir="rtl"] .ide-activity-item.active::before,
+html[dir="rtl"] .ide-activity-item.active::before,
+body[dir="rtl"] .ide-activity-item.active::before {
+  right: -5px !important;
+  left: auto !important;
+  border-radius: 2px 0 0 2px !important;
+}
+
+/* Точка статуса Electron в RTL */
+[dir="rtl"] .ide-status-dot,
+html[dir="rtl"] .ide-status-dot,
+body[dir="rtl"] .ide-status-dot {
+  left: 5px !important;
+  right: auto !important;
+}
+
+/* 9.2 Боковая панель проводника файлов (File Explorer Sidebar) в RTL */
+[dir="rtl"] .ide-file-sidebar,
+html[dir="rtl"] .ide-file-sidebar,
+body[dir="rtl"] .ide-file-sidebar {
+  right: 48px !important;
+  left: auto !important;
+  border-left: 1px solid var(--border-color) !important;
+  border-right: none !important;
+}
+
+[dir="rtl"] .ide-file-sidebar.collapsed,
+html[dir="rtl"] .ide-file-sidebar.collapsed,
+body[dir="rtl"] .ide-file-sidebar.collapsed {
+  transform: translateX(260px) !important;
+  width: 0 !important;
+  pointer-events: none !important;
+}
+
+/* 9.3 Основной вьюпорт IDE в RTL */
+[dir="rtl"] .ide-main-viewport,
+html[dir="rtl"] .ide-main-viewport,
+body[dir="rtl"] .ide-main-viewport {
+  margin-right: 308px !important;
+  margin-left: 0 !important;
+  width: calc(100% - 308px) !important;
+  max-width: calc(100% - 308px) !important;
+  transition: margin-right 0.2s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.2s cubic-bezier(0.4, 0, 0.2, 1), width 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+[dir="rtl"] .ide-main-viewport.sidebar-collapsed,
+html[dir="rtl"] .ide-main-viewport.sidebar-collapsed,
+body[dir="rtl"] .ide-main-viewport.sidebar-collapsed {
+  margin-right: 48px !important;
+  margin-left: 0 !important;
+  width: calc(100% - 48px) !important;
+  max-width: calc(100% - 48px) !important;
+}
+
+/* 9.4 Элементы дерева файлов проводника в RTL */
+[dir="rtl"] .ide-tree-item,
+html[dir="rtl"] .ide-tree-item,
+body[dir="rtl"] .ide-tree-item {
+  padding-left: 8px !important;
+  padding-right: 0 !important;
+}
+
+[dir="rtl"] .ide-tree-folder,
+[dir="rtl"] .ide-tree-file,
+html[dir="rtl"] .ide-tree-folder,
+html[dir="rtl"] .ide-tree-file,
+body[dir="rtl"] .ide-tree-folder,
+body[dir="rtl"] .ide-tree-file {
+  padding-left: 8px !important;
+}
+
+[dir="rtl"] .ide-tree-chevron,
+html[dir="rtl"] .ide-tree-chevron,
+body[dir="rtl"] .ide-tree-chevron {
+  margin-left: 4px !important;
+  margin-right: 0 !important;
+}
+
+[dir="rtl"] .ide-tree-icon,
+html[dir="rtl"] .ide-tree-icon,
+body[dir="rtl"] .ide-tree-icon {
+  margin-left: 6px !important;
+  margin-right: 0 !important;
+}
+
+[dir="rtl"] .ide-git-tag,
+html[dir="rtl"] .ide-git-tag,
+body[dir="rtl"] .ide-git-tag {
+  margin-right: 4px !important;
+  margin-left: 0 !important;
+}
+
+/* 9.5 Адаптивные медиа-запросы для RTL */
+@media (max-width: 992px) {
+  [dir="rtl"] .ide-file-sidebar,
+  html[dir="rtl"] .ide-file-sidebar,
+  body[dir="rtl"] .ide-file-sidebar {
+    width: 230px !important;
+  }
+  [dir="rtl"] .ide-file-sidebar.collapsed,
+  html[dir="rtl"] .ide-file-sidebar.collapsed,
+  body[dir="rtl"] .ide-file-sidebar.collapsed {
+    transform: translateX(230px) !important;
+    width: 0 !important;
+  }
+  [dir="rtl"] .ide-main-viewport,
+  html[dir="rtl"] .ide-main-viewport,
+  body[dir="rtl"] .ide-main-viewport {
+    margin-right: 278px !important;
+    margin-left: 0 !important;
+    width: calc(100% - 278px) !important;
+    max-width: calc(100% - 278px) !important;
+  }
+}
+
+@media (max-width: 576px) {
+  [dir="rtl"] .ide-activity-bar,
+  html[dir="rtl"] .ide-activity-bar,
+  body[dir="rtl"] .ide-activity-bar {
+    width: 40px !important;
+    right: 0 !important;
+    left: auto !important;
+  }
+  [dir="rtl"] .ide-file-sidebar,
+  html[dir="rtl"] .ide-file-sidebar,
+  body[dir="rtl"] .ide-file-sidebar {
+    right: 40px !important;
+    left: auto !important;
+    width: 200px !important;
+  }
+  [dir="rtl"] .ide-file-sidebar.collapsed,
+  html[dir="rtl"] .ide-file-sidebar.collapsed,
+  body[dir="rtl"] .ide-file-sidebar.collapsed {
+    transform: translateX(200px) !important;
+    width: 0 !important;
+  }
+  [dir="rtl"] .ide-main-viewport,
+  html[dir="rtl"] .ide-main-viewport,
+  body[dir="rtl"] .ide-main-viewport {
+    margin-right: 240px !important;
+    margin-left: 0 !important;
+    width: calc(100% - 240px) !important;
+    max-width: calc(100% - 240px) !important;
+  }
+  [dir="rtl"] .ide-main-viewport.sidebar-collapsed,
+  html[dir="rtl"] .ide-main-viewport.sidebar-collapsed,
+  body[dir="rtl"] .ide-main-viewport.sidebar-collapsed {
+    margin-right: 40px !important;
+    margin-left: 0 !important;
+    width: calc(100% - 40px) !important;
+    max-width: calc(100% - 40px) !important;
+  }
+}
