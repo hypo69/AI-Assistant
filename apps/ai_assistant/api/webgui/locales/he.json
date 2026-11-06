@@ -1871,5 +1871,9 @@
     "runAsAdmin": "הפעל כמנהל מערכת",
     "btnExecute": "הפעל כלי",
     "runnerOutput": "תוצאת הפעלה:"
-  }
+  },
+  "tasks.subtabs.casesTitle": "tasks.subtabs.casesTitle",
+  "tasks.subtabs.intakeTitle": "tasks.subtabs.intakeTitle",
+  "tasks.subtabs.coordinationTitle": "tasks.subtabs.coordinationTitle",
+  "tasks.subtabs.docsTitle": "tasks.subtabs.docsTitle"
 }

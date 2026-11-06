@@ -11,7 +11,7 @@
  * Package: apps/ai_assistant/api/webgui/tab_tasks
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-03 16:40:00
+ * Updated: 2026-11-06 23:30:00
  * =============================================================================
  */
 
@@ -38,6 +38,7 @@ export async function initTasksTab() {
   isInitialized = true;
 
   setupSubtabsNavigation();
+  setupTasksHashRouting();
   setupEventListeners();
   await loadCases();
 
@@ -75,7 +76,7 @@ function setupSubtabsNavigation() {
 /**
  * Переключает субпанель по её panelId.
  */
-function switchSubpane(panelId) {
+function switchSubpane(panelId, updateHash = true) {
   // Активируем кнопку в меню
   const navBtns = document.querySelectorAll('#tasks-subtabs-nav button[data-panel-id]');
   navBtns.forEach(b => {
@@ -98,6 +99,31 @@ function switchSubpane(panelId) {
       p.classList.remove('active');
     }
   });
+
+  if (updateHash && window.history?.replaceState) {
+    window.history.replaceState(null, null, `#tab-tasks#${panelId}`);
+  }
+}
+
+/**
+ * Синхронизирует выбранную субпанель с URL-хэшем.
+ */
+function setupTasksHashRouting() {
+  const syncFromHash = () => {
+    const rawHash = window.location.hash || '';
+    if (!rawHash.includes('#tab-tasks#')) return;
+
+    const panelId = rawHash
+      .replace(/^#tab-tasks#/, '')
+      .split('#')[0];
+
+    if (panelId && document.querySelector(`button[data-panel-id="${panelId}"]`)) {
+      switchSubpane(panelId, false);
+    }
+  };
+
+  window.addEventListener('hashchange', syncFromHash);
+  syncFromHash();
 }
 
 /**

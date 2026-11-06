@@ -1871,5 +1871,9 @@
     "runAsAdmin": "Run as Administrator",
     "btnExecute": "Execute Tool",
     "runnerOutput": "Execution Output:"
-  }
+  },
+  "tasks.subtabs.casesTitle": "Section: Дела и Сделки",
+  "tasks.subtabs.intakeTitle": "Section: ИИ-Разбор разговора",
+  "tasks.subtabs.coordinationTitle": "Section: Визиты &amp; Осмотры",
+  "tasks.subtabs.docsTitle": "Section: Пакет документов"
 }

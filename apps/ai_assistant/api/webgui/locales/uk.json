@@ -1871,5 +1871,9 @@
     "runAsAdmin": "Від імені адміністратора",
     "btnExecute": "Виконати інструмент",
     "runnerOutput": "Результат виконання:"
-  }
+  },
+  "tasks.subtabs.casesTitle": "tasks.subtabs.casesTitle",
+  "tasks.subtabs.intakeTitle": "tasks.subtabs.intakeTitle",
+  "tasks.subtabs.coordinationTitle": "tasks.subtabs.coordinationTitle",
+  "tasks.subtabs.docsTitle": "tasks.subtabs.docsTitle"
 }

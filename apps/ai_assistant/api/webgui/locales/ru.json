@@ -1871,5 +1871,9 @@
     "runAsAdmin": "От имени администратора",
     "btnExecute": "Выполнить инструмент",
     "runnerOutput": "Результат выполнения:"
-  }
+  },
+  "tasks.subtabs.casesTitle": "tasks.subtabs.casesTitle",
+  "tasks.subtabs.intakeTitle": "tasks.subtabs.intakeTitle",
+  "tasks.subtabs.coordinationTitle": "tasks.subtabs.coordinationTitle",
+  "tasks.subtabs.docsTitle": "tasks.subtabs.docsTitle"
 }
