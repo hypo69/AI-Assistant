@@ -26,7 +26,7 @@ class VerificationResult:
     warnings: List[str] = field(default_factory=list)
 
 class InstallationVerifier:
-    """Validates full structural integrity and runtime readiness of AI Windows Admin."""
+    """Validates full structural integrity and runtime readiness of AI-Assistant."""
     REQUIRED_DIRECTORIES: List[str] = ['scripts', 'install', 'launchers', 'docs', 'tests', 'src', '.ai', 'tmp', '.skills']
     REQUIRED_FILES: List[str] = ['header.py', 'config.json', 'requirements.txt', 'INSTALL-INSTRUCTION.md']
     ALTERNATIVE_FILES: List[Tuple[str, str]] = [('.env', '.env.example')]
@@ -172,8 +172,8 @@ def main() -> int:
     Returns:
         int: Exit code 0 if required components exist, 1 otherwise.
     """
-    parser = argparse.ArgumentParser(description='Verify AI Windows Admin installation integrity and directories.')
-    parser.add_argument('--project-root', type=str, default='', help='Path to AI Windows Admin project root (default: auto-detected)')
+    parser = argparse.ArgumentParser(description='Verify AI-Assistant installation integrity and directories.')
+    parser.add_argument('--project-root', type=str, default='', help='Path to AI-Assistant project root (default: auto-detected)')
     parser.add_argument('--json', action='store_true', help='Output structured JSON results')
     args = parser.parse_args()
     project_root_path: Optional[Path] = Path(args.project_root) if args.project_root else None
@@ -183,7 +183,7 @@ def main() -> int:
         logger.console(json.dumps(asdict(result), indent=2, ensure_ascii=False))
     else:
         logger.console('=' * 65)
-        logger.console('🔍 AI Windows Admin Installation Verification')
+        logger.console('🔍 AI-Assistant Installation Verification')
         logger.console('=' * 65)
         logger.console(f'Project Root: {result.project_root}')
         logger.console(f'Platform:     {result.os_name}')

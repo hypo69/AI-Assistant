@@ -11,12 +11,13 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-22 16:25:00
+# Updated: 2026-11-06 20:43:00
 # =============================================================================
 
 from __future__ import annotations
 """Тесты для модуля tab_models и REST API моделей, провайдеров и ключей."""
 
+from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -160,3 +161,108 @@ async def test_keys_and_accounts_api_endpoints() -> None:
         accs_data = res_accs.json()
         assert isinstance(accs_data, dict)
         assert "accounts" in accs_data
+
+
+@pytest.mark.asyncio
+async def test_model_tester_script_and_ping_endpoint() -> None:
+    """Проверяет доступность model-tester.js и эндпоинта проверки модели /api/v1/chat/test-model."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Проверка статики model-tester.js
+        res_js = await client.get("/html/js/model-tester.js")
+        assert res_js.status_code == 200
+        assert "sendModelPing" in res_js.text
+        assert "initModelTester" in res_js.text
+
+        # Проверка эндпоинта /api/v1/chat/test-model без явной передачи model/provider
+        with patch(
+            "src.ai.orchestration.unified_chat.UnifiedChatModel.ask",
+            new_callable=AsyncMock,
+            create=True,
+        ) as mock_ask:
+            mock_ask.return_value = "Привет! Я на связи."
+            res_ping = await client.post(
+                "/api/v1/chat/test-model",
+                json={"message": "Привет, ты на связи?"},
+            )
+            assert res_ping.status_code == 200
+            ping_data = res_ping.json()
+            assert ping_data["status"] == "success"
+            assert ping_data["response"] == "Привет! Я на связи."
+            assert "model" in ping_data
+            assert "provider" in ping_data
+
+
+@pytest.mark.asyncio
+async def test_keys_reset_and_management_endpoints() -> None:
+    """Проверяет эндпоинты сброса квот (/api/keys/reset-all) и управления ключами."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Проверка сброса квот всех ключей Gemini (устранение 405 Method Not Allowed)
+        res_reset_all = await client.post("/api/keys/reset-all")
+        assert res_reset_all.status_code == 200
+        data_reset = res_reset_all.json()
+        assert data_reset["status"] == "success"
+        assert "message" in data_reset
+
+        # Проверка сброса квот всех ключей AGY
+        res_agy_reset = await client.post("/api/keys/agy/reset-all")
+        assert res_agy_reset.status_code == 200
+        data_agy_reset = res_agy_reset.json()
+        assert data_agy_reset["status"] == "success"
+
+        # Проверка добавления тестового ключа Gemini
+        test_key_name = "_test_tmp_unit_key"
+        res_add = await client.post(
+            "/api/keys",
+            json={"name": test_key_name, "api_key": "AIzaSyDummyKeyForTestingPurposes123"},
+        )
+        assert res_add.status_code == 200
+
+        try:
+            # Проверка активации ключа
+            res_act = await client.post(f"/api/keys/{test_key_name}/activate")
+            assert res_act.status_code == 200
+
+            # Проверка переключения статуса (PATCH)
+            res_patch = await client.patch(
+                f"/api/keys/{test_key_name}",
+                json={"status": "disabled"},
+            )
+            assert res_patch.status_code == 200
+            assert res_patch.json()["new_status"] == "disabled"
+
+            # Проверка сброса квоты конкретного ключа
+            res_quota = await client.post(f"/api/keys/{test_key_name}/reset-quota")
+            assert res_quota.status_code == 200
+
+            # Проверка тестирования ключа
+            res_test = await client.post(f"/api/keys/{test_key_name}/test")
+            assert res_test.status_code == 200
+            assert "duration_ms" in res_test.json()
+        finally:
+            # Удаление тестового ключа
+            res_del = await client.delete(f"/api/keys/{test_key_name}")
+            assert res_del.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_disabled_providers_not_queried() -> None:
+    """Проверяет, что отключенные в конфигурации провайдеры (Ollama, Foundry) не опрашиваются."""
+    from src.ai.model_manager import get_available_models, is_provider_enabled
+
+    # Проверка функции статуса активности провайдеров
+    assert is_provider_enabled("gemini") is True
+    assert is_provider_enabled("ollama") is False
+    assert is_provider_enabled("foundry") is False
+
+    # Запрос моделей для отключенного провайдера не должен бросать исключений и возвращает пустой список
+    models_ollama = get_available_models("ollama", force_refresh=True)
+    assert models_ollama == []
+
+    models_foundry = get_available_models("foundry", force_refresh=True)
+    assert models_foundry == []
+
+
+
+

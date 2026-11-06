@@ -1,6 +1,6 @@
 # Справочник API AIModalDialog
 
-Компонент: `apps/windows/api/webgui/ai_modal_dialog/`  
+Компонент: `apps/ai_assistant/api/webgui/ai_modal_dialog/`  
 Глобальный синглтон: `window.AIModalDialog` (или `window.AITableModal`)
 
 ---

@@ -1,0 +1,121 @@
+{
+  "$schema": "webgui-menu-v1",
+  "tab_id": "tab-workspace",
+  "draggable": true,
+  "subtabs": {
+    "nav_id": "workspace-subtabs-nav",
+    "storage_key": "tab-workspace_subtabs_order",
+    "items": [
+      {
+        "id": "editor",
+        "button_id": "panel-editor",
+        "pane_id": "subpane-ws-editor",
+        "panel_id": "panel-editor",
+        "icon": "bi bi-code-square text-primary",
+        "label_i18n": "workspace.subtabs.editor",
+        "title_i18n": "workspace.subtabs.editorTitle",
+        "default_title": "workspace.subtabs.editorTitle",
+        "order": 0
+      },
+      {
+        "id": "files",
+        "button_id": "panel-files",
+        "pane_id": "subpane-ws-files",
+        "panel_id": "panel-files",
+        "icon": "bi bi-folder2-open text-primary",
+        "label_i18n": "workspace.subtabs.files",
+        "title_i18n": "workspace.subtabs.panel-filesTitle",
+        "default_title": "Раздел: Файлы",
+        "order": 1
+      },
+      {
+        "id": "documents",
+        "button_id": "panel-documents",
+        "pane_id": "subpane-ws-documents",
+        "panel_id": "panel-documents",
+        "icon": "bi bi-file-earmark-code text-info",
+        "label_i18n": "workspace.subtabs.documents",
+        "title_i18n": "workspace.subtabs.panel-documentsTitle",
+        "default_title": "Раздел: Документы и факты (Git)",
+        "order": 2
+      },
+      {
+        "id": "qa",
+        "button_id": "panel-qa",
+        "pane_id": "subpane-ws-qa",
+        "panel_id": "panel-qa",
+        "icon": "bi bi-chat-dots text-success",
+        "label_i18n": "workspace.subtabs.qa",
+        "title_i18n": "workspace.subtabs.panel-qaTitle",
+        "default_title": "Раздел: Вопрос-Ответ (QA)",
+        "order": 3
+      },
+      {
+        "id": "commits",
+        "button_id": "panel-commits",
+        "pane_id": "subpane-ws-commits",
+        "panel_id": "panel-commits",
+        "icon": "bi bi-git text-danger",
+        "label_i18n": "workspace.subtabs.commits",
+        "title_i18n": "workspace.subtabs.panel-commitsTitle",
+        "default_title": "Раздел: Коммиты",
+        "order": 4
+      },
+      {
+        "id": "tree",
+        "button_id": "panel-tree",
+        "pane_id": "subpane-ws-tree",
+        "panel_id": "panel-tree",
+        "icon": "bi bi-diagram-3 text-warning",
+        "label_i18n": "workspace.subtabs.tree",
+        "title_i18n": "workspace.subtabs.panel-treeTitle",
+        "default_title": "Раздел: Дерево файлов",
+        "order": 5
+      },
+      {
+        "id": "subpane-ws-files-dir",
+        "button_id": "subtab-ws-files-dir-btn",
+        "pane_id": "subpane-ws-files-dir",
+        "panel_id": "panel-subpane-ws-files-dir",
+        "icon": "bi bi-hdd-rack text-primary",
+        "label_i18n": "workspace.filesSubtabs.repoContents",
+        "title_i18n": "workspace.subtabs.ws-files-dir-btnTitle",
+        "default_title": "Содержимое репозитория (Git)",
+        "order": 6
+      },
+      {
+        "id": "subpane-ws-files-track",
+        "button_id": "subtab-ws-files-track-btn",
+        "pane_id": "subpane-ws-files-track",
+        "panel_id": "panel-subpane-ws-files-track",
+        "icon": "bi bi-plus-square-dotted text-success",
+        "label_i18n": "workspace.filesSubtabs.addTracking",
+        "title_i18n": "workspace.subtabs.ws-files-track-btnTitle",
+        "default_title": "Добавление файлов в слежение",
+        "order": 7
+      },
+      {
+        "id": "subpane-ws-files-obsidian",
+        "button_id": "subtab-ws-files-obsidian-btn",
+        "pane_id": "subpane-ws-files-obsidian",
+        "panel_id": "panel-subpane-ws-files-obsidian",
+        "icon": "bi bi-journal-richtext text-info",
+        "label_i18n": "workspace.filesSubtabs.obsidianVault",
+        "title_i18n": "workspace.subtabs.ws-files-obsidian-btnTitle",
+        "default_title": "Раздел: Obsidian Vault",
+        "order": 8
+      },
+      {
+        "id": "subpane-ws-files-sources",
+        "button_id": "subtab-ws-files-sources-btn",
+        "pane_id": "subpane-ws-files-sources",
+        "panel_id": "panel-subpane-ws-files-sources",
+        "icon": "bi bi-folder-symlink-fill text-warning",
+        "label_i18n": "workspace.filesSubtabs.externalSources",
+        "title_i18n": "workspace.subtabs.ws-files-sources-btnTitle",
+        "default_title": "Раздел: Внешние источники",
+        "order": 9
+      }
+    ]
+  }
+}

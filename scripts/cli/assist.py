@@ -3,7 +3,7 @@
 # Process Name: AI-Windows-Admin Scripts Cli - Assist
 # =============================================================================
 # Description:
-#   Cross-platform CLI assistant for AI Windows Admin project management.
+#   Cross-platform CLI assistant for AI-Assistant project management.
 #
 # Usage Examples:
 #   CLI:
@@ -18,10 +18,10 @@
 # Package: scripts.cli
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 16:47:30
+# Updated: 2026-11-01 17:37:00
 # =============================================================================
 
-"""Cross-platform CLI assistant for AI Windows Admin project management.
+"""Cross-platform CLI assistant for AI-Assistant project management.
 
 CLI assistant providing cross-platform project management utilities,
 originally ported from PowerShell assist.ps1 for Windows, Linux, macOS.

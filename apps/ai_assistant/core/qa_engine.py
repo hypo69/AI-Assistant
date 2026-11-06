@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 23:18:00
+# Updated: 2026-11-03 16:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -29,12 +29,19 @@ from __future__ import annotations
 import asyncio, time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+try:
+    from src.config import ai_cfg
+except Exception:
+    ai_cfg = None
+
 from logger import logger
 from apps.ai_assistant.core.nlp.intent_parser import QuestionIntentParser
 from apps.ai_assistant.core.nlp_analyzers import (
     RussianMorphology,
     strip_hebrew_article,
 )
+from apps.ai_assistant.core.qa_prompts import get_insufficient_data_message, get_qa_prompts
+from apps.ai_assistant.core.qa_git_resolver import QaGitResolver
 from apps.ai_assistant.core.workspace_manager import WorkspaceManager
 
 VALID_MODES = {"local_only", "local_first", "cloud_assist", "cloud_enrich"}
@@ -64,8 +71,8 @@ class KnowledgeQAEngine:
         self,
         workspace_manager: Optional[WorkspaceManager] = None,
         cloud_policy_enabled: bool = True,
-        default_provider: str = "gemini",
-        default_model: str = "gemini-3.1-flash-lite",
+        default_provider: Optional[str] = None,
+        default_model: Optional[str] = None,
         chat_model_factory: Optional[Callable[..., Any]] = None,
     ) -> None:
         """Инициализирует QA-движок с поддержкой локального и облачного контуров.
@@ -74,13 +81,15 @@ class KnowledgeQAEngine:
             workspace_manager: Менеджер рабочих областей.
             cloud_policy_enabled: Разрешены ли вызовы облачных моделей политикой безопасности.
             default_provider: Провайдер из модуля src/ai по умолчанию ('gemini', 'agy', 'openai', 'ollama').
-            default_model: Идентификатор модели по умолчанию.
+            default_model: Идентификатор модели по умолчанию (если None — загружается из конфигурации).
             chat_model_factory: Фабрика создания UnifiedChatModel (для DI и тестирования отказов).
         """
         self.wm = workspace_manager or WorkspaceManager()
         self.cloud_policy_enabled = cloud_policy_enabled
-        self.default_provider = default_provider
-        self.default_model = default_model
+        cfg_provider = getattr(ai_cfg, "default_provider", "") if ai_cfg else ""
+        cfg_model = getattr(ai_cfg, "default_model", "") if ai_cfg else ""
+        self.default_provider = str(default_provider or cfg_provider or "gemini").strip()
+        self.default_model = str(default_model or cfg_model or "").strip()
         self.chat_model_factory = chat_model_factory
 
     def _match_facts_locally(
@@ -451,14 +460,8 @@ class KnowledgeQAEngine:
             return None
 
         t0 = time.perf_counter()
-        sys_prompt = (
-            "Ты — точный мультиязычный модуль извлечения фактов и формирования грамматически "
-            "согласованных ответов. Отвечай ТОЛЬКО на основе предоставленного контекста документов. "
-            "Если в контексте нет ответа, ответь строго: INSUFFICIENT_DATA. "
-            "Формируй краткий и грамматически точный ответ на языке вопроса."
-        )
-        limited_ctx = "\n".join(context_snippets[:5])[:2000]
-        user_prompt = f"Контекст документов:\n{limited_ctx}\n\nВопрос ({language}): {question}\nКраткий точный ответ:"
+        limited_ctx = "\n".join(context_snippets[:5])[:4000]
+        sys_prompt, user_prompt = get_qa_prompts(language=language, context=limited_ctx, question=question)
 
         try:
             if self.chat_model_factory:
@@ -476,7 +479,7 @@ class KnowledgeQAEngine:
                     model=model_name,
                 )
 
-            response_text = await chat_instance.ask(q=user_prompt, attempts=2, temperature=0.0)
+            response_text = await chat_instance.ask(q=user_prompt, attempts=4, temperature=0.0)
             lat = (time.perf_counter() - t0) * 1000.0
 
             if not response_text or "INSUFFICIENT_DATA" in response_text:
@@ -506,6 +509,41 @@ class KnowledgeQAEngine:
             return clean_ans
         except Exception as exc:
             lat = (time.perf_counter() - t0) * 1000.0
+            cfg_fallback_model = str(getattr(ai_cfg, "default_model", "") or self.default_model or "").strip()
+            if cfg_fallback_model and model_name != cfg_fallback_model:
+                logger.info(f"[KnowledgeQAEngine] Модель {model_name} отклонила запрос: {exc}. Попытка резервной модели {cfg_fallback_model}...")
+                try:
+                    if self.chat_model_factory:
+                        fb_chat = self.chat_model_factory(
+                            system_instruction=sys_prompt,
+                            provider=provider,
+                            model=cfg_fallback_model,
+                        )
+                    else:
+                        from src.ai.orchestration.unified_chat import UnifiedChatModel
+
+                        fb_chat = UnifiedChatModel(
+                            system_instruction=sys_prompt,
+                            provider=provider,
+                            model=cfg_fallback_model,
+                        )
+                    fb_resp = await fb_chat.ask(q=user_prompt, attempts=3, temperature=0.0)
+                    if fb_resp and "INSUFFICIENT_DATA" not in fb_resp:
+                        clean_ans = fb_resp.strip()
+                        self.wm.store.log_model_usage(
+                            workspace_id=workspace_id,
+                            provider=provider,
+                            model_name=cfg_fallback_model,
+                            operation="qa_synthesis_fallback",
+                            status="success",
+                            latency_ms=(time.perf_counter() - t0) * 1000.0,
+                            prompt_chars=len(user_prompt),
+                            response_chars=len(clean_ans),
+                        )
+                        return clean_ans
+                except Exception as fb_exc:
+                    logger.warning(f"[KnowledgeQAEngine] Резервная модель {cfg_fallback_model} также отклонила запрос: {fb_exc}")
+
             logger.warning(f"[KnowledgeQAEngine] Отказ провайдера ИИ ({provider}:{model_name}): {exc}. Переход в локальный режим.")
             self.wm.store.log_model_usage(
                 workspace_id=workspace_id,
@@ -536,6 +574,14 @@ class KnowledgeQAEngine:
 
         parsed_q = QuestionIntentParser.parse_question(question, language=language)
         q_lang = parsed_q["language"]
+
+        # Извлечение Git-контекста, если вопрос касается коммитов, версий или истории
+        git_ctx, git_sources, git_fallback = await QaGitResolver.resolve(
+            wm=self.wm,
+            workspace_id=workspace_id,
+            parsed_q=parsed_q,
+            language=q_lang,
+        )
 
         all_facts = self.wm.store.get_facts(workspace_id=workspace_id, include_stale=False)
         matched_facts = self._match_facts_locally(parsed_q, all_facts)
@@ -600,7 +646,31 @@ class KnowledgeQAEngine:
                 else:
                     cloud_error_fallback = True
         else:
-            if effective_mode in ("local_first", "cloud_assist", "cloud_enrich") and self.cloud_policy_enabled:
+            # 1. Если обнаружен Git-запрос (коммит, история изменений), используем Git-контекст
+            if git_ctx:
+                sources.extend(git_sources)
+                if effective_mode in ("local_first", "cloud_assist", "cloud_enrich") and self.cloud_policy_enabled:
+                    cloud_ans = await self._call_cloud_model(
+                        workspace_id=workspace_id,
+                        question=question,
+                        language=q_lang,
+                        context_snippets=[git_ctx],
+                        provider=eff_provider,
+                        model_name=eff_model,
+                    )
+                    if cloud_ans:
+                        answer_text = cloud_ans
+                        cloud_insight = cloud_ans
+                        cloud_used = True
+                    else:
+                        cloud_error_fallback = True
+                        if git_fallback:
+                            answer_text = git_fallback
+                elif git_fallback:
+                    answer_text = git_fallback
+
+            # 2. Иначе производим семантический поиск через FAISS
+            elif effective_mode in ("local_first", "cloud_assist", "cloud_enrich") and self.cloud_policy_enabled:
                 ctx_list = [h.get("text", "") for h in faiss_hits if h.get("score", 0) > 0.1]
                 if ctx_list:
                     cloud_ans = await self._call_cloud_model(
@@ -628,12 +698,7 @@ class KnowledgeQAEngine:
 
             if not answer_text:
                 status_str = "insufficient_data"
-                if q_lang == "he":
-                    answer_text = "אין מספיק מידע במסמכי סביבת העבודה כדי לענות על השאלה."
-                elif q_lang == "en":
-                    answer_text = "Insufficient data in the workspace documents to answer this question."
-                else:
-                    answer_text = "Недостаточно сведений в документах рабочей области для ответа на вопрос."
+                answer_text = get_insufficient_data_message(q_lang)
 
         latency_ms = round((time.perf_counter() - t0) * 1000.0, 2)
         self.wm.store.log_query(

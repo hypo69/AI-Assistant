@@ -1,18 +1,18 @@
 # 🎨 Руководство по темам оформления, дизайн-токенам и стилизации WebGUI
 
 Файлы стилей и логики:
-- Таблица переменных дизайн-токенов: `apps/windows/api/webgui/css/variables.css`
-- Дизайн-система компонентов v2.0: `apps/windows/api/webgui/css/themes.css`
-- Базовые стили и геометрия: `apps/windows/api/webgui/css/base.css`
-- Ядро шаблонизатора тем: `apps/windows/api/webgui/js/theme-engine.js`
-- Фасадный модуль управления: `apps/windows/api/webgui/js/theme.js`
-- Интерактивный редактор тем: `apps/windows/api/webgui/theme_editor_tab/`
+- Таблица переменных дизайн-токенов: `apps/ai_assistant/api/webgui/css/variables.css`
+- Дизайн-система компонентов v2.0: `apps/ai_assistant/api/webgui/css/themes.css`
+- Базовые стили и геометрия: `apps/ai_assistant/api/webgui/css/base.css`
+- Ядро шаблонизатора тем: `apps/ai_assistant/api/webgui/js/theme-engine.js`
+- Фасадный модуль управления: `apps/ai_assistant/api/webgui/js/theme.js`
+- Интерактивный редактор тем: `apps/ai_assistant/api/webgui/theme_editor_tab/`
 
 ---
 
 ## 🏗️ 1. Архитектура дизайн-токенов
 
-Веб-интерфейс AI Windows Admin поддерживает мульти-темизацию (светлые, тёмные, системную и высококонтрастные темы оформления) на основе CSS-переменных и адаптивных классов Bootstrap 5.
+Веб-интерфейс AI-Assistant поддерживает мульти-темизацию (светлые, тёмные, системную и высококонтрастные темы оформления) на основе CSS-переменных и адаптивных классов Bootstrap 5.
 
 ### Атрибуты корневого элемента
 При переключении темы скрипт `theme-engine.js` устанавливает на `<html>` и `<body>` следующие атрибуты:
@@ -100,7 +100,7 @@
 
 ## ⚙️ 3. Программный API ThemeEngine
 
-Доступен через ES-модуль `apps/windows/api/webgui/js/theme.js` или глобально в объекте `window.themeEngine`.
+Доступен через ES-модуль `apps/ai_assistant/api/webgui/js/theme.js` или глобально в объекте `window.themeEngine`.
 
 ### Основные методы:
 

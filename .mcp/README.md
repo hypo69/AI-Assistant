@@ -11,7 +11,7 @@ All servers are **кроссплатформенные** (cross-platform) и р�
 
 | Server | Entry Point | Primary Tools | Platform Support |
 |---|---|---|---|
-| **LangChain AI Windows Admin Agent** | `langchain_mcp_server.py` | `agent_query`, `agent_web_search`, `agent_rag_search`, `agent_python_eval` | ✅ Win/Linux/macOS |
+| **LangChain AI-Assistant Agent** | `langchain_mcp_server.py` | `agent_query`, `agent_web_search`, `agent_rag_search`, `agent_python_eval` | ✅ Win/Linux/macOS |
 | **Gemini Search Grounding** | `gemini_search_mcp_server.py` | `gemini_web_search`, `gemini_key_pool_status` | ✅ Win/Linux/macOS |
 | **Gemini CLI Search** | `gemini_cli_search_mcp_server.py` | `gemini_cli_web_search` | ✅ Win/Linux/macOS |
 | **Antigravity Search** | `agy_search_mcp_server.py` | `agy_web_search` | ✅ Win/Linux/macOS |

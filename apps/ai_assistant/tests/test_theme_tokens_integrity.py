@@ -1,7 +1,7 @@
 """
 Тесты целостности токенов оформления и отсутствия захардкоженных стилей.
 
-Updated: 2026-10-25 20:35:00
+Updated: 2026-11-03 14:20:00
 """
 
 import re
@@ -98,5 +98,39 @@ def test_nightview_theme_dark_readable_text_tokens():
         assert '--text-color: #18181b' in content, f"--text-color должен быть #18181b в {themes_css}"
         assert '--text-muted: #3f3f46' in content, f"--text-muted должен быть #3f3f46 в {themes_css}"
         assert '--text-silver: #27272a' in content, f"--text-silver должен быть темным антрацитом в {themes_css}"
+
+
+def test_nightview_70_matches_nightview_style_and_has_zoom_reduction():
+    """Проверяет, что тема NightView 70% повторяет палитру NightView и имеет 30% уменьшение размеров."""
+    import json
+    catalog_path = COMMON_WEBGUI_DIR / "themes" / "themes_catalog.json"
+    assert catalog_path.exists(), "themes_catalog.json должен существовать"
+    themes = json.loads(catalog_path.read_text(encoding="utf-8"))
+    themes_map = {t["id"]: t for t in themes}
+
+    assert "nightview" in themes_map, "Тема nightview должна быть в каталоге"
+    assert "nightview-70" in themes_map, "Тема nightview-70 должна быть в каталоге"
+
+    nv_tokens = themes_map["nightview"]["tokens"]
+    nv70_tokens = themes_map["nightview-70"]["tokens"]
+
+    # Проверяем 100% совпадение стилей и цветов
+    for token_key in ["--bg-color", "--surface-1", "--surface-2", "--card-bg", "--nav-bg", "--modal-bg", "--ui-bg-base", "--ui-bg-surface", "--ui-text-primary", "--ui-accent", "--border-color"]:
+        assert nv_tokens[token_key] == nv70_tokens[token_key], f"Токен {token_key} должен полностью совпадать с NightView"
+
+    # Проверяем наличие зума 70% (30% уменьшение) в base.css и themes.css
+    for base_dir in [COMMON_WEBGUI_DIR, WEBGUI_DIR]:
+        base_css = base_dir / "css" / "base.css"
+        assert base_css.exists()
+        base_content = base_css.read_text(encoding="utf-8")
+        assert 'data-theme="nightview-70"' in base_content
+        assert "zoom: 0.7;" in base_content
+
+        themes_css = base_dir / "css" / "themes.css"
+        assert themes_css.exists()
+        themes_content = themes_css.read_text(encoding="utf-8")
+        assert '[data-theme="nightview-70"]' in themes_content
+        assert "zoom: 0.7;" in themes_content
+
 
 

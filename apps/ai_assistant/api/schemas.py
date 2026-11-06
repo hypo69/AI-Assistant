@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.api
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-15 09:37:00
+# Updated: 2026-11-01 20:05:00
 # =============================================================================
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def get_utc_now_iso() -> str:
@@ -58,21 +58,37 @@ class FileHistoryResponse(BaseModel):
 
 class DiffHunkItem(BaseModel):
     """Срез измененного блока diff."""
-    old_start: int = Field(..., description="Начальная строка в старой ревизии")
-    old_lines: int = Field(..., description="Число строк в старой ревизии")
-    new_start: int = Field(..., description="Начальная строка в новой ревизии")
-    new_lines: int = Field(..., description="Число строк в новой ревизии")
-    hunk_text: str = Field(..., description="Текст фрагмента diff")
+    old_start: int = Field(default=0, description="Начальная строка в старой ревизии")
+    old_lines: int = Field(default=0, description="Число строк в старой ревизии")
+    new_start: int = Field(default=0, description="Начальная строка в новой ревизии")
+    new_lines: int = Field(default=0, description="Число строк в новой ревизии")
+    hunk_text: str = Field(default="", description="Текст фрагмента diff")
 
 
 class DiffResponse(BaseModel):
     """Ответ с результатами сравнения двух коммитов или снимка коммита."""
-    commit_a: str = Field(..., description="Хэш исходного коммита")
+    commit_hash: str = Field(default="", description="Хэш коммита")
+    commit_a: Optional[str] = Field(None, description="Хэш исходного коммита")
     commit_b: Optional[str] = Field(None, description="Хэш целевого коммита")
+    parent_hash: Optional[str] = Field(default="", description="Хэш родительского коммита")
     file_path: Optional[str] = Field(None, description="Целевой файл")
-    diff_text: str = Field(..., description="Текст unified diff")
+    diff_text: str = Field(default="", description="Текст unified diff")
     hunks: List[DiffHunkItem] = Field(default_factory=list, description="Разобранные блоки diff")
     files_changed: List[str] = Field(default_factory=list, description="Список затронутых файлов")
+    truncated: bool = Field(default=False, description="Признак усечения большого diff")
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_hashes(cls, data: Any) -> Any:
+        """Синхронизирует альтернативные имена полей хэшей коммитов."""
+        if isinstance(data, dict):
+            commit_hash = data.get("commit_hash") or data.get("commit_a") or ""
+            parent_hash = data.get("parent_hash") or data.get("commit_b") or ""
+            data.setdefault("commit_hash", commit_hash)
+            data.setdefault("commit_a", commit_hash)
+            data.setdefault("parent_hash", parent_hash)
+            data.setdefault("commit_b", parent_hash)
+        return data
 
 
 class BlameLine(BaseModel):
@@ -125,6 +141,7 @@ class EvidenceLinkSchema(BaseModel):
 
 class AnnotationRequest(BaseModel):
     """Запрос на добавление аннотации к коммиту или ревизии (Шаг 1: Candidate Proposal)."""
+    workspace_id: Optional[str] = Field(None, description="Идентификатор рабочей области")
     commit_hash: Optional[str] = Field(None, description="Хэш коммита")
     source_id: Optional[str] = Field(None, description="Идентификатор источника")
     file_path: Optional[str] = Field(None, description="Опциональный путь к файлу")

@@ -11,12 +11,12 @@
  * Package: apps/ai_assistant/api/webgui/tab_rag
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-23 19:20:00
+ * Updated: 2026-11-01 19:41:00
  * =============================================================================
  */
 
 import { initRagPanel, loadWorkspacesList } from './panel_rag/panel.js';
-import { loadPanelData } from '../../js/panel-loader.js';
+import { loadPanelData } from '../js/panel-loader.js';
 
 let initialized = false;
 

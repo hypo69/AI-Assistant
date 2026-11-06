@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 16:47:30
+# Updated: 2026-11-06 23:05:00
 # =============================================================================
 
 from __future__ import annotations
@@ -184,12 +184,12 @@ async def get_available_chat_models(refresh: bool = False, include_unsupported: 
 
         return {
             "models": {
-                "gemini": gemini_models or ["gemini-3.1-flash-lite", "gemini-2.5-flash"],
-                "foundry": foundry_models or ["foundry:qwen2.5-1.5b-instruct-generic-cpu:4"],
-                "ollama": ollama_models or ["ollama:llama3.1", "ollama:qwen2.5:3b"],
-                "agy": agy_models or ["agy-gemini-3.6-flash"],
-                "gemini_cli": gemini_cli_models or ["gemini_cli:gemini-3.1-flash-lite"],
-                "openai": openai_models or ["openai:gpt-4o-mini", "deepseek:deepseek-chat"],
+                "gemini": gemini_models or [],
+                "foundry": foundry_models or [],
+                "ollama": ollama_models or [],
+                "agy": agy_models or [],
+                "gemini_cli": gemini_cli_models or [],
+                "openai": openai_models or [],
                 "onnx": ["onnx:directml-default"],
             },
             "unsupported_models": {
@@ -203,10 +203,10 @@ async def get_available_chat_models(refresh: bool = False, include_unsupported: 
         logger.warning(f"[router_models] Ошибка загрузки списка моделей: {exc}")
         return {
             "models": {
-                "gemini": ["gemini-3.1-flash-lite", "gemini-2.5-flash"],
-                "agy": ["agy-gemini-3.6-flash"],
-                "ollama": ["ollama:llama3.1"],
-                "foundry": ["foundry:qwen2.5-1.5b"],
+                "gemini": [],
+                "agy": [],
+                "ollama": [],
+                "foundry": [],
             }
         }
 
@@ -375,10 +375,15 @@ async def test_model_endpoint(req: TestModelPayload) -> Dict[str, Any]:
     target_model = req.model.strip()
     provider = req.provider.strip().lower()
 
-    if not target_model:
-        target_model = "gemini-3.1-flash-lite"
-    if not provider:
-        provider = "gemini"
+    if not target_model or not provider:
+        cfg = _load_root_config()
+        ai_sec = cfg.get("ai_providers_and_models_configuration", {})
+        def_prov = str(ai_sec.get("default_provider", "gemini")).strip().lower() or "gemini"
+        def_model = str(ai_sec.get("default_model", "")).strip()
+        if not target_model:
+            target_model = def_model
+        if not provider:
+            provider = def_prov
 
     test_msg = req.message.strip() or "Привет! Назови свою модель и провайдера, и подтверди готовность к работе."
 
@@ -392,7 +397,8 @@ async def test_model_endpoint(req: TestModelPayload) -> Dict[str, Any]:
         response_text = ""
 
         if hasattr(model_instance, "ask"):
-            response_text = await model_instance.ask(test_msg)
+            # attempts=1: без молчаливой смены модели/ключа — проверка должна показывать реальную ошибку
+            response_text = await model_instance.ask(test_msg, attempts=1)
         elif hasattr(model_instance, "chat"):
             response_text = await model_instance.chat(test_msg)
         elif hasattr(model_instance, "chat_stream"):
@@ -406,11 +412,20 @@ async def test_model_endpoint(req: TestModelPayload) -> Dict[str, Any]:
         else:
             response_text = f"Модель {target_model} готова к генерации (режим ответа подтвержден)."
 
+        # Провайдер Gemini может молча переключить модель при 404/429 — отдаём фактически использованную
+        actual_model = target_model
+        gemini_inner = getattr(model_instance, "gemini_model", False)
+        if gemini_inner:
+            actual_model = str(getattr(gemini_inner, "model_name", target_model) or target_model)
+        if actual_model != target_model:
+            logger.warning(f"[router_models] Запрошена модель {target_model}, фактически ответила {actual_model}")
+
         duration_ms = round((time.perf_counter() - start_time) * 1000, 1)
         return {
             "status": "success",
             "response": response_text,
-            "model": target_model,
+            "model": actual_model,
+            "requested_model": target_model,
             "provider": provider,
             "duration_ms": duration_ms
         }
@@ -453,7 +468,7 @@ async def get_system_instruction() -> Dict[str, Any]:
         except Exception:
             pass
 
-    return {"status": "success", "content": "Вы — интеллектуальный ассистент платформы AI Windows Admin."}
+    return {"status": "success", "content": "Вы — интеллектуальный ассистент платформы AI-Assistant."}
 
 
 @router.post("/api/v1/tc/model-instruction", summary="Сохранить системную инструкцию TC")
@@ -544,6 +559,6 @@ async def get_models_summary() -> Dict[str, Any]:
     return {
         "status": "active",
         "default_provider": ai_sec.get("default_provider", "gemini"),
-        "default_model": ai_sec.get("default_model", "gemini-3.1-flash-lite"),
+        "default_model": str(ai_sec.get("default_model", "")).strip(),
         "providers": list(ai_sec.get("providers", {}).keys()),
     }

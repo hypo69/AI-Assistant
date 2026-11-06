@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-15 09:25:00
+# Updated: 2026-11-01 17:40:00
 # =============================================================================
 
 from __future__ import annotations
@@ -32,11 +32,11 @@ def test_two_stage_candidate_proposal_and_validation() -> None:
     proposal = summarizer.propose_annotation(
         commit_hash="a1b2c3d4",
         diff_text=diff_sample,
-        file_path="apps/windows/hardware.py",
+        file_path="apps/ai_assistant/hardware.py",
         author="tester",
     )
     assert proposal["source_id"] == "a1b2c3d4"
-    assert proposal["target_id"] == "apps/windows/hardware.py"
+    assert proposal["target_id"] == "apps/ai_assistant/hardware.py"
     assert "Расчет сенсора" not in proposal["summary"] or "Добавлено строк" in proposal["summary"]
 
     is_valid, sanitized, err = summarizer.validate_candidate(proposal)

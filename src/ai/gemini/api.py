@@ -16,7 +16,7 @@
 # Package: src.ai.gemini
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-16 16:30:00
+# Updated: 2026-11-03 16:25:00
 # =============================================================================
 
 """Модуль реализации компонента `GoogleGenerativeAI` системы AI-Windows-Admin."""
@@ -118,7 +118,9 @@ class GoogleGenerativeAI(
         # from src.config import is_debug_mode
         # if is_debug_mode():
         #     raise RuntimeError(f'[DEBUG MODE] Превышено количество попыток ({attempts}) для Gemini ({self.model_name}): {self._last_exception}')
-        return self._get_exhausted_error_msg()
+        if self._all_keys_exhausted:
+            return self._get_exhausted_error_msg()
+        return self._get_retry_exhausted_error_msg(self.model_name)
 
     async def chat(self, q: str, history: list[dict]=(), flag: str='save_chat', system_instruction: str='', attempts: int=15, model_name: str='', **kwargs) -> str:
         """Process message in chat dialog context.
@@ -234,7 +236,9 @@ class GoogleGenerativeAI(
         # from src.config import is_debug_mode
         # if is_debug_mode():
         #     raise RuntimeError(f'[DEBUG MODE] Превышено количество попыток ({attempts}) для Gemini chat ({active_model}): {self._last_exception}')
-        return self._get_exhausted_error_msg()
+        if self._all_keys_exhausted:
+            return self._get_exhausted_error_msg()
+        return self._get_retry_exhausted_error_msg(active_model)
 
     async def chat_stream(self, q: str, history: list[dict]=(), flag: str='save_chat', system_instruction: str='', attempts: int=15, model_name: str='', generation_config: dict={}, **kwargs) -> AsyncGenerator[str, None]:
         """Stream-generate model response as async generator.

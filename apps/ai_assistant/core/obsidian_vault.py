@@ -27,7 +27,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-23 19:05:00
+# Updated: 2026-11-06 23:05:00
 # =============================================================================
 
 from __future__ import annotations
@@ -41,12 +41,14 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from urllib.parse import quote
 
 from logger import logger
+from apps.ai_assistant.core.service_file_authenticator import ServiceFileAuthenticator
 
 if TYPE_CHECKING:
     from apps.ai_assistant.core.workspace_manager import WorkspaceManager
 
 KNOWLEDGE_BASE_FILENAME = "_Knowledge_Base.md"
 TOPICS_DIRNAME = "_Topics"
+NOTES_DIRNAME = "_notes"
 OBSIDIAN_SECTION_START = "<!-- AI-OBSIDIAN-KNOWLEDGE:START -->"
 OBSIDIAN_SECTION_END = "<!-- AI-OBSIDIAN-KNOWLEDGE:END -->"
 
@@ -132,15 +134,16 @@ class ObsidianVaultBuilder:
         self.wm = workspace_manager
 
     @staticmethod
-    def is_reserved_obsidian_file(filename_or_relpath: str) -> bool:
+    def is_obsidian_generated_content(raw_text: str) -> bool:
+        """Проверяет, содержит ли текст документа маркер генератора заметок Obsidian AI-Assistant."""
+        if not raw_text:
+            return False
+        return "generator: ai_assistant_obsidian" in raw_text or OBSIDIAN_SECTION_START in raw_text
+
+    @classmethod
+    def is_reserved_obsidian_file(cls, filename_or_relpath: str, file_path: Optional[Path] = None) -> bool:
         """Проверяет, является ли файл служебным сводным индексом или конспектом Obsidian."""
-        norm = str(filename_or_relpath).replace("\\", "/").lstrip("/")
-        name = Path(norm).name
-        if name == KNOWLEDGE_BASE_FILENAME:
-            return True
-        if norm.startswith(f"{TOPICS_DIRNAME}/") or f"/{TOPICS_DIRNAME}/" in f"/{norm}":
-            return True
-        return False
+        return ServiceFileAuthenticator.is_service_file(filename_or_relpath, file_path=file_path)
 
     def ensure_vault_config(self, ws_path: Path) -> None:
         """Инициализирует минимальную конфигурацию `.obsidian/app.json` для открытия папки как Vault."""
@@ -170,14 +173,33 @@ class ObsidianVaultBuilder:
         return f"obsidian://open?path={encoded_path}"
 
     def _resolve_doc_md_path(self, ws_path: Path, doc_id: str) -> Path:
-        """Определяет путь к компактному .md файлу документа внутри рабочей области."""
+        """Определяет путь к компактному .md файлу документа внутри рабочей области.
+
+        Для не-markdown файлов (.txt, .docx, .pdf и т.д.) формирует путь к сопутствующему
+        конспекту с префиксом точки (.stem.md), обеспечивая первичную файловую
+        аутентификацию служебного dot-файла.
+        """
         clean_rel = str(doc_id).replace("\\", "/").lstrip("/")
         rel_path = Path(clean_rel)
         if rel_path.suffix.lower() == ".md":
             return ws_path / rel_path
-        if rel_path.suffix.lower() in (".txt", ".csv", ".tsv", ".json", ".docx", ".xlsx", ".xls"):
-            return ws_path / rel_path.with_suffix(".md")
-        return ws_path / f"{clean_rel}.md"
+
+        companion_name = ServiceFileAuthenticator.resolve_obsidian_companion_filename(clean_rel)
+        target = ws_path / rel_path.parent / companion_name
+
+        # Миграция устаревших конспектов без точки
+        legacy_target = ws_path / rel_path.with_suffix(".md")
+        if legacy_target != target and legacy_target.exists() and legacy_target.is_file():
+            try:
+                if not target.exists():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(legacy_target.read_text(encoding="utf-8", errors="replace"), encoding="utf-8")
+                legacy_target.unlink()
+                logger.info(f"[ObsidianVault] Миграция служебного файла в dotfile: {legacy_target.name} -> {target.name}")
+            except Exception as mig_err:
+                logger.warning(f"[ObsidianVault] Ошибка миграции устаревшего файла {legacy_target}: {mig_err}")
+
+        return target
 
     def render_compact_document_markdown(
         self,

@@ -1,0 +1,257 @@
+<!--
+=============================================================================
+Process Name: AI Assistant WebGUI - Document Categorizer Tab
+=============================================================================
+Description:
+  Интерфейс умной категоризации локальных документов пользователя,
+  семантического RAG-поиска и разрешения спорных категорий через Human-in-the-Loop.
+
+File: index.html
+Package: apps/ai_assistant/api/webgui/tab_doc_categorizer
+Author: hypo69
+Copyright: © 2026 hypo69
+Updated: 2026-10-30 15:47:00
+=============================================================================
+-->
+<div class="container-fluid p-3" id="tab-doc-categorizer-container">
+  <!-- Верхняя строка заголовка и глобальных действий -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+        <span class="fs-4">📑</span>
+        <span data-i18n="ui.docCategorizer.title" id="doc-cat-heading-title">Умная категоризация &amp; RAG документов</span>
+      </h4>
+      <div class="small text-muted" data-i18n="ui.docCategorizer.subtitle" id="doc-cat-heading-subtitle">
+        Автоматическое обнаружение, семантический RAG-поиск и интерактивная классификация с обучением на лету
+      </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <button class="btn btn-sm btn-success d-flex align-items-center gap-1.5 shadow-sm fw-semibold" id="btn-doc-scan-auto" type="button">
+        <i class="bi bi-radar"></i>
+        <span data-i18n="ui.docCategorizer.btnAutoScan" id="doc-cat-span-scan-auto">Автопоиск по системе</span>
+      </button>
+      <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 shadow-sm" id="btn-doc-scan-folder" type="button">
+        <i class="bi bi-folder2-open"></i>
+        <span data-i18n="ui.docCategorizer.btnCustomPath" id="doc-cat-span-scan-folder">Указать каталог</span>
+      </button>
+      <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1.5 shadow-sm" id="btn-doc-refresh" title="Обновить статус" data-i18n-title="doc_categorizer.refreshTitle" type="button">
+        <i class="bi bi-arrow-clockwise"></i>
+        <span class="d-none d-sm-inline" data-i18n="common.refresh" id="doc-cat-span-refresh">Обновить</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Плашка прогресса фонового сканирования -->
+  <div class="alert alert-info py-2 px-3 mb-3 d-none align-items-center justify-content-between" id="doc-scan-progress-alert">
+    <div class="d-flex align-items-center gap-2">
+      <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+      <span class="small fw-medium" data-i18n="ui.docCategorizer.scanningProgress" id="doc-scan-progress-text">Выполняется сканирование и RAG-индексация документов...</span>
+      <span class="small font-monospace text-truncate d-inline-block max-width-300" id="doc-scan-current-file"></span>
+    </div>
+    <span class="badge bg-info-subtle text-info border border-info-subtle" id="doc-scan-count-badge">0 найдено</span>
+  </div>
+
+  <!-- Карточки ключевых метрик -->
+  <div class="row g-2 mb-3">
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card shadow-sm border h-100">
+        <div class="card-body p-2.5 d-flex align-items-center justify-content-between">
+          <div>
+            <div class="small text-muted" data-i18n="ui.docCategorizer.statTotal" id="doc-stat-total-label">Всего в базе</div>
+            <div class="fs-4 fw-bold text-body" id="doc-stat-total-val">0</div>
+          </div>
+          <div class="fs-2 text-primary opacity-50"><i class="bi bi-files"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card shadow-sm border h-100">
+        <div class="card-body p-2.5 d-flex align-items-center justify-content-between">
+          <div>
+            <div class="small text-muted" data-i18n="ui.docCategorizer.statClassified" id="doc-stat-classified-label">Категоризировано</div>
+            <div class="fs-4 fw-bold text-success" id="doc-stat-classified-val">0</div>
+          </div>
+          <div class="fs-2 text-success opacity-50"><i class="bi bi-check-circle"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card shadow-sm border h-100">
+        <div class="card-body p-2.5 d-flex align-items-center justify-content-between">
+          <div>
+            <div class="small text-muted" data-i18n="ui.docCategorizer.statUncertain" id="doc-stat-uncertain-label">Требуют внимания</div>
+            <div class="fs-4 fw-bold text-warning" id="doc-stat-uncertain-val">0</div>
+          </div>
+          <div class="fs-2 text-warning opacity-50"><i class="bi bi-question-diamond"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card shadow-sm border h-100">
+        <div class="card-body p-2.5 d-flex align-items-center justify-content-between">
+          <div>
+            <div class="small text-muted" data-i18n="ui.docCategorizer.statRagReady" id="doc-stat-rag-label">Статус RAG FTS5</div>
+            <div class="fs-6 fw-bold text-info" data-i18n="ui.docCategorizer.ragActive" id="doc-stat-rag-val">Активен (Смысловой)</div>
+          </div>
+          <div class="fs-2 text-info opacity-50"><i class="bi bi-search-heart"></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Суб-вкладки (Навигационные пилюли) -->
+  <!-- Блок меню переключения панелей на вкладке. Выбранная панель добавляется в url -->
+  <ul class="nav nav-pills gap-1 mb-3 p-1 bg-body-tertiary rounded-pill border" id="doc-cat-subtabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="btn btn-sm btn-outline-primary active d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#doc-subtab-catalog" data-bs-toggle="pill" id="btn-subtab-catalog" type="button" data-panel-id="panel-catalog" title="Раздел: Каталог документов" data-i18n-title="doc_categorizer.subtabs.subtab-catalogTitle">
+        <i class="bi bi-folder-check me-1"></i>
+        <span data-i18n="ui.docCategorizer.subtabCatalog" id="doc-cat-span-subtab-catalog">Каталог документов</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded position-relative" data-bs-target="#doc-subtab-uncertain" data-bs-toggle="pill" id="btn-subtab-uncertain" type="button" data-panel-id="panel-uncertain" title="Раздел: Очередь вопросов" data-i18n-title="doc_categorizer.subtabs.subtab-uncertainTitle">
+        <i class="bi bi-chat-left-dots me-1 text-warning"></i>
+        <span data-i18n="ui.docCategorizer.subtabUncertain" id="doc-cat-span-subtab-uncertain">Очередь вопросов</span>
+        <span class="badge rounded-pill bg-warning text-dark ms-1 d-none" id="doc-cat-uncertain-badge">0</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#doc-subtab-rag" data-bs-toggle="pill" id="btn-subtab-rag" type="button" data-panel-id="panel-rag" title="Раздел: Семантический RAG-поиск" data-i18n-title="doc_categorizer.subtabs.subtab-ragTitle">
+        <i class="bi bi-search me-1 text-info"></i>
+        <span data-i18n="ui.docCategorizer.subtabRag" id="doc-cat-span-subtab-rag">Семантический RAG-поиск</span>
+      </button>
+    </li>
+  </ul>
+
+  <!-- Содержимое суб-вкладок -->
+  <div class="tab-content" id="doc-cat-subtabs-content">
+    
+    <!-- 1. Каталог документов и категории -->
+    <div class="tab-pane fade show active" id="doc-subtab-catalog" role="tabpanel">
+      <!-- Категорийная панель-сетка -->
+      <div class="row g-2 mb-3" id="doc-categories-chips">
+        <!-- Генерируется динамически через main.js -->
+      </div>
+
+      <!-- Фильтры и таблица документов -->
+      <div class="card shadow-sm border mb-3">
+        <div class="card-header bg-body-tertiary py-2 px-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div class="d-flex align-items-center gap-2 flex-grow-1 max-width-400">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-body border-end-0"><i class="bi bi-search"></i></span>
+              <input class="form-control border-start-0" id="doc-table-filter-input" placeholder="Поиск по имени или фрагменту..." type="text"/>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <select class="form-select form-select-sm" id="doc-filter-status-select">
+              <option value="">Все статусы</option>
+              <option value="classified">Категоризированы</option>
+              <option value="uncertain">Требуют внимания</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 font-size-88" id="doc-items-table">
+            <thead class="table-light">
+              <tr>
+                <th scope="col" style="width: 35%;">Документ</th>
+                <th scope="col" style="width: 20%;">Категория</th>
+                <th scope="col" style="width: 15%;">Уверенность</th>
+                <th scope="col" style="width: 15%;">Размер</th>
+                <th scope="col" style="width: 15%;">Изменен</th>
+              </tr>
+            </thead>
+            <tbody id="doc-items-tbody">
+              <tr>
+                <td class="text-center py-4 text-muted" colspan="5">
+                  <i class="bi bi-inbox fs-2 d-block mb-1"></i>
+                  <span data-i18n="ui.docCategorizer.emptyTable" id="doc-empty-table-text">Документы не загружены. Запустите автопоиск или выберите каталог.</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Очередь вопросов (Human-in-the-Loop) -->
+    <div class="tab-pane fade" id="doc-subtab-uncertain" role="tabpanel">
+      <div class="card shadow-sm border mb-3">
+        <div class="card-header bg-body-tertiary py-2 px-3 d-flex align-items-center justify-content-between">
+          <div class="fw-semibold small d-flex align-items-center gap-2">
+            <i class="bi bi-patch-question text-warning"></i>
+            <span data-i18n="ui.docCategorizer.uncertainHeader" id="doc-uncertain-header-title">Документы, требующие подтверждения</span>
+          </div>
+          <span class="badge bg-warning-subtle text-warning border border-warning-subtle" id="doc-uncertain-queue-count">0 ожидают</span>
+        </div>
+        <div class="card-body p-3" id="doc-uncertain-cards-container">
+          <!-- Генерируется динамически через main.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Семантический RAG-поиск -->
+    <div class="tab-pane fade" id="doc-subtab-rag" role="tabpanel">
+      <div class="card shadow-sm border mb-3">
+        <div class="card-body p-3">
+          <div class="input-group mb-2">
+            <span class="input-group-text bg-body-tertiary"><i class="bi bi-search text-primary"></i></span>
+            <input class="form-control" id="doc-rag-query-input" placeholder="Задайте естественный вопрос или фразу (например: акт за обслуживание сервера, договор аренды, страховка авто)..." type="text"/>
+            <button class="btn btn-primary px-3 fw-semibold d-flex align-items-center gap-1.5" id="btn-doc-rag-search" type="button">
+              <i class="bi bi-sparkles"></i>
+              <span data-i18n="ui.docCategorizer.btnRagSearch" id="doc-rag-span-search">Найти в базе RAG</span>
+            </button>
+          </div>
+          <div class="small text-muted" data-i18n="ui.docCategorizer.ragPromptHint" id="doc-rag-hint-text">
+            Поиск использует полнотекстовый индекс SQLite FTS5 и семантическое ранжирование по текстовым фрагментам документов.
+          </div>
+        </div>
+      </div>
+
+      <!-- Результаты RAG-поиска -->
+      <div class="card shadow-sm border d-none" id="doc-rag-results-card">
+        <div class="card-header bg-body-tertiary py-2 px-3 d-flex align-items-center justify-content-between">
+          <div class="fw-semibold small d-flex align-items-center gap-2">
+            <i class="bi bi-file-earmark-check text-success"></i>
+            <span data-i18n="ui.docCategorizer.ragResultsTitle" id="doc-rag-results-title">Найденные документы и релевантные цитаты</span>
+          </div>
+          <span class="badge bg-primary" id="doc-rag-hits-count">0 совпадений</span>
+        </div>
+        <div class="card-body p-3">
+          <div class="d-flex flex-column gap-2" id="doc-rag-hits-container"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Модальное окно выбора каталога -->
+<div class="modal fade" id="modal-doc-custom-scan" tabindex="-1" aria-labelledby="modalDocCustomScanLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow border-secondary-subtle">
+      <div class="modal-header border-secondary-subtle">
+        <h5 class="modal-title d-flex align-items-center gap-2" id="modalDocCustomScanLabel">
+          <i class="bi bi-folder2-open text-primary"></i>
+          <span data-i18n="ui.docCategorizer.modalScanTitle" id="modal-scan-title-text">Сканирование произвольного каталога</span>
+        </h5>
+        <button class="btn-close" data-bs-dismiss="modal" type="button" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-muted" for="input-custom-scan-path" data-i18n="ui.docCategorizer.pathLabel" id="doc-modal-path-label">
+            Абсолютный путь к папке с документами:
+          </label>
+          <input class="form-control" id="input-custom-scan-path" placeholder="C:\Users\Username\Documents" type="text"/>
+          <div class="form-text small" data-i18n="ui.docCategorizer.pathHint" id="doc-modal-path-hint">
+            Будут безопасно просканированы все вложенные PDF, DOCX, XLSX, TXT и другие форматы документов.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary-subtle">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" type="button" data-i18n="common.cancel" id="doc-modal-cancel-btn">Отмена</button>
+        <button class="btn btn-sm btn-primary fw-semibold" id="btn-start-custom-scan" type="button" data-i18n="ui.docCategorizer.btnStartScan" id="doc-modal-start-btn">Начать сканирование</button>
+      </div>
+    </div>
+  </div>
+</div>

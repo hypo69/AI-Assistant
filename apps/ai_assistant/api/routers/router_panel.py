@@ -23,7 +23,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-26 01:18:00
+# Updated: 2026-11-06 23:15:00
 # =============================================================================
 
 from __future__ import annotations
@@ -146,7 +146,6 @@ def _get_utc_now_iso() -> str:
 _git_adapter = GitAdapter()
 _wiki_adapter = WikiAdapter()
 _rag_retriever = SmartHistoryRAGRetriever()
-_temporal_graph = TemporalCodeGraph()
 
 
 def _fetch_panel_data(
@@ -210,9 +209,12 @@ def _fetch_panel_data(
             for idx, l in enumerate(links)
         ]
     elif panel_key == "panel-knowledge-links":
-        links = _temporal_graph.get_all_links(limit=limit)
-        ws_links = _workspace_manager.graph.get_all_links(limit=limit)
-        combined = list(links) + [wl for wl in ws_links if (wl.source_id, wl.target_id, wl.valid_from) not in {(l.source_id, l.target_id, l.valid_from) for l in links}]
+        target_ws = workspace_id or _workspace_manager.get_active_workspace_id()
+        if not target_ws:
+            links = []
+        else:
+            ws_graph = _workspace_manager.get_workspace_graph(target_ws)
+            links = ws_graph.get_all_links(limit=limit)
         data = [
             {
                 "source_id": l.source_id,
@@ -225,7 +227,7 @@ def _fetch_panel_data(
                 "status": l.status,
                 "created_at": getattr(l, "created_at", _get_utc_now_iso()),
             }
-            for l in combined[:limit]
+            for l in links[:limit]
         ]
     elif panel_key == "panel-rag-chunks":
         target_ws = workspace_id or _workspace_manager.store.get_active_workspace_id() or "default"
@@ -289,7 +291,7 @@ def _fetch_panel_data(
             {
                 "check_name": "temporal_graph_active",
                 "status": "PASS",
-                "details": f"Активных связей: {len(_temporal_graph.get_active_links())}",
+                "details": f"Активных связей: {len((_workspace_manager.get_workspace_graph(workspace_id or _workspace_manager.get_active_workspace_id())).get_active_links()) if (workspace_id or _workspace_manager.get_active_workspace_id()) else 0}",
                 "timestamp": _get_utc_now_iso(),
             },
             {
@@ -323,7 +325,7 @@ def _fetch_panel_data(
             {
                 "module_name": "Temporal Code Graph",
                 "is_ready": True,
-                "details": f"Всего связей: {len(_temporal_graph.get_all_links())}",
+                "details": f"Всего связей: {len((_workspace_manager.get_workspace_graph(workspace_id or _workspace_manager.get_active_workspace_id())).get_all_links()) if (workspace_id or _workspace_manager.get_active_workspace_id()) else 0}",
                 "last_checked_at": _get_utc_now_iso(),
             },
             {

@@ -1,7 +1,7 @@
 /**
  * Вспомогательные утилиты для вкладки управления моделями ИИ.
- * Файл: apps/windows/api/webgui/tab_models/common/ui_utils.js
- * Updated: 2026-10-17 02:00:00
+ * Файл: apps/ai_assistant/api/webgui/tab_models/common/ui_utils.js
+ * Updated: 2026-11-01 17:37:00
  */
 
 /**

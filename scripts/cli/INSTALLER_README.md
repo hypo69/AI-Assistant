@@ -1,4 +1,4 @@
-# Кроссплатформенный установщик AI Windows Admin
+# Кроссплатформенный установщик AI-Assistant
 
 Новая система установки на Python, заменяющая старые PowerShell скрипты.
 
@@ -213,7 +213,7 @@ scripts/cli/
 .\install.ps1
 
 # Специфичные для Windows пути
-$env:LOCALAPPDATA\AI Windows Admin
+$env:LOCALAPPDATA\AI-Assistant
 ```
 
 **Новое:**

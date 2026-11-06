@@ -36,15 +36,16 @@ Updated: 2026-10-26 00:05:00
 </div>
 </div>
 <!-- Верхние вкладки: Установленные vs Маркетплейс расширений -->
+<!-- Блок меню переключения панелей на вкладке. Выбранная панель добавляется в url -->
 <ul class="nav nav-tabs mb-3" id="pluginsTabNav" role="tablist">
 <li class="nav-item" role="presentation">
-<button class="nav-link active fw-semibold d-flex align-items-center gap-1.5" data-bs-target="#tab-pane-installed" data-bs-toggle="tab" id="nav-installed-tab" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary active d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#tab-pane-installed" data-bs-toggle="pill" id="nav-installed-tab" role="tab" type="button" data-panel-id="panel-installed" title="Раздел: Установленные плагины" data-i18n-title="plugins.subtabs.installedTitle">
 <i class="bi bi-check2-circle text-success"></i>
 <span data-i18n="ui.plg.txt_cc2f1a66" id="plg-span-cc2f1a66">Установленные плагины</span>
 </button>
 </li>
 <li class="nav-item" role="presentation">
-<button class="nav-link fw-semibold d-flex align-items-center gap-1.5" data-bs-target="#tab-pane-marketplace" data-bs-toggle="tab" id="nav-marketplace-tab" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#tab-pane-marketplace" data-bs-toggle="pill" id="nav-marketplace-tab" role="tab" type="button" data-panel-id="panel-marketplace" title="Маркетплейс стандартных плагинов" data-i18n-title="plugins.subtabs.marketplaceTitle">
 <i class="bi bi-shop text-primary"></i>
 <span data-i18n="ui.plg.txt_c2db0209" id="plg-span-c2db0209">Маркетплейс стандартных плагинов</span>
 <span class="badge bg-primary text-white rounded-pill px-2 py-0.5 font-size-75" id="marketplace-available-badge">10</span>

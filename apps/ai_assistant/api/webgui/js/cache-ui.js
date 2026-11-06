@@ -16,13 +16,13 @@
 
  *   HTML Integration:
 
- *     <script src="/windows/api/webgui/js/cache-ui.js?v=20261001_v1" type="module"></script>
+ *     <script src="/apps/common/webgui/js/cache-ui.js?v=20261001_v1" type="module"></script>
 
  *
 
  *   JavaScript Import:
 
- *     import { initCacheUI, openCacheModal } from '/windows/api/webgui/js/cache-ui.js';
+ *     import { initCacheUI, openCacheModal } from '/apps/common/webgui/js/cache-ui.js';
 
  *
 
@@ -30,13 +30,13 @@
 
  * Project: ai-windows-admin
 
- * Package: windows/api/webgui/js
+ * Package: apps/common/webgui/js
 
  * Author: hypo69
 
  * Copyright: © 2026 hypo69
 
- * Updated: 2026-10-25 21:45:00
+ * Updated: 2026-11-01 17:37:00
 
  * =============================================================================
 

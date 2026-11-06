@@ -1,756 +1,738 @@
 /**
  * =============================================================================
- * Process Name: Common WebGUI - Universal Rust+Wasm File Editor Orchestrator
+ * Process Name: Common WebGUI - Studio Code Central File Editor Orchestrator
  * =============================================================================
  * Description:
- *   Главный клиентский оркестратор вкладки универсального редактора файлов
+ *   Главный клиентский оркестратор центрального окна редактора файлов Studio Code
  *   (apps/common/webgui/tab_file_editor).
- *   Координирует WebAssembly-ядро, вкладки открытых файлов, дерево файлов
- *   рабочего пространства, переключение режимов VS Code (Code, Markdown Split,
- *   CSV/TSV Grid, Jupyter .ipynb, Media/SVG/PDF Studio, Hex Editor + Data
- *   Inspector), форматирование, Unified Diff и сохранение с коммитом в Git.
+ *   Управляет открытыми вкладками файлов в центральной области (#fe-open-tabs-bar),
+ *   переключением активного файла, встроенным видеоплеером (HTML5 Video),
+ *   аудиоплеером, просмотром изображений, подсчётом строк и символов,
+ *   предпросмотром Markdown, автосохранением/сохранением с коммитом в Git (Ctrl+S)
+ *   и синхронизацией с навигатором файлов (#ide-file-navigator).
  *
  * File: main.js
- * Project: ai-windows-admin
+ * Project: ai-assistant
  * Package: apps/common/webgui/tab_file_editor
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-28 17:10:00
+ * Updated: 2026-11-06 23:15:00
  * =============================================================================
  */
 
-import {
-  initWasmEngine,
-  base64ToUint8Array,
-  uint8ArrayToBase64,
-  analyzeBufferWithWasm,
-} from './wasm_bridge.js';
-import {
-  updateLineGutter,
-  getCursorPosition,
-  renderOutlinePanel,
-  renderMarkdownSplitPreview,
-  runSearchReplace,
-} from './panel_code_editor.js';
-import {
-  renderHexEditorPage,
-  renderTabularGrid,
-  renderNotebookEditor,
-  renderMediaStudio,
-  updateDataInspectorUI,
-} from './panel_specialized_editors.js';
-
 let isInitialized = false;
-let workspaceFilesCache = [];
 const openDocuments = new Map(); // key: `${wsId}:${relPath}` -> docState
 let activeDocKey = null;
 
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogg', 'ogv', 'mov', 'mkv', 'avi', 'm4v']);
+const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'flac', 'aac', 'm4a', 'wma']);
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp']);
+
 function notifyToast(msg, type = 'info') {
-  if (typeof window.showToast === 'function') window.showToast(msg, type);
-  else if (typeof window.showNotificationToast === 'function') window.showNotificationToast(msg, type);
+  if (typeof window.showToast === 'function') {
+    window.showToast(msg, type);
+  } else if (typeof window.showNotificationToast === 'function') {
+    window.showNotificationToast(msg, type);
+  }
 }
 
-function getCurrentWorkspaceId() {
+function getActiveWorkspaceId() {
   if (typeof window.getActiveWorkspaceId === 'function') {
     const ws = window.getActiveWorkspaceId();
     if (ws) return ws;
   }
-  try {
-    return localStorage.getItem('ai_assistant_active_workspace') || 'demo';
-  } catch (_) {
-    return 'demo';
-  }
+  const sel = document.getElementById('top-workspace-select') || document.getElementById('drawer-workspace-select');
+  if (sel && sel.value) return sel.value;
+  return 'default';
 }
 
-function getActiveDoc() {
-  return activeDocKey ? openDocuments.get(activeDocKey) || null : null;
+function makeDocKey(wsId, relPath) {
+  return `${wsId || 'default'}:${(relPath || '').trim()}`;
+}
+
+function getFileIconClass(fileName, isMedia, mediaType) {
+  if (isMedia) {
+    if (mediaType === 'video') return 'bi-file-earmark-play-fill text-danger';
+    if (mediaType === 'audio') return 'bi-file-earmark-music-fill text-info';
+    if (mediaType === 'image') return 'bi-file-earmark-image-fill text-success';
+  }
+  const ext = (fileName.split('.').pop() || '').toLowerCase();
+  switch (ext) {
+    case 'py': return 'bi-filetype-py text-primary';
+    case 'js':
+    case 'mjs': return 'bi-filetype-js text-warning';
+    case 'json': return 'bi-filetype-json text-info';
+    case 'html': return 'bi-filetype-html text-danger';
+    case 'css': return 'bi-filetype-css text-info';
+    case 'md': return 'bi-markdown-fill text-primary';
+    case 'sh':
+    case 'ps1': return 'bi-terminal text-success';
+    default: return 'bi-file-earmark-text text-secondary';
+  }
 }
 
 /**
- * Загружает список файлов текущего рабочего пространства в левую боковую панель.
- * @param {string|null} [wsId=null]
+ * Инициализирует модуль редактора при первом монтировании вкладки.
  */
-export async function loadEditorWorkspaceFiles(wsId = null) {
-  const targetWs = wsId || getCurrentWorkspaceId();
-  const listEl = document.getElementById('fe-workspace-file-list');
-  if (!listEl) return;
+export function initFileEditorTab() {
+  if (isInitialized) return;
+  isInitialized = true;
 
-  try {
-    const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(targetWs)}/directory-contents`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    workspaceFilesCache = (data.items || []).filter((item) => !item.is_dir);
-    renderWorkspaceFileList(
-      document.getElementById('fe-file-filter-input')?.value || '',
-      targetWs
-    );
-
-    // Если еще не открыт ни один файл — открываем первый доступный
-    if (!activeDocKey && workspaceFilesCache.length > 0) {
-      const first = workspaceFilesCache[0];
-      await openFileInWasmEditor(first.rel_path || first.name, targetWs, false);
-    }
-  } catch (err) {
-    listEl.innerHTML = `<div class="p-2 small text-muted">Нет доступных файлов (${err.message})</div>`;
-  }
+  bindToolbarEvents();
+  bindEditorEvents();
+  renderTabsBar();
+  renderActiveDocument();
 }
 
-function renderWorkspaceFileList(filterStr = '', wsId = null) {
-  const listEl = document.getElementById('fe-workspace-file-list');
-  if (!listEl) return;
-  const targetWs = wsId || getCurrentWorkspaceId();
-  const q = (filterStr || '').trim().toLowerCase();
-
-  const filtered = workspaceFilesCache.filter((f) => {
-    const rel = (f.rel_path || f.name || '').toLowerCase();
-    return !q || rel.includes(q);
+/**
+ * Привязывает обработчики кнопок верхней и нижней панелей.
+ */
+function bindToolbarEvents() {
+  // Кнопка сохранения Ctrl+S
+  document.getElementById('fe-btn-save')?.addEventListener('click', () => {
+    saveActiveDocument();
   });
 
-  if (filtered.length === 0) {
-    listEl.innerHTML = `<div class="p-2 small text-muted">Файлы не найдены</div>`;
-    return;
-  }
+  // Кнопка нового файла (+)
+  document.getElementById('fe-btn-new-file')?.addEventListener('click', () => {
+    handleCreateNewFilePrompt();
+  });
 
-  const curDoc = getActiveDoc();
-  listEl.innerHTML = filtered
-    .map((f) => {
-      const rel = f.rel_path || f.name;
-      const isAct = curDoc && curDoc.relPath === rel && curDoc.wsId === targetWs;
-      return `
-        <div class="wasm-editor-file-item ${isAct ? 'active' : ''}" data-fe-rel="${rel}" title="${rel}">
-          <i class="bi bi-file-earmark-code text-primary"></i>
-          <span class="text-truncate">${rel}</span>
-        </div>
-      `;
-    })
-    .join('');
+  // Кнопка закрытия всех вкладок
+  document.getElementById('fe-btn-close-all')?.addEventListener('click', () => {
+    closeAllDocuments();
+  });
 
-  listEl.querySelectorAll('[data-fe-rel]').forEach((item) => {
-    item.addEventListener('click', () => {
-      const rel = item.getAttribute('data-fe-rel');
-      if (rel) openFileInWasmEditor(rel, targetWs, false);
-    });
+  // Кнопка открытия в системном приложении
+  document.getElementById('fe-btn-system-open')?.addEventListener('click', () => {
+    handleOpenSystem();
+  });
+  document.getElementById('fe-btn-binary-open')?.addEventListener('click', () => {
+    handleOpenSystem();
+  });
+
+  // Переключение режимов Редактор / Предпросмотр (Markdown)
+  document.getElementById('fe-tab-mode-code')?.addEventListener('click', () => {
+    switchActiveViewMode('code');
+  });
+  document.getElementById('fe-tab-mode-preview')?.addEventListener('click', () => {
+    switchActiveViewMode('preview');
   });
 }
 
 /**
- * Открывает файл в универсальном Wasm-редакторе (и при необходимости переключает вкладку WebGUI).
- * @param {string} relPath
- * @param {string|null} [wsId=null]
- * @param {boolean} [switchMainWebguiTab=true]
+ * Привязывает обработчики к textarea (счетчики строк, Tab, скролл gutter, Ctrl+S).
  */
-export async function openFileInWasmEditor(relPath, wsId = null, switchMainWebguiTab = true) {
-  if (!relPath) return;
-  const targetWs = wsId || getCurrentWorkspaceId();
-
-  if (switchMainWebguiTab && typeof window.switchTab === 'function') {
-    await window.switchTab('tab-file-editor');
-  }
-
-  const key = `${targetWs}:${relPath}`;
-  if (openDocuments.has(key)) {
-    activeDocKey = key;
-    syncUIWithActiveDocument();
-    return;
-  }
-
-  try {
-    const url = `/api/v1/file-editor/read?workspace_id=${encodeURIComponent(targetWs)}&rel_path=${encodeURIComponent(relPath)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
-
-    const bytes = data.base64_content
-      ? base64ToUint8Array(data.base64_content)
-      : new TextEncoder().encode(data.content || '');
-    const wasmStats = analyzeBufferWithWasm(bytes);
-    const ext = (data.descriptor?.extension || relPath.split('.').pop() || '').toLowerCase();
-    const defaultMode = mapDescriptorModeToStage(data.descriptor?.default_mode || 'code');
-
-    const docState = {
-      key,
-      wsId: targetWs,
-      relPath: data.rel_path || relPath,
-      fileName: data.file_name || relPath.split('/').pop(),
-      ext,
-      descriptor: data.descriptor || {},
-      isBinary: Boolean(data.is_binary),
-      content: data.content ?? '',
-      base64Content: data.base64_content || '',
-      bytes,
-      hexPatches: new Map(),
-      hexPage: 0,
-      selectedOffset: 0,
-      lineEnding: data.line_ending || 'LF',
-      mode: defaultMode,
-      dirty: false,
-      wasmStats,
-      rotation: 0,
-      flipH: false,
-      flipV: false,
-    };
-
-    openDocuments.set(key, docState);
-    activeDocKey = key;
-    syncUIWithActiveDocument();
-  } catch (err) {
-    notifyToast(`Ошибка открытия файла: ${err.message}`, 'danger');
-  }
-}
-
-function mapDescriptorModeToStage(rawMode) {
-  if (['image', 'vector_svg', 'pdf', 'media'].includes(rawMode)) return 'media_studio';
-  if (['code', 'markdown', 'tabular', 'notebook', 'hex'].includes(rawMode)) return rawMode;
-  return 'code';
-}
-
-/**
- * Полностью синхронизирует интерфейс редактора с текущим активным документом.
- */
-function syncUIWithActiveDocument() {
-  renderOpenTabsBar();
-  renderWorkspaceFileList(document.getElementById('fe-file-filter-input')?.value || '');
-
-  const doc = getActiveDoc();
+function bindEditorEvents() {
   const textarea = document.getElementById('fe-code-textarea');
   const gutter = document.getElementById('fe-line-gutter');
-  const outlineEl = document.getElementById('fe-outline-list');
-  const lineEndingSel = document.getElementById('fe-line-ending-select');
+  if (!textarea) return;
 
-  if (!doc) {
-    if (textarea) textarea.value = '';
-    updateLineGutter(textarea, gutter);
-    return;
-  }
-
-  if (lineEndingSel) lineEndingSel.value = doc.lineEnding || 'LF';
-  if (textarea && !doc.isBinary) {
-    textarea.value = doc.content || '';
-    updateLineGutter(textarea, gutter);
-  }
-
-  renderOutlinePanel(doc.content || '', doc.ext, outlineEl, textarea);
-  updateDataInspectorUI(doc.bytes, doc.selectedOffset || 0);
-  switchEditorStageMode(doc.mode);
-  updateStatusBar(doc);
-}
-
-/**
- * Переключает активную сцену редактора (`code`, `markdown`, `tabular`, `notebook`, `media_studio`, `hex`, `diff`).
- * @param {string} mode
- */
-export function switchEditorStageMode(mode) {
-  const doc = getActiveDoc();
-  if (doc && mode !== 'diff') doc.mode = mode;
-
-  // Подсветка пилюль режимов
-  document.querySelectorAll('#fe-mode-pills [data-editor-mode]').forEach((btn) => {
-    btn.classList.toggle('active', btn.getAttribute('data-editor-mode') === mode);
-  });
-
-  const modeBadge = document.getElementById('wasm-active-mode-badge');
-  if (modeBadge) modeBadge.textContent = mode.toUpperCase();
-
-  const stages = {
-    code: document.getElementById('fe-stage-code'),
-    markdown: document.getElementById('fe-stage-code'),
-    tabular: document.getElementById('fe-stage-tabular'),
-    notebook: document.getElementById('fe-stage-notebook'),
-    media_studio: document.getElementById('fe-stage-media'),
-    hex: document.getElementById('fe-stage-hex'),
-    diff: document.getElementById('fe-stage-diff'),
-  };
-
-  Object.values(stages).forEach((el) => {
-    if (!el) return;
-    el.classList.add('d-none');
-    el.classList.remove('d-flex');
-  });
-
-  const targetStage = stages[mode] || stages.code;
-  if (targetStage) {
-    targetStage.classList.remove('d-none');
-    if (targetStage.id !== 'fe-stage-code') targetStage.classList.add('d-flex');
-  }
-
-  const mdSplit = document.getElementById('fe-markdown-split-preview');
-  if (mdSplit) {
-    if (mode === 'markdown') {
-      mdSplit.classList.remove('d-none');
-      renderMarkdownSplitPreview(doc?.content || '', mdSplit);
-    } else {
-      mdSplit.classList.add('d-none');
-    }
-  }
-
-  if (!doc) return;
-
-  if (mode === 'tabular') {
-    renderTabularGrid(doc, (newCsv) => updateActiveDocText(newCsv));
-  } else if (mode === 'notebook') {
-    renderNotebookEditor(doc, (newJson) => updateActiveDocText(newJson));
-  } else if (mode === 'media_studio') {
-    renderMediaStudio(doc, (newB64) => {
-      doc.base64Content = newB64;
-      doc.bytes = base64ToUint8Array(newB64);
-      doc.dirty = true;
-      renderOpenTabsBar();
-    });
-  } else if (mode === 'hex') {
-    const hexContainer = document.getElementById('fe-hex-grid-container');
-    renderHexEditorPage(doc, hexContainer, (offset, newVal) => {
-      doc.bytes[offset] = newVal;
-      doc.hexPatches.set(offset, newVal);
-      doc.dirty = true;
-      doc.wasmStats = analyzeBufferWithWasm(doc.bytes);
-      renderHexEditorPage(doc, hexContainer, () => {});
-      renderOpenTabsBar();
-      updateStatusBar(doc);
-    });
-  }
-}
-
-function updateActiveDocText(newText) {
-  const doc = getActiveDoc();
-  if (!doc) return;
-  doc.content = newText;
-  doc.bytes = new TextEncoder().encode(newText);
-  doc.dirty = true;
-  doc.wasmStats = analyzeBufferWithWasm(doc.bytes);
-  const textarea = document.getElementById('fe-code-textarea');
-  if (textarea && textarea.value !== newText) textarea.value = newText;
-  renderOpenTabsBar();
-  updateStatusBar(doc);
-}
-
-function renderOpenTabsBar() {
-  const bar = document.getElementById('fe-open-tabs-bar');
-  if (!bar) return;
-  if (openDocuments.size === 0) {
-    bar.innerHTML = `<span class="small text-muted px-2">Нет открытых вкладок</span>`;
-    return;
-  }
-
-  bar.innerHTML = Array.from(openDocuments.values())
-    .map((d) => {
-      const isAct = d.key === activeDocKey;
-      const icon = d.descriptor?.icon_class || 'bi-file-earmark-code';
-      return `
-        <div class="wasm-open-file-tab ${isAct ? 'active' : ''}" data-open-tab-key="${d.key}">
-          <i class="bi ${icon} text-primary"></i>
-          <span>${d.fileName}</span>
-          ${d.dirty ? '<span class="text-warning fw-bold" title="Несохраненные изменения">●</span>' : ''}
-          <button type="button" class="wasm-open-file-tab-close" data-close-tab-key="${d.key}" title="Закрыть вкладку">&times;</button>
-        </div>
-      `;
-    })
-    .join('');
-
-  bar.querySelectorAll('[data-open-tab-key]').forEach((tabEl) => {
-    tabEl.addEventListener('click', (e) => {
-      if (e.target.closest('[data-close-tab-key]')) return;
-      activeDocKey = tabEl.getAttribute('data-open-tab-key');
-      syncUIWithActiveDocument();
-    });
-  });
-
-  bar.querySelectorAll('[data-close-tab-key]').forEach((closeBtn) => {
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const k = closeBtn.getAttribute('data-close-tab-key');
-      openDocuments.delete(k);
-      if (activeDocKey === k) {
-        const keys = Array.from(openDocuments.keys());
-        activeDocKey = keys.length > 0 ? keys[keys.length - 1] : null;
-      }
-      syncUIWithActiveDocument();
-    });
-  });
-}
-
-function updateStatusBar(doc) {
-  const setTxt = (id, val) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-  };
-  const textarea = document.getElementById('fe-code-textarea');
-  const pos = getCursorPosition(textarea);
-  setTxt('fe-status-cursor', `Ln ${pos.line}, Col ${pos.col}`);
-  setTxt('fe-status-lines', `${doc?.wasmStats?.linesCount || 1} lines`);
-  setTxt('fe-status-size', `${doc?.bytes?.length || 0} B`);
-  setTxt('fe-status-hash', `FNV1a: ${doc?.wasmStats?.hashHex || '00000000'}`);
-  setTxt('fe-status-wasm-timing', `⚡ Wasm: ${doc?.wasmStats?.durationMs || '0.0'} ms`);
-  setTxt('fe-status-lang', doc?.descriptor?.display_name || 'Plain Text');
-}
-
-async function saveActiveDocument() {
-  const doc = getActiveDoc();
-  if (!doc) return;
-
-  const commitMsg = document.getElementById('fe-commit-msg-input')?.value || '';
-  const lineEnding = document.getElementById('fe-line-ending-select')?.value || 'LF';
-
-  const payload = {
-    workspace_id: doc.wsId,
-    rel_path: doc.relPath,
-    line_ending: lineEnding,
-    commit_to_git: true,
-    commit_message: commitMsg || null,
-  };
-
-  if (doc.hexPatches && doc.hexPatches.size > 0 && doc.isBinary) {
-    payload.hex_patches = Array.from(doc.hexPatches.entries()).map(([offset, value]) => ({ offset, value }));
-  } else if (doc.isBinary) {
-    payload.base64_content = doc.base64Content || uint8ArrayToBase64(doc.bytes);
-  } else {
-    payload.content = doc.content;
-  }
-
-  try {
-    const res = await fetch('/api/v1/file-editor/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
-
-    doc.dirty = false;
-    doc.hexPatches.clear();
-    renderOpenTabsBar();
-    notifyToast(`Файл "${doc.relPath}" сохранён (${data.size} B, FNV1a: ${data.fnv1a_hash})`, 'success');
-  } catch (err) {
-    notifyToast(`Ошибка сохранения: ${err.message}`, 'danger');
-  }
-}
-
-async function formatActiveDocument() {
-  const doc = getActiveDoc();
-  if (!doc || doc.isBinary) return;
-
-  try {
-    const res = await fetch('/api/v1/file-editor/format', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: doc.content,
-        extension: doc.ext,
-        language_id: doc.descriptor?.language_id || 'plaintext',
-        indent_size: 2,
-      }),
-    });
-    const data = await res.json();
-    if (!data.valid && data.diagnostics?.length) {
-      notifyToast(data.diagnostics.join('; '), 'warning');
-      return;
-    }
-    updateActiveDocText(data.formatted);
-    syncUIWithActiveDocument();
-    notifyToast('Документ отформатирован и проверен', 'info');
-  } catch (err) {
-    notifyToast(`Ошибка форматирования: ${err.message}`, 'danger');
-  }
-}
-
-async function showActiveDocumentDiff() {
-  const doc = getActiveDoc();
-  if (!doc) return;
-  try {
-    const res = await fetch('/api/v1/file-editor/diff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        workspace_id: doc.wsId,
-        rel_path: doc.relPath,
-        modified_content: doc.content || '',
-      }),
-    });
-    const data = await res.json();
-    const diffOut = document.getElementById('fe-diff-output');
-    const diffBadge = document.getElementById('fe-diff-summary-badge');
-    if (diffBadge) diffBadge.textContent = `+${data.added_lines || 0} / -${data.removed_lines || 0}`;
-    if (diffOut) {
-      diffOut.textContent = data.unified_diff || 'Изменений относительно сохранённой версии на диске нет.';
-    }
-    switchEditorStageMode('diff');
-  } catch (err) {
-    notifyToast(`Ошибка расчёта Diff: ${err.message}`, 'danger');
-  }
-}
-
-function bindEvents() {
-  const textarea = document.getElementById('fe-code-textarea');
-  const gutter = document.getElementById('fe-line-gutter');
-
-  textarea?.addEventListener('input', () => {
+  textarea.addEventListener('input', () => {
     const doc = getActiveDoc();
-    if (doc) {
-      doc.content = textarea.value;
-      doc.bytes = new TextEncoder().encode(textarea.value);
-      doc.dirty = true;
-      doc.wasmStats = analyzeBufferWithWasm(doc.bytes);
-      if (doc.mode === 'markdown') {
-        renderMarkdownSplitPreview(doc.content, document.getElementById('fe-markdown-split-preview'));
-      }
-      renderOutlinePanel(doc.content, doc.ext, document.getElementById('fe-outline-list'), textarea);
-      renderOpenTabsBar();
-      updateStatusBar(doc);
-    }
-    updateLineGutter(textarea, gutter);
+    if (!doc) return;
+    doc.content = textarea.value;
+    doc.isDirty = (doc.content !== doc.initialContent);
+    updateGutter();
+    updateCursorAndStats();
+    updateActiveTabDirtyIndicator();
   });
 
-  textarea?.addEventListener('scroll', () => {
+  textarea.addEventListener('scroll', () => {
     if (gutter) gutter.scrollTop = textarea.scrollTop;
   });
 
-  textarea?.addEventListener('click', () => updateStatusBar(getActiveDoc()));
-  textarea?.addEventListener('keyup', () => updateStatusBar(getActiveDoc()));
+  textarea.addEventListener('keyup', updateCursorAndStats);
+  textarea.addEventListener('click', updateCursorAndStats);
 
-  textarea?.addEventListener('keydown', (e) => {
+  textarea.addEventListener('keydown', (e) => {
+    // Поддержка сохранения по Ctrl+S / Cmd+S
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      saveActiveDocument();
+      return;
+    }
+
+    // Поддержка отступа Tab (2 пробела)
     if (e.key === 'Tab') {
       e.preventDefault();
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
-      textarea.value = textarea.value.slice(0, start) + '  ' + textarea.value.slice(end);
+      const val = textarea.value;
+      textarea.value = val.substring(0, start) + '  ' + val.substring(end);
       textarea.selectionStart = textarea.selectionEnd = start + 2;
       textarea.dispatchEvent(new Event('input'));
     }
   });
-
-  // Переключение режимов редактора (Pills)
-  document.querySelectorAll('#fe-mode-pills [data-editor-mode]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const mode = btn.getAttribute('data-editor-mode');
-      if (mode) switchEditorStageMode(mode);
-    });
-  });
-
-  document.getElementById('fe-btn-save')?.addEventListener('click', saveActiveDocument);
-  document.getElementById('fe-btn-format')?.addEventListener('click', formatActiveDocument);
-  document.getElementById('fe-btn-diff')?.addEventListener('click', showActiveDocumentDiff);
-  document.getElementById('fe-btn-refresh-files')?.addEventListener('click', () => loadEditorWorkspaceFiles());
-
-  document.getElementById('fe-btn-toggle-tree')?.addEventListener('click', () => {
-    document.getElementById('fe-workbench')?.classList.toggle('hide-left');
-  });
-
-  document.getElementById('fe-file-filter-input')?.addEventListener('input', (e) => {
-    renderWorkspaceFileList(e.target.value);
-  });
-
-  // Создание нового файла
-  document.getElementById('fe-btn-new-file')?.addEventListener('click', async () => {
-    const name = prompt('Введите относительный путь нового файла (например: script.py, table.csv, note.ipynb):', 'new_file.py');
-    if (!name || !name.trim()) return;
-    const wsId = getCurrentWorkspaceId();
-    await fetch('/api/v1/file-editor/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workspace_id: wsId, rel_path: name.trim(), content: '' }),
-    });
-    await loadEditorWorkspaceFiles(wsId);
-    await openFileInWasmEditor(name.trim(), wsId, false);
-  });
-
-  // Загрузка локального файла с диска напрямую в Wasm-память браузера
-  document.getElementById('fe-local-file-input')?.addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const buf = new Uint8Array(await file.arrayBuffer());
-    const stats = analyzeBufferWithWasm(buf);
-    const ext = (file.name.split('.').pop() || '').toLowerCase();
-    const isBin = stats.isBinary;
-    const text = isBin ? '' : new TextDecoder('utf-8').decode(buf);
-    const key = `local:${file.name}`;
-    openDocuments.set(key, {
-      key,
-      wsId: getCurrentWorkspaceId(),
-      relPath: file.name,
-      fileName: file.name,
-      ext,
-      descriptor: { display_name: ext.toUpperCase(), extension: ext },
-      isBinary: isBin,
-      content: text,
-      base64Content: uint8ArrayToBase64(buf),
-      bytes: buf,
-      hexPatches: new Map(),
-      hexPage: 0,
-      selectedOffset: 0,
-      lineEnding: 'LF',
-      mode: isBin ? 'hex' : 'code',
-      dirty: true,
-      wasmStats: stats,
-    });
-    activeDocKey = key;
-    syncUIWithActiveDocument();
-  });
-
-  // Скачивание текущего буфера
-  document.getElementById('fe-btn-download')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (!doc) return;
-    const blob = new Blob([doc.bytes], { type: doc.descriptor?.mime_type || 'application/octet-stream' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = doc.fileName || 'file.bin';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-
-  // Поиск и замена
-  document.getElementById('fe-btn-toggle-search')?.addEventListener('click', () => {
-    document.getElementById('fe-search-bar')?.classList.toggle('d-none');
-    document.getElementById('fe-find-input')?.focus();
-  });
-
-  const execSearch = (mode) => {
-    const q = document.getElementById('fe-find-input')?.value || '';
-    const r = document.getElementById('fe-replace-input')?.value || '';
-    const count = runSearchReplace(textarea, q, r, mode);
-    const badge = document.getElementById('fe-search-matches-badge');
-    if (badge) badge.textContent = `${count}`;
-  };
-  document.getElementById('fe-btn-find-next')?.addEventListener('click', () => execSearch('find'));
-  document.getElementById('fe-btn-replace-one')?.addEventListener('click', () => execSearch('replace'));
-  document.getElementById('fe-btn-replace-all')?.addEventListener('click', () => execSearch('replaceAll'));
-
-  // Пагинация Hex-редактора
-  document.getElementById('fe-hex-prev-page')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (doc && doc.hexPage > 0) {
-      doc.hexPage--;
-      switchEditorStageMode('hex');
-    }
-  });
-  document.getElementById('fe-hex-next-page')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (doc) {
-      doc.hexPage++;
-      switchEditorStageMode('hex');
-    }
-  });
-
-  // Кнопки CSV и Jupyter Notebook и Image Studio
-  document.getElementById('fe-csv-add-row')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (!doc) return;
-    updateActiveDocText((doc.content || '').trimEnd() + '\n,\n');
-    switchEditorStageMode('tabular');
-  });
-  document.getElementById('fe-csv-add-col')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (!doc) return;
-    const delim = doc.ext === 'tsv' ? '\t' : ',';
-    const updated = (doc.content || '')
-      .trimEnd()
-      .split('\n')
-      .map((l, idx) => l + delim + (idx === 0 ? 'NewCol' : ''))
-      .join('\n');
-    updateActiveDocText(updated + '\n');
-    switchEditorStageMode('tabular');
-  });
-  document.getElementById('fe-nb-add-code')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (!doc || !doc.notebookObj) return;
-    doc.notebookObj.cells.push({ cell_type: 'code', execution_count: null, metadata: {}, outputs: [], source: ['# Новый код\n'] });
-    updateActiveDocText(JSON.stringify(doc.notebookObj, null, 2) + '\n');
-    switchEditorStageMode('notebook');
-  });
-  document.getElementById('fe-nb-add-md')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (!doc || !doc.notebookObj) return;
-    doc.notebookObj.cells.push({ cell_type: 'markdown', metadata: {}, source: ['### Заголовок заметки\n'] });
-    updateActiveDocText(JSON.stringify(doc.notebookObj, null, 2) + '\n');
-    switchEditorStageMode('notebook');
-  });
-  document.getElementById('fe-img-rotate-left')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (doc) {
-      doc.rotation = (doc.rotation || 0) - 90;
-      switchEditorStageMode('media_studio');
-    }
-  });
-  document.getElementById('fe-img-rotate-right')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (doc) {
-      doc.rotation = (doc.rotation || 0) + 90;
-      switchEditorStageMode('media_studio');
-    }
-  });
-  document.getElementById('fe-img-flip-h')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (doc) {
-      doc.flipH = !doc.flipH;
-      switchEditorStageMode('media_studio');
-    }
-  });
-  document.getElementById('fe-img-flip-v')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (doc) {
-      doc.flipV = !doc.flipV;
-      switchEditorStageMode('media_studio');
-    }
-  });
-  document.getElementById('fe-pdf-extract-md')?.addEventListener('click', () => {
-    const doc = getActiveDoc();
-    if (!doc) return;
-    const rawStr = new TextDecoder('latin1').decode(doc.bytes || new Uint8Array(0));
-    const matches = [...rawStr.matchAll(/\(([^()]{2,200})\)/g)].map((m) => m[1]);
-    const extracted = `# ${doc.fileName}\n\n` + (matches.length ? matches.join('\n\n') : doc.content || '');
-    doc.isBinary = false;
-    updateActiveDocText(extracted);
-    switchEditorStageMode('markdown');
-  });
-
-  // Горячие клавиши Ctrl+S и Ctrl+F внутри вкладки редактора
-  document.addEventListener('keydown', (e) => {
-    if (typeof window.isTabActive === 'function' && !window.isTabActive('tab-file-editor')) return;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-      e.preventDefault();
-      saveActiveDocument();
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-      e.preventDefault();
-      document.getElementById('fe-search-bar')?.classList.remove('d-none');
-      document.getElementById('fe-find-input')?.focus();
-    }
-  });
-
-  document.addEventListener('workspace:changed', (e) => {
-    loadEditorWorkspaceFiles(e.detail?.workspaceId);
-  });
 }
 
 /**
- * Инициализирует вкладку универсального редактора файлов Rust + WebAssembly.
+ * Открывает файл в центральном окне Studio Code в виде вкладки.
+ * @param {string} relPath - Относительный путь к файлу
+ * @param {string} [wsId] - ID рабочей области
+ * @param {boolean} [switchSubtab=true] - Переключить ли субвкладку на panel-file-editor
  */
-export async function initFileEditorTab() {
-  if (!isInitialized) {
-    bindEvents();
-    isInitialized = true;
+export async function openDocumentInTab(relPath, wsId, switchSubtab = true) {
+  if (!relPath) return;
+  const currentWs = wsId || getActiveWorkspaceId();
+  const docKey = makeDocKey(currentWs, relPath);
+
+  // Переключаем интерфейс на суб-панель редактора
+  if (switchSubtab) {
+    switchToEditorSubtab();
   }
 
-  await initWasmEngine();
-  try {
-    const res = await fetch('/api/v1/file-editor/catalog');
-    if (res.ok) {
-      const cat = await res.json();
-      const badge = document.getElementById('fe-catalog-count-badge');
-      if (badge) badge.textContent = `${cat.total_types || 85}+`;
+  // Если файл уже открыт во вкладках — просто активируем её
+  if (openDocuments.has(docKey)) {
+    activeDocKey = docKey;
+    renderTabsBar();
+    renderActiveDocument();
+    return;
+  }
+
+  const fileName = relPath.split('/').pop().split('\\').pop();
+  const ext = (fileName.split('.').pop() || '').toLowerCase();
+  const isVideo = VIDEO_EXTENSIONS.has(ext);
+  const isAudio = AUDIO_EXTENSIONS.has(ext);
+  const isImage = IMAGE_EXTENSIONS.has(ext);
+  const isMedia = isVideo || isAudio || isImage;
+  const mediaType = isVideo ? 'video' : (isAudio ? 'audio' : (isImage ? 'image' : null));
+  const rawUrl = `/api/v1/workspaces/${encodeURIComponent(currentWs)}/file-raw?rel_path=${encodeURIComponent(relPath)}`;
+
+  let isBinary = isMedia;
+  let initialContent = '';
+
+  // Для не-медиа файлов загружаем текстовое содержимое через API
+  if (!isMedia) {
+    try {
+      const url = `/api/v1/workspaces/${encodeURIComponent(currentWs)}/file-content?rel_path=${encodeURIComponent(relPath)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Ошибка HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      isBinary = Boolean(data.is_binary);
+      initialContent = isBinary ? '' : (data.content ?? '');
+    } catch (err) {
+      console.warn(`[FileEditor] Не удалось загрузить содержимое ${relPath}:`, err);
+      notifyToast(`Не удалось прочитать файл: ${err.message}`, 'danger');
+      return;
     }
-  } catch (_) {}
+  }
 
-  await loadEditorWorkspaceFiles();
+  const docState = {
+    wsId: currentWs,
+    relPath,
+    fileName,
+    ext,
+    isMedia,
+    mediaType,
+    rawUrl,
+    isBinary,
+    content: initialContent,
+    initialContent,
+    isDirty: false,
+    viewMode: 'code',
+    cursorLine: 1,
+    cursorCol: 1,
+  };
+
+  openDocuments.set(docKey, docState);
+  activeDocKey = docKey;
+
+  renderTabsBar();
+  renderActiveDocument();
 }
 
-export function activateFileEditorTab() {
-  loadEditorWorkspaceFiles();
+/**
+ * Переключает навигацию рабочей области на суб-панель редактора.
+ */
+function switchToEditorSubtab() {
+  if (typeof window.switchWorkspaceSubTab === 'function') {
+    window.switchWorkspaceSubTab('panel-file-editor');
+    return;
+  }
+  const btn = document.getElementById('subtab-ws-file-editor-btn');
+  if (btn) btn.click();
 }
 
-export function deactivateFileEditorTab() {}
-
-if (typeof window !== 'undefined') {
-  window.initFileEditorTab = initFileEditorTab;
-  window.activateFileEditorTab = activateFileEditorTab;
-  window.deactivateFileEditorTab = deactivateFileEditorTab;
-  window.openFileInWasmEditor = openFileInWasmEditor;
+/**
+ * Возвращает состояние активного документа.
+ */
+function getActiveDoc() {
+  if (!activeDocKey) return null;
+  return openDocuments.get(activeDocKey) || null;
 }
+
+/**
+ * Отрисовывает полосу открытых вкладок.
+ */
+function renderTabsBar() {
+  const bar = document.getElementById('fe-open-tabs-bar');
+  if (!bar) return;
+
+  bar.innerHTML = '';
+  if (openDocuments.size === 0) {
+    return;
+  }
+
+  for (const [key, doc] of openDocuments.entries()) {
+    const isActive = (key === activeDocKey);
+    const tabEl = document.createElement('div');
+    tabEl.className = `wasm-tab-item d-flex align-items-center gap-1.5 px-2.5 py-1 rounded-top small border-end border-subtle ${isActive ? 'active' : ''}`;
+    tabEl.style.cursor = 'pointer';
+
+    const iconClass = getFileIconClass(doc.fileName, doc.isMedia, doc.mediaType);
+    tabEl.innerHTML = `
+      <i class="bi ${iconClass}"></i>
+      <span class="wasm-tab-title text-truncate" style="max-width: 140px;" title="${doc.relPath}">${doc.fileName}</span>
+      <span class="wasm-tab-dirty text-warning ${doc.isDirty ? '' : 'd-none'}">●</span>
+      <button type="button" class="btn-close btn-close-white wasm-tab-close p-0 ms-1" style="font-size: 0.65rem;" title="Закрыть вкладку"></button>
+    `;
+
+    // Клик по вкладке — активация
+    tabEl.addEventListener('click', (e) => {
+      if (e.target.closest('.wasm-tab-close')) return;
+      activeDocKey = key;
+      renderTabsBar();
+      renderActiveDocument();
+    });
+
+    // Клик по крестику — закрытие вкладки
+    tabEl.querySelector('.wasm-tab-close')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeDocument(key);
+    });
+
+    bar.appendChild(tabEl);
+  }
+}
+
+/**
+ * Закрывает указанную вкладку документа.
+ */
+function closeDocument(key) {
+  const doc = openDocuments.get(key);
+  if (!doc) return;
+
+  if (doc.isDirty) {
+    const ok = confirm(`Файл "${doc.fileName}" имеет несохранённые изменения. Закрыть без сохранения?`);
+    if (!ok) return;
+  }
+
+  // Если закрывается активный медиафайл — останавливаем воспроизведение
+  if (doc.isMedia && key === activeDocKey) {
+    stopMediaPlayback();
+  }
+
+  openDocuments.delete(key);
+
+  if (activeDocKey === key) {
+    const remaining = Array.from(openDocuments.keys());
+    activeDocKey = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+  }
+
+  renderTabsBar();
+  renderActiveDocument();
+}
+
+/**
+ * Закрывает все открытые вкладки.
+ */
+function closeAllDocuments() {
+  let hasDirty = false;
+  for (const doc of openDocuments.values()) {
+    if (doc.isDirty) {
+      hasDirty = true;
+      break;
+    }
+  }
+  if (hasDirty) {
+    const ok = confirm('Есть несохранённые файлы. Закрыть все вкладки без сохранения?');
+    if (!ok) return;
+  }
+
+  stopMediaPlayback();
+  openDocuments.clear();
+  activeDocKey = null;
+
+  renderTabsBar();
+  renderActiveDocument();
+}
+
+/**
+ * Останавливает воспроизведение встроенных плееров.
+ */
+function stopMediaPlayback() {
+  const video = document.getElementById('fe-media-video');
+  const audio = document.getElementById('fe-media-audio');
+  if (video) {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  }
+  if (audio) {
+    audio.pause();
+    audio.removeAttribute('src');
+    audio.load();
+  }
+}
+
+/**
+ * Отрисовывает содержимое активного документа на центральной сцене.
+ */
+function renderActiveDocument() {
+  const emptyState = document.getElementById('fe-empty-state');
+  const binaryNotice = document.getElementById('fe-binary-notice');
+  const textStage = document.getElementById('fe-text-stage');
+  const mediaStage = document.getElementById('fe-media-stage');
+
+  const fileNameEl = document.getElementById('fe-active-file-name');
+  const filePathEl = document.getElementById('fe-active-file-path');
+  const fileIconEl = document.getElementById('fe-active-file-icon');
+  const viewModeGroup = document.getElementById('fe-view-mode-group');
+  const btnSave = document.getElementById('fe-btn-save');
+  const textarea = document.getElementById('fe-code-textarea');
+
+  const video = document.getElementById('fe-media-video');
+  const audioContainer = document.getElementById('fe-media-audio-container');
+  const audio = document.getElementById('fe-media-audio');
+  const image = document.getElementById('fe-media-image');
+
+  // Всегда сначала приостанавливаем текущий поток медиа при смене документа
+  stopMediaPlayback();
+
+  const doc = getActiveDoc();
+
+  // Если нет открытых вкладок
+  if (!doc) {
+    if (emptyState) emptyState.classList.remove('d-none');
+    if (binaryNotice) binaryNotice.classList.add('d-none');
+    if (textStage) textStage.classList.add('d-none');
+    if (mediaStage) mediaStage.classList.add('d-none');
+
+    if (fileNameEl) fileNameEl.textContent = 'Файл не выбран';
+    if (filePathEl) filePathEl.textContent = '---';
+    if (fileIconEl) fileIconEl.className = 'bi bi-file-earmark-code text-primary fs-5';
+    if (viewModeGroup) viewModeGroup.classList.add('d-none');
+    if (btnSave) btnSave.disabled = true;
+
+    updateCursorAndStats();
+    return;
+  }
+
+  // Скрываем заглушку "нет файлов"
+  if (emptyState) emptyState.classList.add('d-none');
+
+  // Обновляем шапку активного файла
+  if (fileNameEl) fileNameEl.textContent = doc.fileName;
+  if (filePathEl) filePathEl.textContent = doc.relPath;
+  if (fileIconEl) {
+    const iconClass = getFileIconClass(doc.fileName, doc.isMedia, doc.mediaType);
+    fileIconEl.className = `bi ${iconClass} fs-5`;
+  }
+
+  // 1. СЛУЧАЙ: ВСТРОЕННЫЙ МЕДИАПЛЕЕР (Видео, Аудио, Картинки)
+  if (doc.isMedia) {
+    if (binaryNotice) binaryNotice.classList.add('d-none');
+    if (textStage) textStage.classList.add('d-none');
+    if (viewModeGroup) viewModeGroup.classList.add('d-none');
+    if (btnSave) btnSave.disabled = true;
+
+    if (mediaStage) mediaStage.classList.remove('d-none');
+
+    if (doc.mediaType === 'video') {
+      if (video) {
+        video.classList.remove('d-none');
+        video.src = doc.rawUrl;
+      }
+      if (audioContainer) audioContainer.classList.add('d-none');
+      if (image) image.classList.add('d-none');
+      setStatsText('Видеофайл • Встроенный видеоплеер');
+    } else if (doc.mediaType === 'audio') {
+      if (video) video.classList.add('d-none');
+      if (audioContainer) {
+        audioContainer.classList.remove('d-none');
+        const titleEl = document.getElementById('fe-media-audio-title');
+        if (titleEl) titleEl.textContent = doc.fileName;
+      }
+      if (audio) {
+        audio.src = doc.rawUrl;
+      }
+      if (image) image.classList.add('d-none');
+      setStatsText('Аудиозапись • Встроенный аудиоплеер');
+    } else if (doc.mediaType === 'image') {
+      if (video) video.classList.add('d-none');
+      if (audioContainer) audioContainer.classList.add('d-none');
+      if (image) {
+        image.classList.remove('d-none');
+        image.src = doc.rawUrl;
+      }
+      setStatsText('Изображение • Предпросмотр');
+    }
+    return;
+  }
+
+  // 2. СЛУЧАЙ: НЕИЗВЕСТНЫЙ БИНАРНЫЙ ФАЙЛ
+  if (doc.isBinary) {
+    if (mediaStage) mediaStage.classList.add('d-none');
+    if (textStage) textStage.classList.add('d-none');
+    if (binaryNotice) binaryNotice.classList.remove('d-none');
+    if (viewModeGroup) viewModeGroup.classList.add('d-none');
+    if (btnSave) btnSave.disabled = true;
+    setStatsText('Бинарный файл');
+    return;
+  }
+
+  // 3. СЛУЧАЙ: ТЕКСТОВЫЙ / CODE / MARKDOWN ФАЙЛ
+  if (mediaStage) mediaStage.classList.add('d-none');
+  if (binaryNotice) binaryNotice.classList.add('d-none');
+  if (textStage) textStage.classList.remove('d-none');
+  if (btnSave) btnSave.disabled = false;
+
+  // Для файлов Markdown показываем переключатель "Редактор / Предпросмотр"
+  const isMd = doc.ext === 'md' || doc.ext === 'markdown';
+  if (viewModeGroup) {
+    if (isMd) {
+      viewModeGroup.classList.remove('d-none');
+    } else {
+      viewModeGroup.classList.add('d-none');
+    }
+  }
+
+  if (textarea) {
+    textarea.value = doc.content ?? '';
+  }
+
+  updateGutter();
+  updateCursorAndStats();
+  applyViewMode(doc.viewMode || 'code');
+}
+
+function setStatsText(txt) {
+  const statsEl = document.getElementById('fe-editor-stats');
+  if (statsEl) statsEl.textContent = txt;
+}
+
+/**
+ * Переключает режим отображения Редактор / Предпросмотр.
+ */
+function switchActiveViewMode(mode) {
+  const doc = getActiveDoc();
+  if (!doc) return;
+  doc.viewMode = mode;
+  applyViewMode(mode);
+}
+
+function applyViewMode(mode) {
+  const btnCode = document.getElementById('fe-tab-mode-code');
+  const btnPrev = document.getElementById('fe-tab-mode-preview');
+  const textarea = document.getElementById('fe-code-textarea');
+  const gutter = document.getElementById('fe-line-gutter');
+  const preview = document.getElementById('fe-markdown-preview');
+
+  if (mode === 'preview') {
+    if (btnCode) btnCode.classList.remove('active');
+    if (btnPrev) btnPrev.classList.add('active');
+    if (textarea) textarea.classList.add('d-none');
+    if (gutter) gutter.classList.add('d-none');
+    if (preview) {
+      preview.classList.remove('d-none');
+      renderMarkdownPreview();
+    }
+  } else {
+    if (btnCode) btnCode.classList.add('active');
+    if (btnPrev) btnPrev.classList.remove('active');
+    if (textarea) textarea.classList.remove('d-none');
+    if (gutter) gutter.classList.remove('d-none');
+    if (preview) preview.classList.add('d-none');
+  }
+}
+
+/**
+ * Рендерит предпросмотр Markdown с помощью window.marked (если доступен).
+ */
+function renderMarkdownPreview() {
+  const doc = getActiveDoc();
+  const preview = document.getElementById('fe-markdown-preview');
+  if (!doc || !preview) return;
+
+  const raw = doc.content || '';
+  if (typeof window.marked === 'function') {
+    preview.innerHTML = window.marked(raw);
+  } else if (typeof window.marked?.parse === 'function') {
+    preview.innerHTML = window.marked.parse(raw);
+  } else {
+    preview.textContent = raw;
+  }
+}
+
+/**
+ * Обновляет нумерацию строк слева от редактора.
+ */
+function updateGutter() {
+  const textarea = document.getElementById('fe-code-textarea');
+  const gutter = document.getElementById('fe-line-gutter');
+  if (!textarea || !gutter) return;
+
+  const lines = (textarea.value || '').split('\n').length;
+  let numbers = '';
+  for (let i = 1; i <= lines; i++) {
+    numbers += i + '\n';
+  }
+  gutter.textContent = numbers;
+}
+
+/**
+ * Обновляет позицию курсора и статистику символов/строк.
+ */
+function updateCursorAndStats() {
+  const doc = getActiveDoc();
+  const textarea = document.getElementById('fe-code-textarea');
+  const cursorEl = document.getElementById('fe-editor-cursor');
+  const statsEl = document.getElementById('fe-editor-stats');
+
+  if (!doc) {
+    if (cursorEl) cursorEl.textContent = 'Ln 1, Col 1';
+    if (statsEl) statsEl.textContent = 'Строк: 0 | Символов: 0';
+    return;
+  }
+
+  if (doc.isMedia || doc.isBinary) {
+    if (cursorEl) cursorEl.textContent = '---';
+    return;
+  }
+
+  if (!textarea) return;
+
+  const val = textarea.value || '';
+  const selStart = textarea.selectionStart || 0;
+  const upToCursor = val.substring(0, selStart);
+  const lines = upToCursor.split('\n');
+  const curLine = lines.length;
+  const curCol = lines[lines.length - 1].length + 1;
+
+  if (cursorEl) cursorEl.textContent = `Ln ${curLine}, Col ${curCol}`;
+  const totalLines = val.split('\n').length;
+  const totalChars = val.length;
+  if (statsEl) statsEl.textContent = `Строк: ${totalLines} | Символов: ${totalChars}`;
+}
+
+/**
+ * Обновляет индикатор несохранённых правок (желтая точка) на активной вкладке.
+ */
+function updateActiveTabDirtyIndicator() {
+  const doc = getActiveDoc();
+  if (!doc) return;
+  const bar = document.getElementById('fe-open-tabs-bar');
+  if (!bar) return;
+  const activeTab = bar.querySelector('.wasm-tab-item.active .wasm-tab-dirty');
+  if (activeTab) {
+    if (doc.isDirty) {
+      activeTab.classList.remove('d-none');
+    } else {
+      activeTab.classList.add('d-none');
+    }
+  }
+}
+
+/**
+ * Сохраняет активный документ через POST /api/v1/workspaces/{workspace_id}/file-content.
+ */
+export async function saveActiveDocument() {
+  const doc = getActiveDoc();
+  if (!doc || doc.isBinary || doc.isMedia) return;
+
+  const btnSave = document.getElementById('fe-btn-save');
+  const commitInput = document.getElementById('fe-commit-msg-input');
+  const statusBadge = document.getElementById('fe-save-status');
+
+  const commitMsg = commitInput?.value?.trim() || `Правка файла ${doc.fileName}`;
+
+  try {
+    if (btnSave) btnSave.disabled = true;
+    if (statusBadge) {
+      statusBadge.textContent = 'Сохранение...';
+      statusBadge.className = 'badge bg-warning-subtle text-warning';
+    }
+
+    const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(doc.wsId)}/file-content`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rel_path: doc.relPath,
+        content: doc.content,
+        commit_message: commitMsg,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Ошибка ${res.status}`);
+    }
+
+    doc.initialContent = doc.content;
+    doc.isDirty = false;
+    updateActiveTabDirtyIndicator();
+
+    if (commitInput) commitInput.value = '';
+    if (statusBadge) {
+      statusBadge.textContent = 'Сохранено в Git';
+      statusBadge.className = 'badge bg-success-subtle text-success';
+      setTimeout(() => {
+        statusBadge.textContent = '';
+      }, 3000);
+    }
+    notifyToast(`Файл "${doc.fileName}" успешно сохранён`, 'success');
+  } catch (err) {
+    console.error('[FileEditor] Ошибка сохранения файла:', err);
+    notifyToast(`Ошибка сохранения: ${err.message}`, 'danger');
+    if (statusBadge) {
+      statusBadge.textContent = 'Ошибка сохранения';
+      statusBadge.className = 'badge bg-danger-subtle text-danger';
+    }
+  } finally {
+    if (btnSave) btnSave.disabled = false;
+  }
+}
+
+/**
+ * Открывает диалог создания нового файла.
+ */
+function handleCreateNewFilePrompt() {
+  const name = prompt('Введите имя нового файла (например, app.py или notes.md):');
+  if (!name || !name.trim()) return;
+  const relPath = name.trim();
+  const currentWs = getActiveWorkspaceId();
+  openDocumentInTab(relPath, currentWs, true);
+}
+
+/**
+ * Открывает текущий файл в ассоциированном системном приложении Windows.
+ */
+async function handleOpenSystem() {
+  const doc = getActiveDoc();
+  if (!doc) return;
+
+  try {
+    const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(doc.wsId)}/open-file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rel_path: doc.relPath }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    notifyToast(`Файл ${doc.fileName} открывается в системе`, 'info');
+  } catch (err) {
+    notifyToast(`Не удалось открыть файл в системе: ${err.message}`, 'warning');
+  }
+}
+
+// Экспорт для глобального использования из дерева файлов и контекстного меню
+window.openFileInCentralEditor = openDocumentInTab;
+window.openFileInWasmEditor = openDocumentInTab;
+
+export default {
+  initFileEditorTab,
+  openDocumentInTab,
+  saveActiveDocument,
+};

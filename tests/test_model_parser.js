@@ -1,9 +1,9 @@
 /**
  * Тест парсера ответов модели без сторонней библиотеки Prism.js
- * Updated: 2026-10-20 19:10:00
+ * Updated: 2026-11-01 17:40:00
  */
 const fs = require('fs');
-const jsCode = fs.readFileSync('apps/windows/api/webgui/ai_modal_dialog/main.js', 'utf8');
+const jsCode = fs.readFileSync('apps/ai_assistant/api/webgui/ai_modal_dialog/main.js', 'utf8');
 
 globalThis.window = { AIModalDialog: null };
 globalThis.document = { getElementById: () => null, addEventListener: () => {} };

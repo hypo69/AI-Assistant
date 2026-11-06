@@ -15,7 +15,7 @@
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-28 02:35:00
+ * Updated: 2026-11-06 21:28:00
  * =============================================================================
  */
 
@@ -192,7 +192,10 @@ export function renderDrawerWorkspaces(workspaces, activeWsId = '') {
             } fs-6 flex-shrink-0 drawer-ws-icon"></i>
             <div class="text-truncate text-start">
               <div class="fw-medium text-truncate">${title}</div>
-              <div class="small text-muted text-truncate font-size-75">${subInfo}</div>
+              <div class="small text-muted text-truncate font-size-75 d-flex align-items-center gap-1 mt-0.5" dir="ltr">
+                <span class="badge bg-body-secondary text-body border px-1 py-0.5 drawer-ws-quick-link" data-panel="panel-documents" title="Открыть панель документов: ${docsCount}">📄 ${docsCount} док.</span>
+                <span class="badge bg-body-secondary text-body border px-1 py-0.5 drawer-ws-quick-link" data-panel="panel-facts" title="Открыть панель фактов: ${factsCount}">💡 ${factsCount} факт.</span>
+              </div>
             </div>
           </div>
           <span class="badge ${
@@ -294,12 +297,14 @@ export async function initDrawerWorkspaces() {
   const group = document.getElementById('drawer-workspaces-group');
   if (group) {
     group.addEventListener('click', (e) => {
+      const quickLink = e.target.closest('.drawer-ws-quick-link, [data-panel]');
       const wsBtn = e.target.closest('.drawer-ws-item, [data-ws-id]');
       if (wsBtn) {
         const wsId = wsBtn.getAttribute('data-ws-id');
         if (wsId) {
           e.preventDefault();
-          switchToWorkspace(wsId, 'panel-files');
+          const targetPanel = quickLink ? quickLink.getAttribute('data-panel') : 'panel-files';
+          switchToWorkspace(wsId, targetPanel || 'panel-files');
         }
       }
     });

@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 23:14:00
+# Updated: 2026-11-01 18:27:00
 # =============================================================================
 
 from __future__ import annotations
@@ -180,6 +180,7 @@ def test_user_settings_modal_elements_ids_and_i18n() -> None:
         "user-settings-auth-desc-text",
         "user-settings-google-btn",
         "user-settings-google-btn-text",
+        "user-settings-google-sync-hint",
         "modal-lang-container",
         "modal-lang-selector-label",
         "modal-lang-selector-text",
@@ -199,11 +200,25 @@ def test_user_settings_modal_elements_ids_and_i18n() -> None:
         "opt-theme-cyberpunk",
         "opt-theme-terminal",
         "opt-theme-nordic-frost",
+        "opt-theme-solarized-dark",
         "opt-theme-high-contrast",
         "optgroup-themes-light",
         "opt-theme-brick",
         "opt-theme-light",
+        "opt-theme-nightview",
         "opt-theme-light-enterprise",
+        "modal-model-ping-section",
+        "modal-model-ping-header",
+        "modal-model-ping-title",
+        "modal-model-ping-title-text",
+        "model-ping-input-group",
+        "model-ping-input",
+        "btn-model-ping-send",
+        "model-ping-btn-icon",
+        "model-ping-btn-text",
+        "model-ping-response-container",
+        "model-ping-response-label",
+        "model-ping-response",
         "modal-theme-editor-section",
         "modal-btn-open-theme-editor",
         "modal-btn-open-theme-editor-label",
@@ -219,6 +234,10 @@ def test_user_settings_modal_elements_ids_and_i18n() -> None:
     for elem_id in required_ids:
         elem = modal.find(id=elem_id)
         assert elem is not None, f"Элемент с id='{elem_id}' не найден в userSettingsModal"
+
+    # Проверяем заголовок как в проекте AI-TC (bi-person-gear)
+    header_icon = modal.find(id="userSettingsModalLabel").find("i")
+    assert header_icon is not None and "bi-person-gear" in header_icon.get("class", [])
 
     # Проверяем комментарии <!-- описание --> в разметке модального окна
     modal_raw = content[content.find('id="userSettingsModal"'):content.find('<!-- Модальное окно управления браузерным кешем -->')]
@@ -253,11 +272,14 @@ def test_user_settings_modal_elements_ids_and_i18n() -> None:
         "<!-- Неоновая киберпанк тема Cyberpunk Neon -->",
         "<!-- Консольная тема Terminal (Matrix / CRT) -->",
         "<!-- Скандинавская морозная тема Nordic Frost -->",
+        "<!-- Глубокая сине-зеленая тема Solarized Deep -->",
         "<!-- Тема высокой контрастности High Contrast -->",
         "<!-- Группа светлых тем интерфейса -->",
         "<!-- Кирпичная тема Terracotta Brick -->",
         "<!-- Стандартная светлая тема Light / NightView -->",
+        "<!-- Тёплая бумажная тема NightView -->",
         "<!-- Корпоративная светлая тема Light Enterprise -->",
+        "<!-- Секция быстрой проверки доступности активной AI-модели -->",
         "<!-- Секция навигации в Редактор тем оформления -->",
         "<!-- Кнопка перехода в Редактор тем оформления -->",
         "<!-- Описание возможностей редактора тем -->",
@@ -309,6 +331,15 @@ def test_user_settings_locales_hebrew_and_all_translations() -> None:
         "logout",
         "authDesc",
         "signInGoogle",
+        "googleSyncServicesHint",
+        "modelPingTitle",
+        "modelPingPlaceholder",
+        "modelPingDefaultMessage",
+        "modelPingSendBtn",
+        "modelPingSending",
+        "modelPingWaiting",
+        "modelPingEmptyResponse",
+        "modelPingResponseLabel",
         "userDefault",
         "close",
     ]
@@ -381,5 +412,22 @@ def test_ide_activity_bar_rtl_support() -> None:
     assert "padding-inline-start" in fe_js
     assert "closedChevron" in fe_js or "bi-chevron-left" in fe_js
     assert "languageChanged" in fe_js
+
+
+def test_model_tester_script_exists_and_integrated() -> None:
+    """Проверяет наличие модуля model-tester.js и его интеграцию в main.js."""
+    model_tester_path = _WEBGUI_DIR / "js" / "model-tester.js"
+    main_js_path = _WEBGUI_DIR / "js" / "main.js"
+
+    assert model_tester_path.exists(), "Файл js/model-tester.js не найден"
+    mt_content = model_tester_path.read_text(encoding="utf-8")
+    assert "export async function sendModelPing" in mt_content
+    assert "export function initModelTester" in mt_content
+    assert "/api/v1/chat/test-model" in mt_content
+
+    main_content = main_js_path.read_text(encoding="utf-8")
+    assert "initModelTester" in main_content
+    assert "sendModelPing" in main_content
+
 
 

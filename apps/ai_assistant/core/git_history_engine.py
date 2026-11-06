@@ -12,15 +12,15 @@
 #     from apps.ai_assistant.core.git_history_engine import GitHistoryEngine
 #
 #     engine = GitHistoryEngine()
-#     commits = await engine.get_file_history(file_path="apps/windows/main.py", limit=10)
-#     diff = await engine.get_diff(commit_hash="a1b2c3", file_path="apps/windows/main.py")
+#     commits = await engine.get_file_history(file_path="apps/ai_assistant/main.py", limit=10)
+#     diff = await engine.get_diff(commit_hash="a1b2c3", file_path="apps/ai_assistant/main.py")
 #
 # File: git_history_engine.py
 # Project: ai-windows-admin
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-15 09:40:00
+# Updated: 2026-11-01 20:05:00
 # =============================================================================
 
 from __future__ import annotations
@@ -209,12 +209,25 @@ class GitHistoryEngine:
         hunks = self._parse_hunks(lines, file_path or "")
         diff_text = "\n".join(lines)
 
+        files_changed: List[str] = []
+        if file_path:
+            files_changed = [file_path]
+        else:
+            for l in lines:
+                if l.startswith("diff --git a/"):
+                    m = re.match(r"^diff --git a/(.*?) b/(.*?)$", l)
+                    if m:
+                        files_changed.append(m.group(2))
+
         return DiffResponse(
             commit_hash=commit_hash,
+            commit_a=commit_hash,
             parent_hash=parent_hash or "",
+            commit_b=parent_hash or "",
             file_path=file_path,
             diff_text=diff_text,
             hunks=hunks,
+            files_changed=files_changed,
             truncated=truncated,
         )
 
@@ -235,11 +248,15 @@ class GitHistoryEngine:
                 old_start = int(match.group(1)) if match else 0
                 new_start = int(match.group(3)) if match else 0
 
+                                # Парсим количество строк в блоке из заголовка @@ -old_start,old_lines +new_start,new_lines @@
+                old_lines = int(match.group(2)) if match and match.group(2) else 1
+                new_lines = int(match.group(4)) if match and match.group(4) else 1
                 current_item = DiffHunkItem(
-                    file_path=file_path,
                     old_start=old_start,
+                    old_lines=old_lines,
                     new_start=new_start,
-                    header=line,
+                    new_lines=new_lines,
+                    hunk_text="",
                 )
                 current_lines.append(line)
             elif current_item:

@@ -18,7 +18,7 @@
 # Package: src.ai.providers.gemini_cli
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 17:35:00
+# Updated: 2026-11-06 23:05:00
 # =============================================================================
 
 from __future__ import annotations
@@ -60,6 +60,31 @@ class GeminiCliResponse:
         """Флаг успешного завершения процесса."""
         return self.return_code == 0
 
+def _resolve_cli_default_model() -> str:
+    """Определяет модель Gemini CLI по умолчанию из конфигурации."""
+    try:
+        from src.config import ai_cfg
+        if ai_cfg and hasattr(ai_cfg, 'providers'):
+            cli_sec = getattr(ai_cfg.providers, 'gemini_cli', None)
+            if cli_sec:
+                m = getattr(cli_sec, 'default_model', None) or getattr(cli_sec, 'model', None)
+                if m:
+                    return str(m).strip()
+    except Exception:
+        pass
+    try:
+        from header import __root__
+        import json
+        cfg_file = __root__ / 'config.json'
+        if cfg_file.exists():
+            with open(cfg_file, 'r', encoding='utf-8') as f:
+                c = json.load(f)
+            return str(c.get('ai_providers_and_models_configuration', {}).get('providers', {}).get('gemini_cli', {}).get('default_model', '')).strip()
+    except Exception:
+        pass
+    return ''
+
+
 class GeminiCliProvider:
     """Провайдер для выполнения запросов к Gemini CLI из Python.
 
@@ -69,7 +94,7 @@ class GeminiCliProvider:
     3. ``stream()`` / ``stream_async()`` — потоковый вывод токенов/строк.
     4. ``run_agent()`` — выполнение задач CLI в контексте рабочей директории проекта.
     """
-    _DEFAULT_MODEL: str = 'gemini-3.1-flash-lite'
+    _DEFAULT_MODEL: str = _resolve_cli_default_model()
     _IGNORE_LINE_PREFIXES: tuple[str, ...] = ('YOLO mode is enabled', 'Loaded extension:', 'Loading extension')
 
     def __init__(self, executable: str='gemini', working_directory: Optional[Union[str, Path]]=None, timeout: int=300, default_model: str=_DEFAULT_MODEL) -> None:

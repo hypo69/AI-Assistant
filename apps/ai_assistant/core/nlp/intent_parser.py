@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.core.nlp
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-20 12:18:00
+# Updated: 2026-11-03 16:52:00
 # =============================================================================
 
 from __future__ import annotations
@@ -51,10 +51,36 @@ class QuestionIntentParser:
         q_clean = question.strip()
 
         if lang == "he":
-            return cls._parse_hebrew_question(q_clean)
-        if lang == "en":
-            return cls._parse_english_question(q_clean)
-        return cls._parse_russian_question(q_clean)
+            parsed = cls._parse_hebrew_question(q_clean)
+        elif lang == "en":
+            parsed = cls._parse_english_question(q_clean)
+        else:
+            parsed = cls._parse_russian_question(q_clean)
+
+        # Выделение запросов по Git-истории и конкретным хэшам коммитов
+        q_low = q_clean.lower()
+        commit_hash_match = re.search(r"\b([0-9a-f]{7,40})\b", q_clean, re.IGNORECASE)
+        commit_hash = commit_hash_match.group(1).lower() if commit_hash_match else ""
+
+        git_keywords = (
+            "commit", "קומיט", "קוממיט", "коммит", "коммите", "коммита", "коммиту",
+            "diff", "дифф", "ревизи", "גרסה", "git", "гит"
+        )
+        is_git_kw = any(kw in q_low for kw in git_keywords)
+
+        if commit_hash:
+            parsed["intent"] = "git_commit_query"
+            parsed["commit_hash"] = commit_hash
+            parsed["is_git_query"] = True
+        elif is_git_kw:
+            parsed["intent"] = "git_history_query"
+            parsed["commit_hash"] = ""
+            parsed["is_git_query"] = True
+        else:
+            parsed["commit_hash"] = ""
+            parsed["is_git_query"] = False
+
+        return parsed
 
     @classmethod
     def _parse_russian_question(cls, q: str) -> Dict[str, Any]:

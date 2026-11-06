@@ -7,17 +7,17 @@ Description:
 
 Usage Examples:
     Web Route:
-      /windows/api/webgui/tab_models/index.html
+      /apps/common/webgui/tab_models/index.html
 
     Tab Frame Integration:
-      <iframe src="/windows/api/webgui/tab_models/index.html" class="w-100 h-100 border-0"></iframe>
+      <iframe src="/apps/common/webgui/tab_models/index.html" class="w-100 h-100 border-0"></iframe>
 
 File: index.html
 Project: ai-windows-admin
 Package: apps/ai_assistant/api/webgui/tab_models
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-10-26 00:05:00
+Updated: 2026-11-01 17:37:00
 =============================================================================
 -->
 <!-- Models & APIs Management Tab -->
@@ -164,24 +164,25 @@ Updated: 2026-10-26 00:05:00
 <div class="card-body p-0">
 <div class="d-flex flex-column flex-md-row align-items-stretch">
 <!-- Sidebar Pills -->
+<!-- Блок меню переключения панелей на вкладке. Выбранная панель добавляется в url -->
 <div aria-orientation="vertical" class="nav flex-column nav-pills p-3 bg-body-tertiary border-end" id="provider-pills-tab" role="tablist" style="min-width: 250px; min-height: 400px; border-top-left-radius: 0.375rem; border-bottom-left-radius: 0.375rem;">
 <h6 class="text-uppercase text-muted fw-bold small mb-3 ps-2" data-i18n="ui.mdl.txt_260d2e67" id="mdl-h6-260d2e67">Настройки провайдеров</h6>
-<button aria-controls="pill-gemini" aria-selected="true" class="nav-link active text-start rounded-3 mb-2 fw-bold" data-bs-target="#pill-gemini" data-bs-toggle="pill" data-i18n="ui.mdl.txt_6772f21b" id="pill-gemini-tab" role="tab" type="button">
+<button aria-controls="pill-gemini" aria-selected="true" class="btn btn-sm btn-outline-primary active d-flex align-items-center gap-1.5 py-1 px-2.5 rounded text-start" data-bs-target="#pill-gemini" data-bs-toggle="pill" data-i18n="ui.mdl.txt_6772f21b" id="pill-gemini-tab" role="tab" type="button" data-panel-id="panel-gemini" title="Раздел: ✨ Google Gemini" data-i18n-title="models.subtabs.geminiTitle">
             ✨ Google Gemini
           </button>
-<button aria-controls="pill-agy" aria-selected="false" class="nav-link text-start rounded-3 mb-2 fw-bold" data-bs-target="#pill-agy" data-bs-toggle="pill" data-i18n="ui.mdl.txt_8dee2b37" id="pill-agy-tab" role="tab" type="button">
+<button aria-controls="pill-agy" aria-selected="false" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded text-start" data-bs-target="#pill-agy" data-bs-toggle="pill" data-i18n="ui.mdl.txt_8dee2b37" id="pill-agy-tab" role="tab" type="button" data-panel-id="panel-agy" title="🚀 Google Antigravity (AGY)" data-i18n-title="models.subtabs.agyTitle">
             🚀 Google Antigravity (AGY)
           </button>
-<button aria-controls="pill-google-accounts" aria-selected="false" class="nav-link text-start rounded-3 mb-2 fw-bold" data-bs-target="#pill-google-accounts" data-bs-toggle="pill" data-i18n="ui.mdl.txt_27b162d0" id="pill-google-accounts-tab" role="tab" type="button">
+<button aria-controls="pill-google-accounts" aria-selected="false" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded text-start" data-bs-target="#pill-google-accounts" data-bs-toggle="pill" data-i18n="ui.mdl.txt_27b162d0" id="pill-google-accounts-tab" role="tab" type="button" data-panel-id="panel-google-accounts" title="🌐 Google Workspace (Аккаунты)" data-i18n-title="models.subtabs.google-accountsTitle">
             🌐 Google Workspace (Аккаунты)
           </button>
-<button aria-controls="pill-foundry" aria-selected="false" class="nav-link text-start rounded-3 mb-2 fw-bold" data-bs-target="#pill-foundry" data-bs-toggle="pill" data-i18n="ui.mdl.txt_aa090a70" id="pill-foundry-tab" role="tab" type="button">
+<button aria-controls="pill-foundry" aria-selected="false" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded text-start" data-bs-target="#pill-foundry" data-bs-toggle="pill" data-i18n="ui.mdl.txt_aa090a70" id="pill-foundry-tab" role="tab" type="button" data-panel-id="panel-foundry" title="Раздел: ⚙️ Microsoft Foundry" data-i18n-title="models.subtabs.foundryTitle">
             ⚙️ Microsoft Foundry
           </button>
-<button aria-controls="pill-ollama" aria-selected="false" class="nav-link text-start rounded-3 mb-2 fw-bold" data-bs-target="#pill-ollama" data-bs-toggle="pill" data-i18n="ui.mdl.txt_1ad13077" id="pill-ollama-tab" role="tab" type="button">
+<button aria-controls="pill-ollama" aria-selected="false" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded text-start" data-bs-target="#pill-ollama" data-bs-toggle="pill" data-i18n="ui.mdl.txt_1ad13077" id="pill-ollama-tab" role="tab" type="button" data-panel-id="panel-ollama" title="Раздел: 🦙 Ollama (Local)" data-i18n-title="models.subtabs.ollamaTitle">
             🦙 Ollama (Local)
           </button>
-<button aria-controls="pill-onnx" aria-selected="false" class="nav-link text-start rounded-3 fw-bold" data-bs-target="#pill-onnx" data-bs-toggle="pill" data-i18n="ui.mdl.txt_a6aa677c" id="pill-onnx-tab" role="tab" type="button">
+<button aria-controls="pill-onnx" aria-selected="false" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded text-start" data-bs-target="#pill-onnx" data-bs-toggle="pill" data-i18n="ui.mdl.txt_a6aa677c" id="pill-onnx-tab" role="tab" type="button" data-panel-id="panel-onnx" title="Раздел: 🧠 Microsoft ONNX / Olive" data-i18n-title="models.subtabs.onnxTitle">
             🧠 Microsoft ONNX / Olive
           </button>
 </div>
@@ -360,10 +361,10 @@ Updated: 2026-10-26 00:05:00
 <label class="form-label small text-muted fw-bold" data-i18n="ui.mdl.txt_1c1f4d9e" id="mdl-label-1c1f4d9e">Учетные данные (Credentials JSON):</label>
 <ul class="nav nav-pills nav-fill mb-2" id="gacc-input-mode-tabs" role="tablist">
 <li class="nav-item" role="presentation">
-<button class="nav-link active py-1 small" data-bs-target="#gacc-mode-file" data-bs-toggle="pill" data-i18n="ui.mdl.txt_7424ef43" id="gacc-mode-file-tab" role="tab" type="button">📁 Загрузить файл</button>
+<button class="btn btn-sm btn-outline-primary active d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#gacc-mode-file" data-bs-toggle="pill" data-i18n="ui.mdl.txt_7424ef43" id="gacc-mode-file-tab" role="tab" type="button" data-panel-id="panel-gacc-mode-file" title="Раздел: 📁 Загрузить файл" data-i18n-title="models.subtabs.gacc-mode-fileTitle">📁 Загрузить файл</button>
 </li>
 <li class="nav-item" role="presentation">
-<button class="nav-link py-1 small" data-bs-target="#gacc-mode-json" data-bs-toggle="pill" data-i18n="ui.mdl.txt_d68dba98" id="gacc-mode-json-tab" role="tab" type="button">📝 Вставить JSON</button>
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#gacc-mode-json" data-bs-toggle="pill" data-i18n="ui.mdl.txt_d68dba98" id="gacc-mode-json-tab" role="tab" type="button" data-panel-id="panel-gacc-mode-json" title="Раздел: 📝 Вставить JSON" data-i18n-title="models.subtabs.gacc-mode-jsonTitle">📝 Вставить JSON</button>
 </li>
 </ul>
 <div class="tab-content" id="gacc-input-mode-tabContent">

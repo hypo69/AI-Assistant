@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 23:06:00
+# Updated: 2026-11-06 23:15:00
 # =============================================================================
 
 from __future__ import annotations
@@ -42,14 +42,20 @@ from apps.ai_assistant.core.git_history_engine import GitHistoryEngine
 from apps.ai_assistant.core.query_orchestrator import QueryOrchestrator
 from apps.ai_assistant.core.temporal_code_graph import TemporalCodeGraph
 from apps.ai_assistant.core.wikillm_version_linker import WikiLLMVersionLinker
+from apps.ai_assistant.api.routers.router_knowledge import _workspace_manager
 
 router = APIRouter(prefix="/api/v1", tags=["Git WikiLLM & RAG"])
 
-_graph = TemporalCodeGraph()
-_linker = WikiLLMVersionLinker(temporal_graph=_graph)
 _summarizer = AIDiffSummarizer()
 _git_engine = GitHistoryEngine()
-_orchestrator = QueryOrchestrator(temporal_graph=_graph, wiki_linker=_linker, git_engine=_git_engine)
+
+
+def _get_target_graph(workspace_id: Optional[str] = None) -> TemporalCodeGraph:
+    """Возвращает изолированный темпоральный граф связей для указанной или активной рабочей области."""
+    ws_id = workspace_id or _workspace_manager.get_active_workspace_id()
+    if ws_id:
+        return _workspace_manager.get_workspace_graph(ws_id)
+    return _workspace_manager.graph
 
 
 class SupersedeRequest(BaseModel):
@@ -57,6 +63,7 @@ class SupersedeRequest(BaseModel):
     source_id: str = Field(..., description="Идентификатор источника")
     target_id: str = Field(..., description="Идентификатор цели")
     invalidating_commit: str = Field(..., description="Хэш отменяющего коммита")
+    workspace_id: Optional[str] = Field(None, description="Идентификатор рабочей области")
 
 
 class InsightsRequest(BaseModel):
@@ -90,8 +97,9 @@ async def create_annotation(request: AnnotationRequest) -> AnnotationResponse:
         logger.warning(f"[RouterGitWikiLLM] Кандидат отклонен верификатором: {error_msg}")
         raise HTTPException(status_code=422, detail=f"Ошибка валидации: {error_msg}")
 
-    # 3. Фиксация в темпоральном графе
-    link = _graph.add_link(
+    # 3. Фиксация в изолированном темпоральном графе рабочей области
+    target_graph = _get_target_graph(request.workspace_id)
+    link = target_graph.add_link(
         source_id=sanitized["source_id"],
         target_id=sanitized["target_id"],
         relation_type=sanitized["relation_type"],
@@ -110,7 +118,8 @@ async def create_annotation(request: AnnotationRequest) -> AnnotationResponse:
 @router.post("/supersede", summary="Мягкая инвалидация связи (SUPERSEDED)")
 async def supersede_annotation(request: SupersedeRequest) -> Dict[str, Any]:
     """Переводит устаревшую связь в статус SUPERSEDED с фиксацией коммита инвалидации."""
-    updated = _graph.supersede_link(
+    target_graph = _get_target_graph(request.workspace_id)
+    updated = target_graph.supersede_link(
         source_id=request.source_id,
         target_id=request.target_id,
         invalidating_commit=request.invalidating_commit,
@@ -130,14 +139,16 @@ async def supersede_annotation(request: SupersedeRequest) -> Dict[str, Any]:
 async def get_knowledge_links(
     source_id: Optional[str] = Query(None, description="Фильтр по источнику (коммит или файл)"),
     status: str = Query("ACTIVE", description="Статус связей: ACTIVE или ALL"),
+    workspace_id: Optional[str] = Query(None, description="Идентификатор рабочей области"),
 ) -> List[EvidenceLinkSchema]:
     """Возвращает срез темпоральных связей графа с поддержкой фильтрации."""
+    target_graph = _get_target_graph(workspace_id)
     if status.upper() == "ALL":
-        links = _graph.get_all_links()
+        links = target_graph.get_all_links()
         if source_id:
             links = [l for l in links if l.source_id == source_id]
         return links
-    return _graph.get_active_links(source_id=source_id)
+    return target_graph.get_active_links(source_id=source_id)
 
 
 @router.post("/insights", summary="ИИ-анализ диффа и архитектурных последствий")

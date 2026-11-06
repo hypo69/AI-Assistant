@@ -17,7 +17,7 @@
  * Package: windows/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-10 17:35:00
+ * Updated: 2026-10-25 23:38:00
  * =============================================================================
  */
 
@@ -69,6 +69,7 @@ const URL_PATTERNS = [
   { pattern: /\/api\/plugins/, strategy: CACHE_STRATEGIES.SEMI_STATIC, tag: 'plugins' },
   
   // Hardware и системные спецификации
+  { pattern: /\/api\/v1\/about-system\/bundle/, strategy: CACHE_STRATEGIES.SEMI_STATIC, tag: 'about-system-bundle' },
   { pattern: /\/api\/v1\/system\/hardware/, strategy: CACHE_STRATEGIES.SEMI_STATIC, tag: 'hardware' },
   { pattern: /\/api\/v1\/windows-backup/, strategy: CACHE_STRATEGIES.SEMI_STATIC, tag: 'backup' },
   
@@ -174,14 +175,13 @@ export async function cachedApiFetch(url, options = {}, cacheOptions = {}) {
   } = cacheOptions;
   
   const cacheKey = generateCacheKey(url, options);
-  const cache = browserCache;
+  const cache = (typeof window !== 'undefined' && window.browserCache) ? window.browserCache : browserCache;
 
   // Отключаем кеш для указанных вкладок
   const currentTab = window.location.hash;
   const NO_CACHE_TABS = [
     '#tab-hardware-load-inspector',
     '#tab-processes-load-inspector',
-    '#tab-about-system',
   ];
   if (NO_CACHE_TABS.some(prefix => currentTab.startsWith(prefix))) {
     const resp = await fetch(url, {

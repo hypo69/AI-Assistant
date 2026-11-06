@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 23:15:00
+# Updated: 2026-11-03 16:56:00
 # =============================================================================
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ class LanguageAnalyzer(Protocol):
 
 
 def detect_language(text: str) -> str:
-    """Определяет основной язык текста по символьным диапазонам Unicode.
+    """Определяет основной язык текста по директиве lang= или символьным диапазонам Unicode.
 
     Args:
         text: Входная строка текста.
@@ -69,6 +69,18 @@ def detect_language(text: str) -> str:
     """
     if not text or not text.strip():
         return "unknown"
+
+    # Приоритетная проверка явной языковой директивы lang=<code > в заголовке
+    for line in text[:400].splitlines():
+        cl = line.strip().lower()
+        if cl.startswith("lang="):
+            val = cl.split("=", 1)[1].strip()
+            if val in ("ru", "he", "en", "ua", "uk"):
+                return "ua" if val == "uk" else val
+        elif cl.startswith("language:"):
+            val = cl.split(":", 1)[1].strip().strip('"\'')
+            if val in ("ru", "he", "en", "ua", "uk"):
+                return "ua" if val == "uk" else val
 
     he_count = len(re.findall(r"[\u0590-\u05FF]", text))
     ru_count = len(re.findall(r"[а-яА-ЯёЁ]", text))

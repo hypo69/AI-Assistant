@@ -9,7 +9,7 @@
  * Файл: apps/ai_assistant/api/webgui/tab_models/main.js
  * Пакет: apps/ai_assistant/api/webgui/tab_models
  * Автор: hypo69
- * Updated: 2026-10-22 16:11:00
+ * Updated: 2026-11-03 11:46:00
  * =============================================================================
  */
 
@@ -431,4 +431,49 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initModelsTab);
 } else {
   initModelsTab();
+}
+
+/**
+ * Автоматическая синхронизация активной панели вкладки с URL-хэшем.
+ */
+export function initTabUrlHashRouting() {
+  const canonicalTabId = 'tab-models';
+  const syncFromHash = () => {
+    const raw = window.location.hash || '';
+    if (!raw.includes(canonicalTabId)) return;
+    const parts = raw.replace(/^#/, '').split('#');
+    const panelPart = parts.find((p) => p.startsWith('panel-'));
+    if (panelPart) {
+      const btn = document.querySelector(`button[data-panel-id="${panelPart}"]`) ||
+                  document.querySelector(`button[data-bs-target="#${panelPart}"]`);
+      if (btn && window.bootstrap && window.bootstrap.Tab) {
+        (window.bootstrap.Tab.getInstance?.(btn) || window.bootstrap.Tab.getOrCreateInstance?.(btn) || new window.bootstrap.Tab(btn)).show();
+      }
+    }
+  };
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-panel-id], button[data-bs-toggle="pill"]');
+    if (btn) {
+      const panelId = btn.getAttribute('data-panel-id') || btn.getAttribute('data-bs-target')?.replace('#', '');
+      const blockId = btn.getAttribute('data-block-id');
+      if (panelId) {
+        let hash = `#${canonicalTabId}#${panelId}`;
+        if (blockId) hash += `#${blockId}`;
+        history.replaceState(null, null, hash);
+      }
+    }
+  });
+
+  window.addEventListener('hashchange', syncFromHash);
+  syncFromHash();
+}
+
+if (typeof window !== 'undefined') {
+  window.initTabUrlHashRouting = initTabUrlHashRouting;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTabUrlHashRouting);
+  } else {
+    initTabUrlHashRouting();
+  }
 }

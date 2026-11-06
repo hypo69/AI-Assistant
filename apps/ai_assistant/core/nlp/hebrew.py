@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core.nlp
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 23:15:00
+# Updated: 2026-11-06 21:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -58,6 +58,9 @@ _HE_VERB_LEXICON: Dict[str, Dict[str, str]] = {
     "תיקנה": {"lemma": "תיקן", "tense": "past", "gender": "femn", "voice": "active"},
     "יצר": {"lemma": "יצר", "tense": "past", "gender": "masc", "voice": "active"},
     "יצרה": {"lemma": "יצר", "tense": "past", "gender": "femn", "voice": "active"},
+    "ירש": {"lemma": "ירש", "tense": "past", "gender": "masc", "voice": "active"},
+    "ירשה": {"lemma": "ירש", "tense": "past", "gender": "femn", "voice": "active"},
+    "ירשו": {"lemma": "ירש", "tense": "past", "number": "plur", "voice": "active"},
 }
 
 

@@ -1,0 +1,33 @@
+{
+  "$schema": "webgui-menu-v1",
+  "tab_id": "tab-plugins",
+  "draggable": true,
+  "subtabs": {
+    "nav_id": "plugins-subtabs-nav",
+    "storage_key": "tab-plugins_subtabs_order",
+    "items": [
+      {
+        "id": "installed",
+        "button_id": "nav-installed-tab",
+        "pane_id": "tab-pane-installed",
+        "panel_id": "panel-installed",
+        "icon": "bi bi-check2-circle text-success",
+        "label_i18n": "ui.plg.txt_cc2f1a66",
+        "title_i18n": "plugins.subtabs.installedTitle",
+        "default_title": "Раздел: Установленные плагины",
+        "order": 0
+      },
+      {
+        "id": "marketplace",
+        "button_id": "nav-marketplace-tab",
+        "pane_id": "tab-pane-marketplace",
+        "panel_id": "panel-marketplace",
+        "icon": "bi bi-shop text-primary",
+        "label_i18n": "ui.plg.txt_c2db0209",
+        "title_i18n": "plugins.subtabs.marketplaceTitle",
+        "default_title": "Маркетплейс стандартных плагинов",
+        "order": 1
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
 **Версия:** 3.6.0  
 **Пакет:** `apps.ai_assistant.api.webgui.js`  
 **Автор:** hypo69  
-**Updated:** 2026-10-26 00:35:00  
+**Updated:** 2026-11-01 18:30:00  
 
 ---
 
@@ -30,4 +30,5 @@
 | [`context-menu.js`](context-menu.js) | Кастомное контекстное меню для таблиц, файлов и узлов графа. |
 | [`api-cache.js`](api-cache.js), [`browser-cache.js`](browser-cache.js), [`cache-ui.js`](cache-ui.js) | Клиентское кеширование ответов API, индикация состояния кеша и инвалидация. |
 | [`toast.js`](toast.js) | Неблокирующие всплывающие уведомления о событиях и ошибках. |
-| [`userSettings.js`](userSettings.js) | Управление пользовательскими настройками интерфейса. |
+| [`userSettings.js`](userSettings.js) | Управление пользовательскими настройками интерфейса и авторизацией Google OAuth. |
+| [`model-tester.js`](model-tester.js) | Быстрая проверка доступности активной AI-модели (`/api/v1/chat/test-model`). |

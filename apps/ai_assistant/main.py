@@ -16,7 +16,7 @@
 # Package: apps.ai_assistant
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 20:38:00
+# Updated: 2026-11-06 23:05:00
 # =============================================================================
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ from apps.ai_assistant.api.routers.router_file_history import router as history_
 from apps.ai_assistant.api.routers.router_git_wikillm import router as wikillm_router
 from apps.ai_assistant.api.routers.router_git_maintenance import router as git_maintenance_router
 from apps.ai_assistant.api.routers.router_knowledge import router as knowledge_router
-from apps.ai_assistant.api.routers.router_obsidian import router as obsidian_router
+from apps.ai_assistant.api.routers.router_obsidian import router as ws_obsidian_router
 from apps.ai_assistant.api.routers.router_models import router as models_router
 from apps.ai_assistant.api.routers.router_auth import router as auth_router
 from apps.ai_assistant.api.routers.router_panel import router as panel_router
@@ -204,7 +204,7 @@ app.add_middleware(
 
 # Подключение маршрутизаторов API
 app.include_router(knowledge_router)
-app.include_router(obsidian_router)
+app.include_router(ws_obsidian_router)
 app.include_router(history_router)
 app.include_router(wikillm_router)
 app.include_router(git_maintenance_router)
@@ -519,7 +519,7 @@ def run(
     target_host = str(host if host is not None else server_cfg.get("host", cfg.get("host", "127.0.0.1")))
     preferred_engine = (engine or cfg.get("engine", {}).get("preferred", "electron")).lower()
 
-    # Определение активного рабочего пространства для канонического URL (#tab-workspace#panel-files#workspace=<id>)
+    # Определение активного рабочего пространства для канонического URL (#tab-chat#workspace=<id>)
     active_ws_id = ""
     try:
         from apps.ai_assistant.core.workspace_manager import WorkspaceManager
@@ -528,9 +528,13 @@ def run(
         existing_ids = {w.get("workspace_id") for w in all_workspaces if w.get("workspace_id")}
 
         # 1. Проверяем последнее активное рабочее пространство из config.json / store
-        saved_active = wm.get_active_workspace_id() or ""
-        if saved_active and saved_active in existing_ids:
-            active_ws_id = saved_active
+        cfg_ws = cfg.get("active_workspace") or cfg.get("last_active_workspace") or wm.get_active_workspace_id_from_config()
+        if cfg_ws and str(cfg_ws).strip() in existing_ids:
+            active_ws_id = str(cfg_ws).strip()
+        if not active_ws_id:
+            saved_active = wm.get_active_workspace_id() or ""
+            if saved_active and saved_active in existing_ids:
+                active_ws_id = saved_active
 
         # 2. Проверяем сохранённое состояние в electron_state.json
         if not active_ws_id:
@@ -564,6 +568,7 @@ def run(
     else:
         # Если ни одного рабочего пространства нет — сразу переходим на менеджер создания
         url = f"{url}/#tab-create-workspace"
+
 
     chromium_cfg = cfg.get("chromium") or cfg.get("browser", {})
     raw_profile = chromium_cfg.get("profile_dir", "data/chromium/profiles")

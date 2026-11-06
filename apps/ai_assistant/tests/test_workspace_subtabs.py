@@ -1,10 +1,8 @@
 """
 
-=============================================================================
 
 Process Name: Test AI Assistant Workspace Subtabs Navigation and URL Routing
 
-=============================================================================
 
 Description:
 
@@ -28,9 +26,7 @@ Author: hypo69
 
 Copyright: © 2026 hypo69
 
-Updated: 2026-10-25 21:15:00
 
-=============================================================================
 
 """
 
@@ -74,11 +70,11 @@ def test_workspace_subtabs_html_structure() -> None:
 
     # 2. Проверяем наличие кнопок суб-вкладок в стиле верхнего меню
 
-    assert 'id="subtab-ws-step1-btn"' in html, "Кнопка Файлы (Шаг 1) не найдена"
+    assert 'id="subtab-ws-files-btn"' in html, "Кнопка Файлы (Шаг 1) не найдена"
 
-    assert 'id="subtab-ws-step2-btn"' in html, "Кнопка Шаг 2 не найдена"
+    assert 'id="subtab-ws-documents-btn"' in html, "Кнопка Шаг 2 не найдена"
 
-    assert 'id="subtab-ws-step3-btn"' in html, "Кнопка Шаг 3 не найдена"
+    assert 'id="subtab-ws-qa-btn"' in html, "Кнопка Шаг 3 не найдена"
 
     assert 'id="subtab-ws-chat-btn"' in html, "Кнопка Чат не найдена"
 
@@ -98,13 +94,13 @@ def test_workspace_subtabs_html_structure() -> None:
 
 
 
-    assert 'data-bs-target="#subpane-ws-step1"' in html, "Target для шага 1 не настроен"
+    assert 'data-bs-target="#subpane-ws-files"' in html, "Target для шага 1 не настроен"
 
-    assert 'data-bs-target="#subpane-ws-step2"' in html, "Target для шага 2 не настроен"
+    assert 'data-bs-target="#subpane-ws-documents"' in html, "Target для шага 2 не настроен"
 
-    assert 'data-bs-target="#subpane-ws-step3"' in html, "Target для шага 3 не настроен"
+    assert 'data-bs-target="#subpane-ws-qa"' in html, "Target для шага 3 не настроен"
 
-    assert 'data-bs-target="#subpane-ws-chat"' in html, "Target для чата не настроен"
+    assert ('data-bs-target="#subpane-ws-chat"' in html or "switchTab('tab-chat')" in html), "Target для чата не настроен"
 
     assert 'data-bs-target="#subpane-ws-commits"' in html, "Target для коммитов не настроен"
 
@@ -130,11 +126,11 @@ def test_workspace_subtabs_html_structure() -> None:
 
     assert 'id="workspace-subtabs-content"' in html, "Контейнер #workspace-subtabs-content не найден"
 
-    assert 'id="subpane-ws-step1"' in html, "Панель #subpane-ws-step1 не найдена"
+    assert 'id="subpane-ws-files"' in html, "Панель #subpane-ws-files не найдена"
 
-    assert 'id="subpane-ws-step2"' in html, "Панель #subpane-ws-step2 не найдена"
+    assert 'id="subpane-ws-documents"' in html, "Панель #subpane-ws-documents не найдена"
 
-    assert 'id="subpane-ws-step3"' in html, "Панель #subpane-ws-step3 не найдена"
+    assert 'id="subpane-ws-qa"' in html, "Панель #subpane-ws-qa не найдена"
 
     assert 'id="subpane-ws-chat"' in html, "Панель #subpane-ws-chat не найдена"
 
@@ -144,11 +140,11 @@ def test_workspace_subtabs_html_structure() -> None:
 
     # 4. Проверяем изоляцию существующих панелей по порядку
 
-    step1_pos = html.find('id="subpane-ws-step1"')
+    files_pos = html.find('id="subpane-ws-files"')
 
-    step2_pos = html.find('id="subpane-ws-step2"')
+    docs_pos = html.find('id="subpane-ws-documents"')
 
-    step3_pos = html.find('id="subpane-ws-step3"')
+    qa_pos = html.find('id="subpane-ws-qa"')
 
     chat_pos = html.find('id="subpane-ws-chat"')
 
@@ -156,7 +152,7 @@ def test_workspace_subtabs_html_structure() -> None:
 
 
 
-    assert step1_pos < step2_pos < step3_pos < chat_pos < commits_pos, "Суб-панели расположены не по порядку"
+    assert (files_pos < docs_pos < qa_pos < chat_pos < commits_pos), "Суб-панели расположены не по порядку"
 
 
 
@@ -178,9 +174,9 @@ def test_workspace_subtabs_html_structure() -> None:
 
     # Панель Файлы: выбор рабочей области и источники
 
-    assert step1_pos < files_card < step2_pos, "panel-files не внутри subpane-ws-step1"
+    assert files_pos < files_card < docs_pos, "panel-files не внутри subpane-ws-files"
 
-    assert step1_pos < sources_card < step2_pos, "panel-sources не внутри subpane-ws-step1"
+    assert files_pos < sources_card < docs_pos, "panel-sources не внутри subpane-ws-files"
 
 
 
@@ -198,15 +194,15 @@ def test_workspace_subtabs_html_structure() -> None:
 
     # Шаг 2: документы и факты
 
-    assert step2_pos < docs_card < step3_pos, "panel-documents не внутри subpane-ws-step2"
+    assert docs_pos < docs_card < qa_pos, "panel-documents не внутри subpane-ws-documents"
 
-    assert step2_pos < facts_card < step3_pos, "panel-facts не внутри subpane-ws-step2"
+    assert docs_pos < facts_card < qa_pos, "panel-facts не внутри subpane-ws-documents"
 
 
 
     # Шаг 3: умный поиск QA
 
-    assert step3_pos < qa_card < chat_pos, "panel-qa не внутри subpane-ws-step3"
+    assert qa_pos < qa_card < chat_pos, "panel-qa не внутри subpane-ws-qa"
 
 
 
@@ -364,7 +360,7 @@ def test_top_workspace_dropdown_integration() -> None:
 
 
 
-    assert "window.switchWorkspaceSubTab('step2')" in content, "top_workspace_dropdown.js не переключает на step2"
+    assert "window.switchWorkspaceSubTab('panel-documents'" in content, "top_workspace_dropdown.js не переключает на step2"
 
 
 

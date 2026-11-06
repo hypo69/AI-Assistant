@@ -1,7 +1,7 @@
 /**
  * Модуль тестирования моделей LLM и отмены текущих запросов.
- * Файл: apps/windows/api/webgui/tab_models/panel_models_catalog/test.js
- * Updated: 2026-10-17 02:05:00
+ * Файл: apps/ai_assistant/api/webgui/tab_models/panel_models_catalog/test.js
+ * Updated: 2026-11-01 17:37:00
  */
 
 import { escapeHtml, showModelsNotification } from '../common/ui_utils.js';

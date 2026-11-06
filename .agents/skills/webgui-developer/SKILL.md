@@ -1,233 +1,96 @@
 ---
 name: webgui-developer
-description: Архитектурный стандарт, шаблоны, кодогенератор и пошаговые протоколы для разработки, модификации и отладки веб-интерфейсов, вкладок (*_tab) и интеграции с AIModalDialog и tab-core в AI Windows Admin.
+description: Архитектурный стандарт, шаблоны и пошаговые протоколы для разработки, модификации и отладки веб-интерфейсов, вкладок (tab_<tab_id>) и интеграции с AIModalDialog и tab-core в AI-Assistant.
 description_i18n:
-  en: Architectural standards, templates, scaffolding CLI, and step-by-step protocols for developing, modifying, and debugging WebGUI tabs (*_tab) with AIModalDialog and tab-core integration in AI Windows Admin.
-  ru: Архитектурный стандарт, шаблоны, кодогенератор и пошаговые протоколы для разработки, модификации и отладки веб-интерфейсов, вкладок (*_tab) и интеграции с AIModalDialog и tab-core в AI Windows Admin.
+  en: Architectural standards, templates, and step-by-step protocols for developing, modifying, and debugging WebGUI tabs (tab_<tab_id>) with AIModalDialog and tab-core integration in AI-Assistant.
+  ru: Архитектурный стандарт, шаблоны и пошаговые протоколы для разработки, модификации и отладки веб-интерфейсов, вкладок (tab_<tab_id>) и интеграции с AIModalDialog и tab-core в AI-Assistant.
 ---
 
 # 🌐 Навык: Разработчик WebGUI (WebGUI Developer)
 
-Этот навык предназначен для проектирования, создания, модификации и поддержки вкладок (`*_tab`) и веб-интерфейсов в экосистеме **AI Windows Admin** (`apps/windows/api/webgui`).
+**Updated:** 2026-11-01 17:35:00
+
+Этот навык предназначен для проектирования, создания, модификации и поддержки вкладок (`tab_<tab_id>`) и веб-интерфейса в проекте **AI-Assistant** (`apps/ai_assistant/api/webgui/` и `apps/common/webgui/`).
 
 ---
 
 ## 🎯 Когда активировать этот навык
 
-- Разработка новой функциональной вкладки (`*_tab`) для системных панелей (`/tc`, `/admin`, `/apps`, `/`).
-- Модификация или рефакторинг существующей вкладки WebGUI.
-- Интеграция таблиц и списков с универсальным модальным окном ИИ-ассистента (`window.AIModalDialog.show`).
-- Настройка и отладка фонового опроса телеметрии через `tab-core.js` (Active-Only Polling).
-- Аудит верстки на соответствие темной/светлой темам и исключение хардкода цветов.
-- Регистрация вкладок в `core/tab-registry.js` и меню `config/tc_menu_config.json`.
+- Разработка новой функциональной вкладки (`tab_<tab_id>`) в `apps/ai_assistant/api/webgui/` или `apps/common/webgui/`.
+- Модификация или рефакторинг существующих вкладок (`tab_workspace`, `tab_commits`, `tab_diff`, `tab_timeline`, `tab_graph`, `tab_rag`, `tab_verification`, `tab_git_maintenance`, `tab_doc_categorizer`, `tab_gmail`, `tab_calendar`, `tab_drive`, `tab_contacts`, `tab_models`, `tab_plugins`, `tab_chat`, `tab_theme_editor`, `tab_file_editor`, `tab_file_tree`, `tab_obsidian`).
+- Интеграция списков и таблиц с универсальным модальным окном ИИ-ассистента (`window.AIModalDialog.show`).
+- Настройка двухуровневых меню субпанелей и блоков (`menu_config.json`, `SUBTABS_AND_BLOCKS_MENU.md`).
+- Аудит верстки на соответствие темам оформления, размеру модальных окон (`90vw × 90vh`) и правилам RTL.
 
 ---
 
 ## 🏗️ Архитектурная карта WebGUI
 
 ```text
-apps/windows/api/webgui/
-├── core/
-│   └── tab-registry.js          # Единый реестр вкладок (SSOT)
+apps/ai_assistant/api/webgui/
+├── index.html                   # Главная оболочка (Top Navbar, IDE Activity Bar, Offcanvas, Modals)
+├── css/
+│   ├── main.css                 # Главная таблица стилей (@import компонентов и rtl.css)
+│   ├── components.css           # Компоненты и единый размер модальных окон 90vw × 90vh
+│   ├── rtl.css                  # Правила двунаправленного интерфейса RTL/LTR и полей ввода (§ 8.1)
+│   ├── themes.css               # Палитры тем оформления
+│   └── variables.css            # Базовые CSS-переменные
 ├── js/
-│   ├── tab-core.js              # Ядро переключения вкладок, lazy load и поллинга
-│   ├── theme-engine.js          # Переключение тем оформления (Dark, Light, Terminal, etc.)
-│   └── toast.js                 # Уведомления toast
-├── ai_modal_dialog/             # Универсальное окно ИИ-анализа сущностей
-├── templates/
-│   └── tab_template/            # Эталонный шаблон вкладки (index.html, main.js, README.md)
-└── <name>_tab/                  # Изолированный модуль вкладки
+│   ├── main.js                  # Главный оркестратор и реестр ленивой загрузки вкладок (TABS)
+│   ├── tab-core.js              # Ядро переключения вкладок, синхронизации URL hash и поллинга
+│   ├── panel-loader.js          # Загрузчик субпанелей внутри составных вкладок
+│   ├── menu_dnd.js              # Drag & Drop кнопок меню (menu_config.json)
+│   ├── i18n.js & global-i18n.js # Локализация (ru, en, he, uk) и переключение dir="rtl"/"ltr"
+│   └── theme.js & theme-engine.js # Движок тем оформления
+├── locales/                     # Словари локализации: ru.json, en.json, he.json, uk.json
+├── ai_modal_dialog/             # Универсальное модальное окно ИИ-анализа и WikiLLM
+└── tab_<tab_id>/                # Изолированный модуль вкладки
     ├── index.html               # Чистая разметка (БЕЗ тегов <script>)
     ├── main.js                  # Контроллер: window.init<Name>Tab, window.deactivate<Name>Tab
-    └── README.md                # Документация модуля
+    ├── menu_config.json         # Конфигурация меню субпанелей и блоков (опционально)
+    └── README.md                # Документация модуля на русском языке
 ```
 
 ---
 
-## 🚀 Пошаговый протокол: Создание новой вкладки
+## 🚀 Пошаговый протокол: Создание или изменение вкладки
 
-### 1. Автоматическая генерация через CLI (Рекомендуется)
-Выполните скрипт генератора из навыка:
-```powershell
-py .agents/skills/webgui-developer/scripts/scaffold_tab.py <name> --title "<Заголовок RU>" --icon "<bi-icon>" --table-type "<type>"
-
-# Пример:
-py .agents/skills/webgui-developer/scripts/scaffold_tab.py storage_health --title "Здоровье дисков" --icon "bi-hdd-network" --table-type "disk"
-```
-Скрипт автоматически:
-- Создаст каталог `apps/windows/api/webgui/storage_health_tab/`
-- Сгенерирует `index.html` и `main.js` с правильными именами и заголовками `Updated:`
-- Выведет готовые блоки кода для регистрации в `tab-registry.js` и `tc_menu_config.json`.
-
-### 2. Ручное создание на базе шаблона
-Если генератор не используется:
-1. Скопируйте `apps/windows/api/webgui/templates/tab_template/` в `apps/windows/api/webgui/<name>_tab/`.
-2. Замените префиксы `template-` на `<name>-`.
-3. В `main.js` объявите функцию `window.init<PascalName>Tab`.
-4. Подключите реальный API endpoint вместо мока.
-
-### 3. Регистрация вкладки в SSOT реестре
-Откройте [tab-registry.js](file:///c:/Users/onela/AppData/Local/AI-TC/apps/windows/api/webgui/core/tab-registry.js) и добавьте вкладку в `TAB_DEFINITIONS`:
-```javascript
-{
-  id: 'storage_health',
-  label: 'Здоровье дисков',
-  icon: 'bi-hdd-network',
-  tab: 'storage-health',
-  tabId: 'tab-storage-health',
-  html: '/html/storage_health_tab/index.html?v=20261015_v1',
-  js: '/html/storage_health_tab/main.js?v=20261015_v1'
-}
-```
-
-### 4. Добавление в меню навигации
-Откройте `apps/windows/api/webgui/config/tc_menu_config.json` и добавьте пункт в `sidebarItems` или `topButtons`:
-```json
-{
-  "id": "storage_health",
-  "tab": "tab-storage-health",
-  "icon": "bi-hdd-network",
-  "label": "Здоровье дисков",
-  "order": 25,
-  "visible": true
-}
-```
-
-### 5. Создание и внедрение суб-меню панелей (Subtabs Nav-Pills Hub)
-Когда вкладка объединяет несколько функциональных панелей (как в `tab_software_scanner` и `tab_processes_load_inspector`), запрещено располагать их длинной вертикальной «простыней». Все панели скрываются под горизонтальным меню закругленных пилюль (`nav nav-pills` с `rounded-pill`).
-
-Для автоматической генерации разметки шапки и JS переключателя используйте встроенный инструмент:
-```powershell
-py .agents/skills/webgui-developer/scripts/subtabs_builder.py generate \
-  --title "Мониторинг процессов" \
-  --subtitle "Диспетчер задач и активность хоста" \
-  --icon "⚡" \
-  --prefix "proc" \
-  --tabs "manager:'Диспетчер процессов':bi-layout-text-window-reverse:text-primary top:'Топ процессов':bi-speedometer2:text-warning net:'Сетевая активность':bi-globe:text-info files:'Изменения файлов':bi-activity:text-success"
-```
-Инструмент выводит готовую HTML разметку шапки, контейнеров `tab-pane` и экспорт функции `switch<Prefix>SubTab(id)` для программного переключения.
+1. **Каталог вкладки `apps/ai_assistant/api/webgui/tab_<tab_id>/`**:
+   - Создайте `index.html` (чистая разметка с атрибутами `data-i18n` и `data-i18n-title`), `main.js` (с экспортом `window.init<PascalName>Tab`) и `README.md` на русском языке.
+   - Если во вкладке есть субпанели и подменю блоков — добавьте `menu_config.json` согласно стандарту `.ai/instructions/standards/SUBTABS_AND_BLOCKS_MENU.md`.
+2. **Регистрация в `apps/ai_assistant/api/webgui/js/main.js`**:
+   - Добавьте запись в словарь `TABS`:
+     ```javascript
+     'my-feature': ['/html/tab_my_feature/index.html?v=YYYYMMDD_v1', '/html/tab_my_feature/main.js?v=YYYYMMDD_v1'],
+     ```
+3. **Навигация в `apps/ai_assistant/api/webgui/index.html`**:
+   - Добавьте кнопку с атрибутом `data-tab="tab-my-feature"`, `data-i18n` и `data-i18n-title`.
+4. **Локализация**:
+   - Добавьте все текстовые ключи (`*Label`) и статические подсказки (`*Title`) во все 4 файла `apps/ai_assistant/api/webgui/locales/{ru,en,he,uk}.json`.
 
 ---
 
 ## ⚡ Обязательные стандарты разработки
 
-### 1. Навигация строго через `data-tab`
-```html
-<!-- ✅ ПРАВИЛЬНО -->
-<button type="button" data-tab="tab-storage-health">Диски</button>
-
-<!-- ❌ ЗАПРЕЩЕНО -->
-<button type="button" data-bs-target="#tab-storage-health" data-bs-toggle="tab">...</button>
-<button type="button" onclick="switchTab('storage-health')">...</button>
-```
-
-### 2. Поллинг строго через `registerTabPoller`
-```javascript
-// ✅ ПРАВИЛЬНО: Опрос засыпает при неактивной вкладке или свернутом браузере
-window.registerTabPoller('tab-storage-health', async () => {
-  await fetchDriveMetrics();
-}, 5000, { immediate: false });
-
-// ❌ ЗАПРЕЩЕНО: Обычный setInterval приводит к утечкам ресурсов и блокировке бэкенда!
-setInterval(fetchDriveMetrics, 5000);
-```
-
-### 3. Полный запрет хардкода в стилях (Всё только через механизм тем)
-
-> [!CAUTION]
-> **Никакого хардкода в стилях!**
-> Категорически запрещено прописывать цвета, фоны и границы через HEX (`#facc15`, `#12151a`), RGB/RGBA или в инлайновых атрибутах `style="color:...", style="background:..."`.
-> Всё оформление реализуется **строго через механизм тем** и дизайн-токены CSS-переменных, либо системные классы компонентов.
-
-Все компоненты ОБЯЗАНЫ использовать стандартные CSS-переменные дизайн-системы и классы Bootstrap 5:
-- Фоны: `bg-body`, `bg-body-tertiary`, `var(--bg-color)`, `var(--surface-1)`, `var(--surface-2)`
-- Текст: `text-body`, `text-muted`, `var(--text-color)`, `var(--ui-text-primary)`
-- Границы: `border-subtle`, `border-secondary-subtle`, `var(--border-color)`
-- Акценты: `text-primary`, `btn-primary`, `var(--ui-accent)`, `var(--nav-active)`
-- Скругления: `var(--radius-sm)`, `var(--radius-md)`, `var(--radius-lg)`
-- Подробный справочник токенов: [references/themes_and_styling.md](references/themes_and_styling.md)
-
-#### Статусные бейджи (`ui-badge`):
-```html
-<!-- ✅ ПРАВИЛЬНО: Семантические бейджи дизайн-системы (адаптивны для Light, Brick, Dark, Terminal) -->
-<span class="ui-badge ui-badge-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>2666 MHz (⚠️ занижена на 534 MHz)</span>
-<span class="ui-badge ui-badge-success"><i class="bi bi-check-circle-fill me-1"></i>Оптимально</span>
-<span class="ui-badge ui-badge-danger"><i class="bi bi-x-circle-fill me-1"></i>Отключен</span>
-<span class="ui-badge ui-badge-info">3200 MHz</span>
-<span class="ui-badge ui-badge-neutral">NTFS</span>
-
-<!-- ❌ КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: Инлайновый хардкод цветов разрушает светлые и контрастные темы! -->
-<span class="badge border border-warning-subtle" style="color: #facc15; background: rgba(234, 179, 8, 0.18);">...</span>
-```
-
-#### Карточки и контейнеры:
-```html
-<!-- ✅ ПРАВИЛЬНО -->
-<div class="card bg-body border-subtle shadow-sm">
-  <div class="card-header bg-body-tertiary text-body">Заголовок</div>
-</div>
-
-<!-- ❌ ЗАПРЕЩЕНО -->
-<div class="card bg-dark text-white" style="background-color: #12151a;">...</div>
-```
-
-### 4. Интеграция с `window.AIModalDialog.show({...})`
-Строки таблиц должны иметь класс `interactive-table-row` и навешанный обработчик:
-```javascript
-modal.show({
-  title: drive.model,
-  subtitle: `Серийный номер: ${drive.serial}`,
-  icon: '💽',
-  tableType: 'disk',
-  badges: [{ text: drive.health, class: 'badge bg-success' }],
-  metadata: [
-    { label: 'Размер', value: `${drive.size_gb} GB` },
-    { label: 'Температура', value: `${drive.temperature_c} °C` }
-  ],
-  rawTitle: 'SMART телеметрия',
-  rawContent: JSON.stringify(drive.smart_attributes, null, 2),
-  autoRun: false
-});
-```
-
-### 5. Стандарт Drill-down в таблицах (Иконка дрели СЛЕВА)
-Если сущности в таблице поддерживают углубленный анализ (Drill-down / Deep Dive / переход к инспектору инстанса):
-- **Запрет текстовых кнопок справа:** Запрещено размещать кнопки вида `🔬 Deep Dive` в конце строки или теле таблицы.
-- **Размещение строго СЛЕВА:** Кнопка Drill-down размещается в **первой колонке СЛЕВА** от строки (`<th>` и `<td>`).
-- **Иконка:** Стандартизированная красная дрель `/html/assets/red_drill.png`.
-- **Изоляция клика:** Кнопка или ячейка помечается классом `no-modal-trigger` и вызывает `e.stopPropagation()`, чтобы переход к детальному представлению не конфликтовал с открытием модального окна `AIModalDialog`.
-
-```html
-<!-- Колонка дрели в заголовке таблицы -->
-<th style="width: 36px; text-align: center;" title="Drill-down: Детальный анализ"></th>
-
-<!-- Ячейка дрели в строке -->
-<td class="text-center no-modal-trigger" style="width: 36px;">
-  <button type="button" class="btn-drilldown-proc" title="Drill-down: Глубокий анализ">
-    <img src="/html/assets/red_drill.png?v=YYYYMMDD_vN" alt="Drill-down">
-  </button>
-</td>
-```
-
-### 6. Интерактивный Редактор тем (`theme_editor_tab`)
-В экосистему встроен модуль кастомизации оформления:
-- Вкладка: `theme-editor` (`apps/windows/api/webgui/theme_editor_tab/`)
-- Быстрый доступ: кнопка навигации встроена в модальное окно настроек профиля (`#userSettingsModal`):
-  `<button class="btn btn-outline-primary btn-sm w-100" data-tab="tab-theme-editor" data-bs-dismiss="modal">`
-- Программное управление: `window.themeEngine.applyCustomOverrides(tokens, save)`, `window.themeEngine.clearCustomOverrides()`.
+1. **Навигация строго через `data-tab`**:
+   - Используйте `<button type="button" data-tab="tab-commits">...</button>`.
+2. **Поллинг строго через `window.registerTabPoller`**:
+   - Прямой `setInterval` для опроса API запрещен; опрос должен автоматически останавливаться при уходе с вкладки или сворачивании окна браузера.
+3. **Полный запрет хардкода в стилях и строках UI**:
+   - Все цвета, фоны и рамки задаются строго через CSS-переменные тем (`var(--surface-1)`, `var(--text-color)`, `var(--border-color)`) и семантические классы (`ui-badge`, `ui-card`).
+4. **Модальные окна = 90vw × 90vh (`WEBGUI.md` § 5.4)**:
+   - Все модальные окна подчиняются глобальному правилу `.modal .modal-dialog` (`90vw × 90vh`). Запрещено задавать индивидуальные размеры отдельным окнам.
+5. **Поля ввода в RTL (`WEBGUI.md` § 5.5)**:
+   - При выборе RTL-языка (`html[dir="rtl"]`) все поля ввода (`input`, `textarea`, `select`, `contenteditable`) читаются и заполняются справа налево (секция 8.1 в `rtl.css`). Исключение — поля с явным `dir="ltr"` (пути, URL, хеши, команды).
 
 ---
 
-## 📋 Чек-лист верификации перед коммитом
+## 📋 Чек-лист перед коммитом
 
-- [ ] В `index.html` нет `<script>` тегов.
-- [ ] Опрос бэкенда зарегистрирован через `window.registerTabPoller`.
-- [ ] Кнопка навигации содержит `data-tab="tab-<name>"`.
-- [ ] **Никакого хардкода в стилях:** Проверено отсутствие HEX/RGB/RGBA и инлайновых стилей оформления (`style="color:...", style="background:..."`). Всё оформление (фоны, текст, рамки, бейджи `ui-badge-*`) подключено строго через механизм тем.
-- [ ] Табличные строки поддерживают вызов `AIModalDialog.show()`.
-- [ ] Drill-down сущностей оформлен иконкой дрели (`/html/assets/red_drill.png`) строго СЛЕВА от строки таблицы.
-- [ ] Вкладка зарегистрирована в `core/tab-registry.js`, `apps/modules/tabs-config.js` и `config/tc_menu_config.json`.
-- [ ] Версия ассетов обновлена: `?v=YYYYMMDD_vN`.
-- [ ] В шапке каждого файла присутствует `Updated: YYYY-MM-DD HH:MM:SS`.
-- [ ] Комментарии, docstrings и документация на русском языке.
-
+- [ ] Каталог вкладки назван строго `tab_<tab_id>` и зарегистрирован в `apps/ai_assistant/api/webgui/js/main.js` (`TABS`).
+- [ ] В `index.html` вкладки нет тегов `<script>`.
+- [ ] Все строки и статические тултипы переведены в `ru.json`, `en.json`, `he.json`, `uk.json`.
+- [ ] Отсутствует хардкод цветов (HEX/RGB/inline styles).
+- [ ] Все модальные окна имеют размер `90vw × 90vh` без локальных переопределений.
+- [ ] В RTL-режиме все поля ввода читаются справа налево.
+- [ ] Обновлена версия ассетов `?v=YYYYMMDD_vN` и метка `Updated: YYYY-MM-DD HH:MM:SS` в шапке файлов.

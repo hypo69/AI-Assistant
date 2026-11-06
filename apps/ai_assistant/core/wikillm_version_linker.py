@@ -11,7 +11,7 @@
 #     from apps.ai_assistant.core.wikillm_version_linker import WikiLLMVersionLinker
 #
 #     linker = WikiLLMVersionLinker()
-#     links = linker.auto_link_commit("c1a2b3", ["apps/windows/hardware/sensors.py"], "Fix sensor crash")
+#     links = linker.auto_link_commit("c1a2b3", ["apps/ai_assistant/hardware/sensors.py"], "Fix sensor crash")
 #     context = linker.get_context_for_entity("hardware")
 #
 # File: wikillm_version_linker.py
@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:22:00
+# Updated: 2026-11-01 17:40:00
 # =============================================================================
 
 from __future__ import annotations

@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 18:38:00
+# Updated: 2026-11-03 14:00:00
 # =============================================================================
 
 from __future__ import annotations
@@ -172,9 +172,9 @@ class VirtualCategoryTreeEngine:
         name = str(item.get("name") or Path(rel_path).name)
         if not rel_path or name.startswith(".") or ".obsidian/" in f"{rel_path}/" or rel_path.startswith(".obsidian/"):
             return False
-        if name in ("_Knowledge_Base.md", "_Index.md") or rel_path.startswith(("_Entities/", "_Topics/")):
+        if name in ("_Knowledge_Base.md", "_Index.md", "README.md") or name.lower() in ("readme.md", ".gitignore") or rel_path.startswith(("_Entities/", "_Topics/")):
             return False
-        if item.get("source_mode") == "linked":
+        if item.get("source_mode") == "linked" or item.get("is_external"):
             return True
         # Если это сгенерированная заметка Obsidian (.md), которая не является первичным документом в SQLite
         if name.endswith(".md") and rel_path not in indexed_doc_ids and name not in indexed_doc_ids:

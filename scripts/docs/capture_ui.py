@@ -17,7 +17,7 @@
 # Package: tools
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 22:22:44
+# Updated: 2026-11-01 17:37:00
 # =============================================================================
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     :returns: Настроенный парсер аргументов.
     """
     parser = argparse.ArgumentParser(
-        description='Автоматический обход веб-интерфейса AI Windows Admin и сохранение состояний в PNG.'
+        description='Автоматический обход веб-интерфейса AI-Assistant и сохранение состояний в PNG.'
     )
 
     parser.add_argument(
@@ -221,7 +221,7 @@ async def collect_navigation(
     try:
         drawer_btn = page.locator('#apps-drawer-toggle-btn, .left-drawer-tab-trigger').first
         if await drawer_btn.count() > 0:
-            debug('Открытие боковой панели навигации AI Windows Admin...', debug_enabled)
+            debug('Открытие боковой панели навигации AI-Assistant...', debug_enabled)
             await drawer_btn.click(timeout=2000)
             await page.wait_for_timeout(800)
     except Exception as exc:

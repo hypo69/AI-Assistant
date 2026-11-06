@@ -30,7 +30,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-26 01:10:00
+# Updated: 2026-11-06 23:15:00
 # =============================================================================
 
 from __future__ import annotations
@@ -215,13 +215,14 @@ class WorkspaceRelocator:
         except Exception as faiss_exc:
             logger.warning(f"[WorkspaceRelocator] Ошибка миграции FAISS для {old_doc_id} -> {new_doc_id}: {faiss_exc}")
 
-        # 2. Перепривязка в темпоральном графе знаний (TemporalCodeGraph)
+        # 2. Перепривязка в изолированном темпоральном графе знаний рабочей области
         try:
             if commit_hash:
-                active_links = wm.graph.get_active_links(source_id=old_doc_id)
-                wm.graph.supersede_links_by_source(source_id=old_doc_id, invalidating_commit=commit_hash)
+                ws_graph = wm.get_workspace_graph(workspace_id)
+                active_links = ws_graph.get_active_links(source_id=old_doc_id)
+                ws_graph.supersede_links_by_source(source_id=old_doc_id, invalidating_commit=commit_hash)
                 for lnk in active_links:
-                    wm.graph.add_link(
+                    ws_graph.add_link(
                         source_id=new_doc_id,
                         target_id=lnk.target_id,
                         relation_type=lnk.relation_type,
@@ -229,7 +230,7 @@ class WorkspaceRelocator:
                         confidence=lnk.confidence,
                         provenance=lnk.provenance,
                     )
-                wm.graph.add_link(
+                ws_graph.add_link(
                     source_id=new_doc_id,
                     target_id=old_doc_id,
                     relation_type="relocated_from",

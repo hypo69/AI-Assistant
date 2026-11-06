@@ -20,14 +20,14 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 20:02:00
+# Updated: 2026-11-06 23:05:00
 # =============================================================================
 
 from __future__ import annotations
 """REST API роутер управления рабочими областями, фактами и вопросно-ответной системой."""
 
 import asyncio, json
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
@@ -35,12 +35,14 @@ from pydantic import BaseModel, Field
 from logger import logger
 from apps.ai_assistant.core.qa_engine import KnowledgeQAEngine
 from apps.ai_assistant.core.workspace_manager import WorkspaceManager
+from apps.ai_assistant.core.workspace_prompt_generator import WorkspacePromptGenerator
 
 router = APIRouter(prefix="/api/v1", tags=["Multilingual Knowledge & Workspaces"])
 
 # Единый экземпляр менеджера рабочих областей и QA-движка
 _workspace_manager = WorkspaceManager()
 _qa_engine = KnowledgeQAEngine(workspace_manager=_workspace_manager)
+_prompt_generator = WorkspacePromptGenerator(workspace_manager=_workspace_manager)
 
 
 def _resolve_target_workspace(workspace_id: Optional[str] = None) -> Optional[str]:
@@ -91,8 +93,8 @@ class AskQuestionRequest(BaseModel):
     workspace_id: Optional[str] = Field(None, description="Идентификатор рабочей области")
     language: Optional[str] = Field(None, description="Язык вопроса ('ru', 'he', 'en') или автоопределение")
     mode: str = Field("local_first", description="Режим: local_only, local_first, cloud_assist, cloud_enrich")
-    provider: Optional[str] = Field("gemini", description="Провайдер из модуля src/ai (gemini, agy, openai, ollama)")
-    model: Optional[str] = Field("gemini-3.1-flash-lite", description="Идентификатор модели ИИ")
+    provider: Optional[str] = Field(None, description="Провайдер из модуля src/ai (gemini, agy, openai, ollama)")
+    model: Optional[str] = Field(None, description="Идентификатор модели ИИ")
 
 
 class RagQueryRequest(BaseModel):
@@ -292,6 +294,19 @@ async def ensure_workspace_folder(workspace_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("/workspaces/{workspace_id}/open-folder", summary="Открытие папки рабочей области в Проводнике Windows")
+@router.post("/workspaces/{workspace_id}/open-folder", summary="Открытие папки рабочей области в Проводнике Windows (POST)")
+async def open_workspace_folder(workspace_id: str) -> Dict[str, Any]:
+    """Открывает физическую директорию рабочей области в нативном Проводнике Windows."""
+    try:
+        return _workspace_manager.open_workspace_folder(workspace_id)
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except Exception as exc:
+        logger.error(f"[RouterKnowledge] Ошибка открытия папки рабочей области {workspace_id}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.post("/workspaces", summary="Создание или выбор рабочей области с Git")
 async def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
     """Создаёт или открывает рабочую область и инициализирует в ней Git-репозиторий."""
@@ -428,6 +443,23 @@ async def list_workspace_commits(
     """Возвращает коммиты индивидуального Git-репозитория рабочей области."""
     commits = await _workspace_manager.get_workspace_commits(workspace_id, file_path=file_path, limit=limit)
     return {"status": "ok", "workspace_id": workspace_id, "count": len(commits), "commits": commits}
+
+
+@router.get("/workspaces/{workspace_id}/suggested-questions", summary="Генерация контекстных быстрых вопросов по содержанию рабочей области")
+async def get_workspace_suggested_questions(
+    workspace_id: str,
+    language: Optional[str] = Query("ru", description="Язык вопросов (ru, en, he, uk)"),
+    limit: int = Query(3, ge=1, le=10, description="Максимальное число вопросов"),
+) -> Dict[str, Any]:
+    """Возвращает контекстные быстрые вопросы, сгенерированные по коммитам, файлам и сущностям."""
+    target_ws = _resolve_target_workspace(workspace_id)
+    if not target_ws:
+        raise HTTPException(status_code=400, detail="Рабочее пространство не выбрано")
+    return await _prompt_generator.generate_prompts(
+        workspace_id=target_ws,
+        language=language or "ru",
+        limit=limit,
+    )
 
 
 @router.post("/documents/import", summary="Импорт/обновление документа с коммитом в Git и извлечением фактов")
@@ -613,6 +645,30 @@ async def move_workspace_item_endpoint(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as exc:
         logger.error(f"[RouterKnowledge] Ошибка перемещения объекта {req.old_rel_path} -> {req.new_rel_path} в {workspace_id}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/workspaces/{workspace_id}/file-raw", summary="Прямой стриминг файла рабочей области")
+async def get_workspace_file_raw_endpoint(
+    workspace_id: str,
+    rel_path: str = Query(..., description="Относительный путь к файлу"),
+) -> FileResponse:
+    """Возвращает файл рабочей области через FileResponse с поддержкой Range-запросов для видео/аудио."""
+    try:
+        clean_rel, target_path, mime_type = _workspace_manager.get_workspace_raw_file_path(
+            workspace_id=workspace_id, rel_path=rel_path
+        )
+        return FileResponse(
+            path=str(target_path),
+            media_type=mime_type,
+            filename=target_path.name,
+        )
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        logger.error(f"[RouterKnowledge] Ошибка отдачи медиафайла {rel_path} в {workspace_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -827,7 +883,7 @@ async def ask_question(req: AskQuestionRequest) -> Dict[str, Any]:
     if not target_ws:
         raise HTTPException(status_code=400, detail="Рабочее пространство не выбрано")
     try:
-        return await _qa_engine.ask(
+        ans = await _qa_engine.ask(
             question=req.question,
             workspace_id=target_ws,
             language=req.language,
@@ -835,6 +891,14 @@ async def ask_question(req: AskQuestionRequest) -> Dict[str, Any]:
             provider=req.provider,
             model=req.model,
         )
+        # Динамические Follow-up вопросы на основе найденных источников и сущностей
+        ans["suggested_quick_questions"] = _prompt_generator.generate_follow_up_prompts(
+            sources=ans.get("sources", []),
+            entities=ans.get("wiki_links", []),
+            language=req.language or ans.get("language", "ru"),
+            limit=2,
+        )
+        return ans
     except Exception as exc:
         logger.error(f"[RouterKnowledge] Ошибка обработки вопроса '{req.question}': {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -950,38 +1014,26 @@ async def rebuild_faiss(req: FaissRebuildRequest) -> Dict[str, Any]:
 @router.get("/ai-models", summary="Список доступных провайдеров и моделей из модуля src/ai")
 async def list_ai_models() -> Dict[str, Any]:
     """Возвращает перечень поддерживаемых провайдеров и моделей из единого модуля src/ai."""
-    providers = [
-        {
-            "provider": "gemini",
-            "label": "Google Gemini API (src/ai/gemini)",
-            "models": ["gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-pro-latest"],
-        },
-        {
-            "provider": "agy",
-            "label": "Antigravity SDK (src/ai/providers/agy)",
-            "models": ["agy-gemini-2.5-flash", "agy-gemini-2.5-pro", "agy-claude-sonnet"],
-        },
-        {
-            "provider": "gemini_cli",
-            "label": "Gemini CLI (src/ai/providers/gemini_cli)",
-            "models": ["gemini-2.5-flash", "gemini-3.1-flash-lite"],
-        },
-        {
-            "provider": "openai",
-            "label": "OpenAI / Совместимые API (src/ai/providers/openai)",
-            "models": ["openai:gpt-4o-mini", "deepseek:deepseek-chat", "groq:llama-3.3-70b-versatile"],
-        },
-        {
-            "provider": "ollama",
-            "label": "Ollama Local LLM (src/ai/providers/ollama)",
-            "models": ["ollama:qwen2.5:3b", "ollama:llama3.2:3b"],
-        },
-        {
-            "provider": "foundry",
-            "label": "Microsoft Foundry Local (src/ai/providers/foundry)",
-            "models": ["foundry:qwen2.5-1.5b-instruct-generic-cpu:4"],
-        },
-    ]
+    from src.ai.model_manager import get_available_models
+    prov_labels = {
+        "gemini": "Google Gemini API (src/ai/gemini)",
+        "agy": "Antigravity SDK (src/ai/providers/agy)",
+        "gemini_cli": "Gemini CLI (src/ai/providers/gemini_cli)",
+        "openai": "OpenAI / Совместимые API (src/ai/providers/openai)",
+        "ollama": "Ollama Local LLM (src/ai/providers/ollama)",
+        "foundry": "Microsoft Foundry Local (src/ai/providers/foundry)",
+    }
+    providers = []
+    for prov, label in prov_labels.items():
+        try:
+            models = get_available_models(provider=prov)
+        except Exception:
+            models = []
+        providers.append({
+            "provider": prov,
+            "label": label,
+            "models": models,
+        })
     return {"status": "ok", "providers": providers}
 
 

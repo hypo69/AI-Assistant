@@ -1,6 +1,6 @@
 # Справочник API tab-core.js
 
-Файл: `apps/windows/api/webgui/js/tab-core.js`
+Файл: `apps/ai_assistant/api/webgui/js/tab-core.js`
 
 `tab-core.js` — единственный источник правды для переключения вкладок, управления их жизненным циклом и фонового опроса телеметрии.
 

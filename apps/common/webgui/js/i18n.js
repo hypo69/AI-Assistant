@@ -20,7 +20,7 @@
  * Package: windows/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-25 22:45:00
+ * Updated: 2026-10-10 17:35:00
  * =============================================================================
  */
 
@@ -162,19 +162,6 @@ function setupLanguageEvents() {
             switchLocale(e.target.value);
         }
     });
-
-    // Наблюдатель за изменением атрибута dir на <html> для синхронизации выдвижного меню
-    if (typeof MutationObserver !== 'undefined' && document.documentElement) {
-        const dirObserver = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-                if (m.type === 'attributes' && m.attributeName === 'dir') {
-                    const isRtl = document.documentElement.getAttribute('dir') === 'rtl';
-                    syncOffcanvasDirection(isRtl);
-                }
-            }
-        });
-        dirObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['dir'] });
-    }
 }
 
 /**
@@ -211,11 +198,9 @@ export async function initI18n(langOrLocale) {
         }
     }
 
-    const isRtl = (lang === 'he' || lang === 'ar');
     document.documentElement.setAttribute('lang', lang);
     document.documentElement.setAttribute('data-locale', locale);
-    document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
-    syncOffcanvasDirection(isRtl);
+    document.documentElement.setAttribute('dir', (lang === 'he' || lang === 'ar') ? 'rtl' : 'ltr');
 
     applyTranslations();
     syncSelectors(lang, locale);
@@ -249,11 +234,9 @@ export async function switchLocale(langOrLocale) {
         await i18next.changeLanguage(lang);
     }
 
-    const isRtl = (lang === 'he' || lang === 'ar');
     document.documentElement.setAttribute('lang', lang);
     document.documentElement.setAttribute('data-locale', locale);
-    document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
-    syncOffcanvasDirection(isRtl);
+    document.documentElement.setAttribute('dir', (lang === 'he' || lang === 'ar') ? 'rtl' : 'ltr');
 
     applyTranslations();
     syncSelectors(lang, locale);
@@ -270,24 +253,6 @@ export async function switchLocale(langOrLocale) {
 
 // Алиас для обратной совместимости
 export const switchLang = switchLocale;
-
-/**
- * Синхронизирует позиционирование выдвижного меню в зависимости от направления текста (LTR / RTL).
- * В RTL языках (иврит, арабский) левое выдвижное меню отображается и выдвигается справа.
- * @param {boolean} isRtl - Флаг активности направления текста RTL
- */
-export function syncOffcanvasDirection(isRtl) {
-    const offcanvasEl = document.getElementById('leftSideNavOffcanvas');
-    if (!offcanvasEl) return;
-    if (isRtl) {
-        offcanvasEl.classList.remove('offcanvas-start');
-        offcanvasEl.classList.add('offcanvas-end');
-    } else {
-        offcanvasEl.classList.remove('offcanvas-end');
-        offcanvasEl.classList.add('offcanvas-start');
-    }
-}
-
 
 /**
  * Обновляет все элементы с data-i18n* атрибутами в DOM.

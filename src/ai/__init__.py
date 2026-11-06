@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
-# Process Name: AI-Windows-Admin AI -   Init   Module
+# Process Name: AI-Assistant AI - Init Module
 # =============================================================================
 # Description:
 #   Модуль основной системы (`__init__`).
@@ -9,11 +9,11 @@
 #
 #
 # File: __init__.py
-# Project: ai-windows-admin
+# Project: ai-assistant
 # Package: src.ai
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 17:35:00
+# Updated: 2026-11-06 23:05:00
 # =============================================================================
 
 from __future__ import annotations
@@ -29,9 +29,8 @@ from .providers.ollama import OllamaChatBase, OllamaClient
 from .providers.base import BaseChatProvider
 from .gemini import GoogleGenerativeAI
 from .agents import MediaSearchAgent, MCPClientManager
-from .orchestration import get_available_models, actualize_all_models, add_unsupported_model, load_unsupported_models, UnifiedChatModel
-from .rag import UnifiedKnowledgeHub, TextRAG, PixelRAG, LogRAG
-from .wikillm import WikiLLMEngine, WikiStorage
+from .orchestration import get_available_models, actualize_all_models, add_unsupported_model, load_unsupported_models, UnifiedChatModel, is_provider_enabled
+from .rag import TextRAG
 
 __all__ = [
     'BaseChatProvider',
@@ -55,6 +54,7 @@ __all__ = [
     'actualize_all_models',
     'add_unsupported_model',
     'load_unsupported_models',
+    'is_provider_enabled',
     'MediaSearchAgent',
     'MCPClientManager',
     'UnifiedKnowledgeHub',

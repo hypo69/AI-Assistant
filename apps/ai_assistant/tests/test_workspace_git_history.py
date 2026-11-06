@@ -15,7 +15,7 @@
 # Package: apps/ai_assistant/tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 19:05:00
+# Updated: 2026-11-01 20:06:00
 # =============================================================================
 
 from __future__ import annotations
@@ -151,6 +151,28 @@ def test_file_history_router_workspace_id_support(tmp_path: Path) -> None:
     assert response.status_code == 200
     commits = response.json()
     assert isinstance(commits, list)
+
+
+def test_file_history_diff_endpoint(tmp_path: Path) -> None:
+    """Проверяет эндпоинт GET /api/v1/diff с разбором hunks и поддержкой workspace_id."""
+    app = FastAPI()
+    app.include_router(file_history_router)
+    client = TestClient(app)
+
+    # 1. Получаем последний коммит текущего репозитория
+    hist_res = client.get("/api/v1/history?limit=1")
+    assert hist_res.status_code == 200
+    commits = hist_res.json()
+    if commits:
+        commit_hash = commits[0]["commit_hash"]
+        diff_res = client.get(f"/api/v1/diff?commit_hash={commit_hash}")
+        assert diff_res.status_code == 200
+        diff_data = diff_res.json()
+        assert "diff_text" in diff_data
+        assert "hunks" in diff_data
+        assert "files_changed" in diff_data
+        assert diff_data["commit_hash"] == commit_hash
+        assert diff_data["commit_a"] == commit_hash
 
 
 def test_frontend_workspace_synchronization_scripts() -> None:

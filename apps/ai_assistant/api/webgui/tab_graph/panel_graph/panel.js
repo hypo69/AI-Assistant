@@ -4,14 +4,14 @@
  * =============================================================================
  * Description:
  *   Изолированная панель темпорального графа (panel-knowledge-links).
- *   Отображает связи между ревизиями Git и фактами WikiLLM, поддерживает
- *   фильтрацию статусов и мягкую инвалидацию связей (POST /api/v1/supersede).
+ *   Отображает связи между ревизиями Git и фактами активного рабочего пространства,
+ *   поддерживает фильтрацию статусов и мягкую инвалидацию связей (POST /api/v1/supersede).
  *
  * File: panel.js
  * Package: apps/ai_assistant/api/webgui/tab_graph/panel_graph
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-17 00:47:00
+ * Updated: 2026-11-06 23:15:00
  * =============================================================================
  */
 
@@ -19,15 +19,35 @@ import { registerPanelRenderer, loadPanelData } from '../../js/panel-loader.js';
 
 let rawLinks = [];
 
+export function getActiveWorkspace() {
+  if (typeof window !== 'undefined' && typeof window.getActiveWorkspaceId === 'function') {
+    return window.getActiveWorkspaceId() || null;
+  }
+  return null;
+}
+
+export function updateWorkspaceBadge(wsId) {
+  const badge = document.getElementById('graph-workspace-badge');
+  if (badge) {
+    badge.textContent = wsId ? `Рабочая область: ${wsId}` : 'Рабочая область: не выбрана';
+  }
+}
+
 export function renderGraphTable(links) {
   const tbody = document.getElementById('graph-table-body');
   const countBadge = document.getElementById('graph-count-badge');
+  const currentWs = getActiveWorkspace();
+  updateWorkspaceBadge(currentWs);
+
   if (!tbody) return;
 
   if (countBadge) countBadge.textContent = `${links.length} связей`;
 
   if (links.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-muted">Связи темпорального графа не зафиксированы.</td></tr>`;
+    const emptyMsg = currentWs
+      ? `В рабочей области «${currentWs}» связи темпорального графа пока не зафиксированы.`
+      : 'Рабочая область не выбрана. Выберите рабочую область для просмотра темпорального графа.';
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">${emptyMsg}</td></tr>`;
     return;
   }
 
@@ -65,14 +85,21 @@ export function renderGraphTable(links) {
       const commit = prompt('Введите хэш отменяющего коммита:', 'HEAD');
       if (!commit) return;
 
+      const wsId = getActiveWorkspace();
+
       try {
         const res = await fetch('/api/v1/supersede', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source_id: sourceId, target_id: targetId, invalidating_commit: commit })
+          body: JSON.stringify({
+            source_id: sourceId,
+            target_id: targetId,
+            invalidating_commit: commit,
+            workspace_id: wsId
+          })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        loadPanelData('panel-knowledge-links', { force: true });
+        refreshGraphData();
       } catch (err) {
         alert(`Ошибка инвалидации: ${err.message}`);
       }
@@ -94,13 +121,25 @@ export function renderGraphPanel(result, panelEl) {
   filterLinks();
 }
 
+export function refreshGraphData() {
+  const wsId = getActiveWorkspace();
+  updateWorkspaceBadge(wsId);
+  loadPanelData('panel-knowledge-links', { force: true, workspace_id: wsId });
+}
+
 export function initGraphPanel() {
   registerPanelRenderer('panel-knowledge-links', renderGraphPanel);
 
   document.getElementById('graph-status-filter')?.addEventListener('change', filterLinks);
-  document.getElementById('graph-refresh-btn')?.addEventListener('click', () => {
-    loadPanelData('panel-knowledge-links', { force: true });
+  document.getElementById('graph-refresh-btn')?.addEventListener('click', refreshGraphData);
+
+  // Автоматическое обновление графа при переключении рабочего пространства
+  window.addEventListener('workspace-changed', refreshGraphData);
+  window.addEventListener('workspace:switched', refreshGraphData);
+  window.addEventListener('hashchange', () => {
+    const curWs = getActiveWorkspace();
+    updateWorkspaceBadge(curWs);
   });
 
-  loadPanelData('panel-knowledge-links');
+  refreshGraphData();
 }

@@ -1,6 +1,6 @@
 # 🎨 Редактор тем оформления WebGUI (Theme Editor)
 
-Модуль интерактивной настройки, наследования и кастомизации визуального оформления интерфейса экосистемы **AI Windows Admin** (`apps/windows/api/webgui/tab_theme_editor`).
+Модуль интерактивной настройки, наследования и кастомизации визуального оформления интерфейса экосистемы **AI-Assistant** (`apps/ai_assistant/api/webgui/tab_theme_editor`).
 
 ---
 
@@ -25,7 +25,7 @@
 Модуль декомпозирован на панели с соблюдением стандарта `<= 500` строк функционального кода (`GEMINI.md`):
 
 ```text
-apps/windows/api/webgui/tab_theme_editor/
+apps/ai_assistant/api/webgui/tab_theme_editor/
 ├── index.html                  # Разметка панели настроек, Live Preview и модальных окон дочерних тем
 ├── main.js                     # Главный оркестратор: initThemeEditorTab, deactivateThemeEditorTab
 ├── README.md                   # Документация модуля на русском языке
@@ -89,7 +89,7 @@ apps/windows/api/webgui/tab_theme_editor/
 ## 🛠️ Разработчик и авторские права
 
 - **Автор:** hypo69
-- **Проект:** AI Windows Admin
+- **Проект:** AI-Assistant
 - **Версия:** 1.0 (2026-10-15)
 - **Лицензия:** Собственная лицензия проекта
 

@@ -17,7 +17,7 @@
 # Package: src.ai.orchestration
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 16:47:30
+# Updated: 2026-11-06 20:41:00
 # =============================================================================
 
 """Normalize model identifier for consistent comparison."""
@@ -53,8 +53,8 @@ def _get_active_config_path() -> Path:
 _GLOBAL_CONFIG_PATH: Path = __root__ / 'config.json'
 _GEMINI_UNSUPPORTED_PATH: Path = __root__ / 'src' / 'ai' / 'gemini' / 'unsopported_gemini_models.json'
 _CACHED_MODELS: Dict[str, List[str]] = {}
-_DEFAULT_GEMINI_FALLBACK: List[str] = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-pro-latest']
-_GEMINI_PRIORITY_ORDER: List[str] = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-pro-latest']
+_DEFAULT_GEMINI_FALLBACK: List[str] = ['gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-pro-latest']
+_GEMINI_PRIORITY_ORDER: List[str] = ['gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-pro-latest']
 _DEFAULT_GEMINI_CLI_FALLBACK: List[str] = ['gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.5-flash-lite', 'gemini-pro-latest']
 _GEMINI_CLI_PRIORITY_ORDER: List[str] = ['gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.5-flash-lite', 'gemini-pro-latest']
 
@@ -123,6 +123,64 @@ def is_model_supported(provider: str, model_name: str) -> bool:
             pass
     unsupported = load_unsupported_models(provider)
     return norm not in unsupported
+
+
+def _get_provider_cfg(provider: str) -> Dict[str, Any]:
+    """Возвращает словарь настроек провайдера из ai_cfg или config.json."""
+    prov = provider.lower().strip()
+    key = 'gemini_cli' if prov in ('gemini_cli', 'gemini-cli') else (
+        'hf' if prov in ('hf', 'huggingface') else (
+            'openai' if prov in ('openai', 'openai_compat', 'openai-compat', 'deepseek', 'groq', 'openrouter', 'lmstudio') else prov
+        )
+    )
+    try:
+        from src.config import ai_cfg
+        providers = getattr(ai_cfg, 'providers', None) if ai_cfg else None
+        if providers is not None:
+            if isinstance(providers, dict):
+                cfg = providers.get(key, {})
+            else:
+                cfg = getattr(providers, key, {})
+            if isinstance(cfg, dict):
+                return cfg
+            elif hasattr(cfg, '__dict__'):
+                return vars(cfg)
+    except Exception:
+        pass
+    try:
+        global_cfg = j_loads(_get_active_config_path()) or {}
+        if isinstance(global_cfg, dict):
+            ai_sec = global_cfg.get('ai_providers_and_models_configuration', {})
+            if isinstance(ai_sec, dict):
+                p_sec = ai_sec.get('providers', {})
+                if isinstance(p_sec, dict) and key in p_sec:
+                    val = p_sec[key]
+                    if isinstance(val, dict):
+                        return val
+    except Exception:
+        pass
+    return {}
+
+
+def is_provider_enabled(provider: str) -> bool:
+    """Проверяет, включен ли указанный провайдер в конфигурации приложения.
+
+    Args:
+        provider: Имя провайдера ('gemini', 'gemini_cli', 'agy', 'foundry', 'ollama', 'hf', 'onnx', 'openai').
+
+    Returns:
+        bool: True, если провайдер активен, иначе False.
+    """
+    prov = provider.lower().strip()
+    key = 'gemini_cli' if prov in ('gemini_cli', 'gemini-cli') else (
+        'hf' if prov in ('hf', 'huggingface') else (
+            'openai' if prov in ('openai', 'openai_compat', 'openai-compat', 'deepseek', 'groq', 'openrouter', 'lmstudio') else prov
+        )
+    )
+    cfg = _get_provider_cfg(key)
+    if cfg and 'enabled' in cfg:
+        return bool(cfg['enabled'])
+    return key in ('gemini', 'gemini_cli', 'agy')
 
 def add_unsupported_model(provider: str='gemini', model_name: str='', reason: str='') -> bool:
     """Add unsupported model to configuration file and remove from cache.
@@ -242,14 +300,14 @@ def _fetch_gemini_models_sync(api_key: str='', include_unsupported: bool=False) 
     except Exception:
         pass
     if not pool:
-        pool = ['gemini-3.1-flash-lite', 'gemini-pro-latest']
+        pool = list(_DEFAULT_GEMINI_FALLBACK)
     return pool
 
 def _fetch_foundry_models_sync(base_url: str='', include_unsupported: bool=False) -> List[str]:
     """Synchronously fetch list of models from local Foundry server."""
-    from src.config import ai_cfg
-    providers = getattr(ai_cfg, 'providers', {}) if ai_cfg else {}
-    foundry_cfg = providers.get('foundry', {}) if isinstance(providers, dict) else {}
+    if not is_provider_enabled('foundry'):
+        return []
+    foundry_cfg = _get_provider_cfg('foundry')
     base_url = base_url or (foundry_cfg.get('base_url', 'http://localhost:54837') if foundry_cfg else 'http://localhost:54837')
     fallback_id = foundry_cfg.get('model', 'qwen2.5-1.5b-instruct-generic-cpu:4')
     unsupported: Set[str] = load_unsupported_models('foundry')
@@ -275,9 +333,9 @@ def _fetch_foundry_models_sync(base_url: str='', include_unsupported: bool=False
 
 def _fetch_ollama_models_sync(base_url: str='', include_unsupported: bool=False) -> List[str]:
     """Synchronously fetch list of models from Ollama server."""
-    from src.config import ai_cfg
-    providers = getattr(ai_cfg, 'providers', {}) if ai_cfg else {}
-    ollama_cfg = providers.get('ollama', {}) if isinstance(providers, dict) else {}
+    if not is_provider_enabled('ollama'):
+        return []
+    ollama_cfg = _get_provider_cfg('ollama')
     base_url = base_url or (ollama_cfg.get('base_url', 'http://localhost:11434') if ollama_cfg else 'http://localhost:11434')
     fallback_id = ollama_cfg.get('model', 'llama3.1')
     unsupported: Set[str] = load_unsupported_models('ollama')
@@ -312,11 +370,13 @@ def _fetch_gemini_cli_models_sync(include_unsupported: bool=False) -> List[str]:
         return combined
     pool: List[str] = [m for m in _DEFAULT_GEMINI_CLI_FALLBACK if m not in unsupported]
     if not pool:
-        pool = ['gemini-3.1-flash-lite', 'gemini-2.5-flash']
+        pool = list(_DEFAULT_GEMINI_CLI_FALLBACK)
     return pool
 
 def _fetch_hf_models_sync(include_unsupported: bool=False) -> List[str]:
     """Synchronously fetch list of cached HuggingFace models."""
+    if not is_provider_enabled('hf'):
+        return []
     unsupported: Set[str] = load_unsupported_models('hf')
     models: List[str] = []
     try:
@@ -339,6 +399,8 @@ def _fetch_hf_models_sync(include_unsupported: bool=False) -> List[str]:
 
 def _fetch_onnx_models_sync(include_unsupported: bool=False) -> List[str]:
     """Synchronously fetch list of ONNX models from local models/onnx directory, memory, and config."""
+    if not is_provider_enabled('onnx'):
+        return []
     unsupported: Set[str] = load_unsupported_models('onnx')
     discovered_models: Set[str] = set()
     try:
@@ -382,6 +444,8 @@ def _fetch_onnx_models_sync(include_unsupported: bool=False) -> List[str]:
 
 def _fetch_openai_compat_models_sync(include_unsupported: bool=False) -> List[str]:
     """Synchronously fetch list of OpenAI-compatible provider models."""
+    if not is_provider_enabled('openai'):
+        return []
     unsupported: Set[str] = load_unsupported_models('openai')
     global_cfg: Dict[str, Any] = j_loads(_get_active_config_path())
     models: List[str] = []

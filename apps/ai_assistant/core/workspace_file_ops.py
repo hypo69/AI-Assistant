@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:50:00
+# Updated: 2026-11-06 23:15:00
 # =============================================================================
 
 from __future__ import annotations
@@ -232,6 +232,44 @@ class WorkspaceFileOps:
             "size": len(raw_bytes),
             "lines_count": len(text.splitlines()),
         }
+
+    @classmethod
+    def get_raw_file_path(
+        cls,
+        wm: WorkspaceManager,
+        workspace_id: str,
+        rel_path: str,
+    ) -> Tuple[str, Path, str]:
+        """Возвращает проверенный путь к файлу рабочей области и его MIME-тип для потоковой отдачи.
+
+        Args:
+            wm: Экземпляр WorkspaceManager.
+            workspace_id: Идентификатор рабочего пространства.
+            rel_path: Относительный путь к файлу.
+
+        Returns:
+            Кортеж (нормализованный_относительный_путь, абсолютный_путь_к_файлу, mime_type).
+
+        Raises:
+            FileNotFoundError: Если целевой файл не существует.
+            ValueError: Если путь указывает на директорию.
+        """
+        import mimetypes
+        _, ws_path = wm._get_or_create_workspace(workspace_id)
+        clean_rel, target = cls._normalize_and_resolve(ws_path, rel_path)
+
+        if not target.exists():
+            assets_cand = (ws_path / "assets" / clean_rel).resolve()
+            if assets_cand.exists():
+                target = assets_cand
+                clean_rel = f"assets/{clean_rel}"
+            else:
+                raise FileNotFoundError(f"Файл '{clean_rel}' не найден в рабочей области '{workspace_id}'.")
+        if target.is_dir():
+            raise ValueError(f"Путь '{clean_rel}' указывает на директорию, а не на файл.")
+
+        mime_type, _ = mimetypes.guess_type(str(target))
+        return clean_rel, target, mime_type or "application/octet-stream"
 
     @classmethod
     def save_content(

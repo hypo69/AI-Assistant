@@ -1,6 +1,6 @@
-# 📦 AI Windows Admin Cross-Platform Installation Instructions
+# 📦 AI-Assistant Cross-Platform Installation Instructions
 
-This document specifies the exact installation lifecycle, platform rules, prerequisite validations, configuration steps, and troubleshooting remedies for **AI Windows Admin** on Windows, Linux, and macOS.
+This document specifies the exact installation lifecycle, platform rules, prerequisite validations, configuration steps, and troubleshooting remedies for **AI-Assistant** on Windows, Linux, and macOS.
 
 > [!NOTE]
 > This instruction is used by the **`project-installer`** AI agent skill (`skills/project-installer/SKILL.md`) and by humans for manual or automated installation.
@@ -82,7 +82,7 @@ Users can select their desired dependency profile:
 
 | Profile | Description | Target Requirements Files |
 |---|---|---|
-| **1 (Full - Recommended)** | Full AI Windows Admin suite (Core + AI + Utils) | `requirements.txt` |
+| **1 (Full - Recommended)** | Full AI-Assistant suite (Core + AI + Utils) | `requirements.txt` |
 | **2 (Core Only)** | Minimal lightweight server | `install/req/requirements-core.txt` |
 | **3 (Core + AI)** | Server + AI Providers (Ollama, Gemini, Foundry) | `install/req/requirements-core.txt`, `install/req/requirements-ai.txt` |
 | **4 (Full + Dev)** | Full suite + Tests + Docs | `requirements.txt`, `install/req/requirements-test.txt`, `install/req/requirements-docs.txt` |

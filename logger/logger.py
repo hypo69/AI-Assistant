@@ -21,7 +21,7 @@
 # Package: logger
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 18:47:00
+# Updated: 2026-11-01 17:40:00
 # =============================================================================
 
 from __future__ import annotations
@@ -86,11 +86,11 @@ BG_COLORS: Dict[str, str] = {
 # Декларативная карта маршрутизации логов по подсистемам
 # =============================================================================
 SUBSYSTEM_ROUTING_MAP: List[Tuple[Tuple[str, ...], str]] = [
-    # 1. Стек Windows (apps/windows)
-    (('apps/windows/api', 'apps\\windows\\api', 'router_tc', 'internal_app'), 'windows_api.log'),
-    (('apps/windows/telemetry', 'apps\\windows\\telemetry', 'analytics'), 'telemetry.log'),
-    (('apps/windows/wikillm', 'apps\\windows\\wikillm'), 'wikillm.log'),
-    (('apps/windows', 'apps\\windows', 'src/ai/agents/windows_tools', 'src\\ai\\agents\\windows_tools', 'windows_admin'), 'windows.log'),
+    # 1. Стек Windows (apps/ai_assistant)
+    (('apps/ai_assistant/api', 'apps\\ai_assistant\\api', 'router_tc', 'internal_app'), 'windows_api.log'),
+    (('apps/ai_assistant/telemetry', 'apps\\ai_assistant\\telemetry', 'analytics'), 'telemetry.log'),
+    (('apps/ai_assistant/wikillm', 'apps\\ai_assistant\\wikillm'), 'wikillm.log'),
+    (('apps/ai_assistant', 'apps\\ai_assistant', 'src/ai/agents/windows_tools', 'src\\ai\\agents\\windows_tools', 'windows_admin'), 'windows.log'),
 
     # 2. Изолированные провайдеры ИИ и CLI
     (('src/ai/providers/gemini_cli', 'src\\ai\\providers\\gemini_cli', 'gemini_cli_chat', 'gemini_cli'), 'gemini_cli.log'),

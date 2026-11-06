@@ -1,0 +1,55 @@
+{
+  "$schema": "webgui-menu-v1",
+  "tab_id": "tab-tasks",
+  "draggable": true,
+  "subtabs": {
+    "nav_id": "tasks-subtabs-nav",
+    "storage_key": "tab-tasks_subtabs_order",
+    "items": [
+      {
+        "id": "cases",
+        "button_id": "btn-subtab-cases",
+        "pane_id": "tasks-subpane-cases",
+        "panel_id": "panel-cases",
+        "icon": "bi bi-kanban me-1",
+        "label_i18n": "ui.tasks.subtabCases",
+        "title_i18n": "tasks.subtabs.casesTitle",
+        "default_title": "Раздел: Активные дела и поручения",
+        "order": 0
+      },
+      {
+        "id": "intake",
+        "button_id": "btn-subtab-intake",
+        "pane_id": "tasks-subpane-intake",
+        "panel_id": "panel-intake",
+        "icon": "bi bi-magic me-1 text-primary",
+        "label_i18n": "ui.tasks.subtabIntake",
+        "title_i18n": "tasks.subtabs.intakeTitle",
+        "default_title": "Раздел: ИИ-Мастер декомпозиции поручений",
+        "order": 1
+      },
+      {
+        "id": "coordination",
+        "button_id": "btn-subtab-coordination",
+        "pane_id": "tasks-subpane-coordination",
+        "panel_id": "panel-coordination",
+        "icon": "bi bi-calendar-check me-1 text-success",
+        "label_i18n": "ui.tasks.subtabCoordination",
+        "title_i18n": "tasks.subtabs.coordinationTitle",
+        "default_title": "Раздел: Согласование визитов и календарь",
+        "order": 2
+      },
+      {
+        "id": "docs",
+        "button_id": "btn-subtab-docs",
+        "pane_id": "tasks-subpane-docs",
+        "panel_id": "panel-docs",
+        "icon": "bi bi-file-earmark-text me-1 text-info",
+        "label_i18n": "ui.tasks.subtabDocs",
+        "title_i18n": "tasks.subtabs.docsTitle",
+        "default_title": "Раздел: Пакет документов и договоры",
+        "order": 3
+      }
+    ]
+  }
+}

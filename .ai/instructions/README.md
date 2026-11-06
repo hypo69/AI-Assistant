@@ -1,60 +1,89 @@
-# 🎯 Инструкции и стандарты разработки (`.ai/instructions`)
+# 🎯 Инструкции для моделей (Model Instructions Hub)
 
-**Статус:** ✅ Активно  
-**Версия:** 3.6.0  
-**Автор:** hypo69  
-**Updated:** 2026-10-26 00:35:00  
+Это главный навигатор для AI-ассистентов в проекте **AI-Assistant** (Умный помощник хранения истории файлов, управления базами знаний и персональный ассистент пользователя). Здесь собраны все актуальные стандарты без дублирования и устаревших ссылок.
+
+**Статус:** ✅ Актуально  
+**Версия:** 3.0  
+**Updated:** 2026-11-01 17:30:00
 
 ---
 
-## 📚 Быстрая навигация по существующим стандартам
+## 📚 Быстрая навигация
 
 | Задача | Документ |
-|---|---|
-| **Главный индекс правил проекта** | [`../../GEMINI.md`](../../GEMINI.md) |
-| **Инженерные стандарты и архитектура кода** | [`standards/ENGINEERING.md`](standards/ENGINEERING.md) |
-| **Документирование кода (`hypo69 docblock` на русском) и README** | [`standards/DOCUMENTATION.md`](standards/DOCUMENTATION.md) |
-| **Повторное использование кода и аудит перед разработкой** | [`standards/REUSE.md`](standards/REUSE.md) |
-| **Шапки файлов и фиксация `Updated: YYYY-MM-DD HH:MM:SS`** | [`standards/FILE_HEADERS.md`](standards/FILE_HEADERS.md) |
-| **Разработка вкладок и компонентов WebGUI** | [`standards/WEBGUI.md`](standards/WEBGUI.md) |
-| **Маршрутизация рабочих областей в URL (`#tab-workspace...`)** | [`standards/WORKSPACE_ROUTING.md`](standards/WORKSPACE_ROUTING.md) |
-| **Разработка через тестирование (TDD)** | [`workflows/TDD.md`](workflows/TDD.md) |
-| **Тестирование приложений и проверка покрытия** | [`workflows/TESTING.md`](workflows/TESTING.md) |
-| **Использование универсального CLI `manage_tools.py`** | [`guides/CLI_TOOLS.md`](guides/CLI_TOOLS.md) |
-| **Автоматический запуск сервисных скриптов** | [`guides/MODEL_SCRIPTS.md`](guides/MODEL_SCRIPTS.md) |
-| **Ролевые профили ИИ-ассистента** | [`roles/ADMINISTRATOR.md`](roles/ADMINISTRATOR.md), [`roles/TECHNICIAN.md`](roles/TECHNICIAN.md), [`roles/SECRETARY.md`](roles/SECRETARY.md) |
+|------|--------|
+| **Понять архитектуру проекта** | → [`../../README.md`](../../README.md), [`../../apps/ai_assistant/README.md`](../../apps/ai_assistant/README.md) |
+| **Кодить правильно** | → [`standards/ENGINEERING.md`](standards/ENGINEERING.md) |
+| **Переиспользовать существующий код** | → [`standards/REUSE.md`](standards/REUSE.md) |
+| **Документировать код и шапки файлов** | → [`standards/DOCUMENTATION.md`](standards/DOCUMENTATION.md), [`standards/FILE_HEADERS.md`](standards/FILE_HEADERS.md) |
+| **Разрабатывать WebGUI и вкладки** | → [`standards/WEBGUI.md`](standards/WEBGUI.md) |
+| **Строить меню субпанелей и блоков** | → [`standards/SUBTABS_AND_BLOCKS_MENU.md`](standards/SUBTABS_AND_BLOCKS_MENU.md) |
+| **Маршрутизировать рабочие области в URL** | → [`standards/WORKSPACE_ROUTING.md`](standards/WORKSPACE_ROUTING.md) |
+| **Писать тесты (TDD)** | → [`workflows/TDD.md`](workflows/TDD.md), [`workflows/TESTING.md`](workflows/TESTING.md) |
+| **Использовать CLI инструменты** | → [`guides/CLI_TOOLS.md`](guides/CLI_TOOLS.md), [`guides/MODEL_SCRIPTS.md`](guides/MODEL_SCRIPTS.md) |
 
 ---
 
-## 📖 Структура каталога `.ai/instructions`
+## 📖 Структура директорий `.ai/instructions/`
 
-```text
-.ai/instructions/
-├── README.md                         # Навигатор по стандартам и рабочим процессам
-├── standards/                        # Обязательные инженерные стандарты
-│   ├── DOCUMENTATION.md              # Стандарт русскоязычной документации и docstrings
-│   ├── ENGINEERING.md                # Архитектура, Python 3.12+, лимит 500 строк, логирование
-│   ├── FILE_HEADERS.md               # Стандарт шапок файлов и метки Updated
-│   ├── REUSE.md                      # Правила переиспользования и запрет дубликатов
-│   ├── WEBGUI.md                     # Стандарт вкладок tab_*, тем и CSS-переменных
-│   └── WORKSPACE_ROUTING.md          # Стандарт URL-маршрутизации рабочих областей
-├── workflows/                        # Рабочие процессы разработки и проверки
-│   ├── TDD.md                        # Протокол Test-Driven Development
-│   └── TESTING.md                    # Регламент модульного и интеграционного тестирования
-├── guides/                           # Практические руководства по утилитам
-│   ├── CLI_TOOLS.md                  # Справочник команд manage_tools.py
-│   └── MODEL_SCRIPTS.md              # Правила вызова скриптов моделями
-└── roles/                            # Ролевые инструкции
-    ├── ADMINISTRATOR.md              # Роль системного администратора
-    ├── SECRETARY.md                  # Роль персонального секретаря
-    └── TECHNICIAN.md                 # Роль технического специалиста
-```
+### `/standards/` — Фундаментальные стандарты
+**Один стандарт = одна задача. Без дублирования.**
+
+- **`ENGINEERING.md`**  
+  Как кодить: архитектурные принципы, стиль кода, языковые стандарты (Python 3.12+, Vanilla JS ES6+, HTML/CSS), разделение конфигов и секретов, версионирование фронтенд-ассетов (`?v=YYYYMMDD_vN`).  
+  ⚠️ **Обязательно перед**: написанием любого кода.
+
+- **`REUSE.md`**  
+  Zero-divergence protocol: как искать существующий код в `apps/ai_assistant/`, `apps/common/`, `src/ai/`, `src/utils/`, 4-фазный аудит prior art и запрет на дублирование.  
+  ⚠️ **Обязательно перед**: созданием нового компонента или функции.
+
+- **`DOCUMENTATION.md`**  
+  Как документировать: docstrings (`hypo69 docblock`), `README.md`, комментарии («почему», а не «что»), языковой стандарт (русский).  
+  ⚠️ **Обязательно перед**: добавлением функций, классов и пакетов.
+
+- **`FILE_HEADERS.md`**  
+  Шаблоны заголовков файлов и обязательная фиксация времени изменения (`Updated: YYYY-MM-DD HH:MM:SS`) при любой модификации кода.  
+  ⚠️ **Обязательно при**: создании и любом изменении файлов.
+
+- **`WEBGUI.md`**  
+  Инженерный стандарт разработки веб-интерфейса (`apps/ai_assistant/api/webgui/` и `apps/common/webgui/`): архитектура вкладок `tab_<tab_id>`, управление через `tab-core.js`, Active-Only polling, темы оформления, размер модальных окон **90vw × 90vh** (§ 5.4), чтение полей ввода справа налево в **RTL** (§ 5.5) и интеграция с `AIModalDialog`.  
+  ⚠️ **Обязательно при**: создании или изменении любых веб-интерфейсов и вкладок.
+
+- **`SUBTABS_AND_BLOCKS_MENU.md`**  
+  Стандарт построения двухуровневых меню субпанелей и подменю блоков с мгновенными статическими тултипами (без обращения к AI-модели), локализацией i18n и поддержкой Drag & Drop (`menu_config.json`).
+
+- **`WORKSPACE_ROUTING.md`**  
+  Канонический стандарт маршрутизации рабочих пространств в адресной строке браузера: `#tab-workspace#panel-files#workspace=<workspace_id>`.
 
 ---
 
-## ✅ Ключевые инварианты проекта
+### `/workflows/` — Рабочие процессы
 
-1. **Русский языковой стандарт:** все docstrings, комментарии, README, тестовые описания и сообщения коммитов пишутся строго на **русском языке**.
-2. **Обновление метки времени:** при любом изменении файла в его шапке обновляется строка `Updated: YYYY-MM-DD HH:MM:SS`.
-3. **Логирование:** вывод в консоль без записи в файл выполняется через `logger.console()`, стандартное логирование — через `logger`.
-4. **Отсутствие хардкода в UI:** все цвета и стили задаются исключительно через CSS-переменные (`var(--...)`) и систему тем.
+- **`TDD.md`**  
+  Test-Driven Development: 6-шаговый протокол документирования через тесты, структура тестов AAA, проверка покрытия.
+- **`TESTING.md`**  
+  Структура тестов для модулей `apps/ai_assistant/tests/` и `tests/`, категории проверок и интеграционные тесты.
+
+---
+
+### `/roles/` — Ролевые профили
+
+- **`TECHNICIAN.md`** — обслуживание Git-репозиториев рабочих областей, проверка целостности SQLite баз знаний, индексов FAISS и доступности провайдеров ИИ.
+- **`SECRETARY.md`** — персональный ассистент пользователя: почта Gmail/IMAP/SMTP, Google Calendar, Google Contacts, Google Drive и организация документов.
+- **`ADMINISTRATOR.md`** — управление рабочими пространствами, конфигурацией `config.json`, ключами провайдеров ИИ и сертификатами.
+
+---
+
+### `/guides/` — Практические руководства
+
+- **`CLI_TOOLS.md`** — использование `manage_tools.py`, доступные группы команд.
+- **`MODEL_SCRIPTS.md`** — правила безопасного запуска скриптов моделями.
+
+---
+
+## ✅ Ключевые правила (инвариант)
+
+1. **Одна инструкция = одна ответственность** — нет дублирования между файлами.
+2. **Русский язык везде** — все инструкции, docstrings, комментарии и логи на русском языке.
+3. **Никакого хардкода и полное соблюдение i18n / тем** — все строки UI в словарях локализации (`ru`, `en`, `he`, `uk`), все цвета через CSS-переменные тем, все модальные окна 90vw × 90vh, поля ввода в RTL читаются справа налево.
+4. **Фиксация времени изменения в шапке файла** — при любом изменении кода обязательно обновлять поле `Updated: YYYY-MM-DD HH:MM:SS`.

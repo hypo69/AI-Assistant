@@ -25,7 +25,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-26 01:27:00
+# Updated: 2026-11-06 23:14:00
 # =============================================================================
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ async def test_ide_activity_bar_and_file_explorer_in_index() -> None:
         assert 'id="ide-nav-commits"' in html
         assert 'id="ide-nav-diff"' in html
         assert 'id="ide-nav-timeline"' in html
-        assert 'id="ide-nav-wikillm"' in html
+        assert 'id="ide-nav-chat"' in html
         assert 'id="ide-nav-graph"' in html
         assert 'id="ide-nav-rag"' in html
         assert 'id="ide-nav-verification"' in html
@@ -193,3 +193,69 @@ async def test_ide_viewport_width_and_responsiveness() -> None:
         assert "nav-actions-right" in html
         assert "d-none d-xxl-inline" in html
 
+
+
+@pytest.mark.asyncio
+async def test_sidebar_system_files_filtering_and_show_all_toggle() -> None:
+    """Проверяет сокрытие служебных файлов по умолчанию и наличие кнопки Показать всё (без лишнего тумблера)."""
+    import json
+    from apps.ai_assistant.core.workspace_items_tracker import WorkspaceItemsTracker
+
+    webgui_dir = Path(__file__).resolve().parent.parent / "api" / "webgui"
+    index_html = (webgui_dir / "index.html").read_text(encoding="utf-8")
+    explorer_js = (webgui_dir / "js" / "ide_file_explorer.js").read_text(encoding="utf-8")
+
+    # 1. Проверяем разметку боковой панели (Primary Side Bar Explorer) на наличие кнопки "Показать всё"
+    assert 'id="ide-btn-toggle-show-all"' in index_html, "Кнопка переключателя 'Показать всё' отсутствует в шапке сайдбара"
+    assert 'id="ide-switch-show-all"' not in index_html, "Дублирующий тумблер 'Показать всё' должен отсутствовать в сайдбаре"
+    assert 'id="ide-explorer-toolbar"' not in index_html, "Дублирующий тулбар сайдбара должен отсутствовать"
+
+    # 2. Проверяем функции фильтрации и управления в ide_file_explorer.js
+    assert "isSystemItem" in explorer_js, "Функция isSystemItem отсутствует в ide_file_explorer.js"
+    assert "getVisibleItems" in explorer_js, "Функция getVisibleItems отсутствует в ide_file_explorer.js"
+    assert "setShowAllFiles" in explorer_js, "Функция setShowAllFiles отсутствует в ide_file_explorer.js"
+    assert "updateShowAllControls" in explorer_js, "Функция updateShowAllControls отсутствует в ide_file_explorer.js"
+    assert "ai:system-files-toggled" in explorer_js, "Событие синхронизации ai:system-files-toggled отсутствует"
+
+    # 3. Проверяем наличие ключей локализации во всех поддерживаемых языках (RU, EN, HE, UK)
+    locales_dir = webgui_dir / "locales"
+    for lang in ["ru", "en", "he", "uk"]:
+        loc_file = locales_dir / f"{lang}.json"
+        assert loc_file.exists(), f"Файл локализации {lang}.json отсутствует"
+        loc_data = json.loads(loc_file.read_text(encoding="utf-8"))
+        assert "showAllFiles" in loc_data.get("workspace", {}), f"workspace.showAllFiles отсутствует в {lang}.json"
+        assert "hideSystemFiles" in loc_data.get("workspace", {}), f"workspace.hideSystemFiles отсутствует в {lang}.json"
+        assert "toggleShowAll" in loc_data.get("titles", {}).get("ide", {}), f"titles.ide.toggleShowAll отсутствует в {lang}.json"
+
+    # 4. Проверяем корректность флагов is_system для служебных файлов рабочего пространства
+    from apps.ai_assistant.core.workspace_manager import WorkspaceManager
+    wm = WorkspaceManager()
+    ws_id = "test_sidebar_toggle_ws"
+    ws = wm.create_or_select_workspace(workspace_id=ws_id, name="Sidebar Toggle WS")
+    tracker = WorkspaceItemsTracker(wm)
+    try:
+        contents = tracker.get_directory_contents(ws_id)
+        items = contents["items"]
+        sys_items = [i for i in items if i.get("is_system")]
+        assert len(sys_items) >= 2, "Служебные файлы не распознаны как is_system"
+        for i in sys_items:
+            n = i["name"].lower()
+            rel = i["rel_path"].lower()
+            assert (
+                n.startswith(".")
+                or n.startswith("_")
+                or n in ("readme.md", "assets", "knowledge_base.md")
+                or any(p.startswith(".") or p.startswith("_") or p == "assets" for p in rel.split("/"))
+            ), f"Неожиданный служебный файл: {i}"
+    finally:
+        try:
+            wm.registry.delete_workspace(ws_id)
+        except Exception:
+            pass
+        import os, stat, shutil
+        ws_p = wm.workspaces_dir / ws_id
+        if ws_p.exists():
+            def _rm_ro(func, path, exc):
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            shutil.rmtree(ws_p, onerror=_rm_ro)

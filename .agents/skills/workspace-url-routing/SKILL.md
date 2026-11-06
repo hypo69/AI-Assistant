@@ -59,7 +59,7 @@ http://localhost:8002/#tab-workspace#panel-files#workspace=<workspace_id>
    ```
 2. **Активация вкладки:** вызывается `window.switchTab('tab-workspace')`.
 3. **Фокус на документы:** страница плавно скроллится к карточке `#panel-documents` (`panel-files`).
-4. **Синхронизация селекторов:** обновляется верхний выпадающий список `updateTopWorkspaceDropdown(wsId)` и селектор `#ws-selector`.
+4. **Синхронизация активного пространства:** обновляется верхний выпадающий список `updateTopWorkspaceDropdown(wsId)`.
 
 ### 2. Открытие страницы по прямой ссылке
 При загрузке страницы с готовым URL вида `http://localhost:8002/#tab-workspace#panel-files#workspace=demo`:

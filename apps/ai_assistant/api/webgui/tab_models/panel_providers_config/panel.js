@@ -1,8 +1,8 @@
 /**
  * Модуль конфигурации локальных и облачных провайдеров (Foundry, Ollama, AGY, ONNX)
  * и управления системной инструкцией ИИ.
- * Файл: apps/windows/api/webgui/tab_models/panel_providers_config/panel.js
- * Updated: 2026-10-17 02:25:00
+ * Файл: apps/ai_assistant/api/webgui/tab_models/panel_providers_config/panel.js
+ * Updated: 2026-11-01 17:37:00
  */
 
 import { showModelsNotification } from '../common/ui_utils.js';

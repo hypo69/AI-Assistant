@@ -1,96 +1,78 @@
-# GEMINI.MINIFIED.md
-# Updated: 2026-10-26 00:35:00
+# GEMINI.MINIFIED.md — Инструкции для выполнения задач (AI-Assistant)
 
 > [!IMPORTANT]
-> **Назначение файла**: Этот контекст предназначен исключительно для работы автономных агентов с **внутренними знаниями, готовыми инструментами и навыками (Skills)**.
-> Файл **НЕ предназначен для разработки исходного кода**. Модели не требуется знать исходный код проекта.
-> 
-> **Базовый путь к ресурсам проекта**: Так как агент запускается из рабочей поддиректории (на 2 уровня глубже корня проекта), **ко всем путям к ресурсам проекта обязательно добавляется префикс `../../`**.
+> **Назначение файла**: Этот компактный индекс предназначен для работы с проектом **AI-Assistant** (Умный помощник хранения истории файлов, управления базами знаний и персональный ассистент пользователя) через CLI и навыки агентов.
 
 ---
 
-## 🗺️ Карта ресурсов проекта (относительно рабочей директории: `../../`)
+## 🧭 Навигация из рабочей директории (`scripts/cli/`)
 
-### 1. Навыки агентов (Skills) — `../../.agents/skills/`
-Каждый навык изолирован в подкаталоге `../../.agents/skills/<skill-name>/` и содержит файл-инструкцию `SKILL.md` (с описанием возможностей, форматом вызова и сопутствующими скриптами):
-- `../../.agents/skills/ai-modal-assistant/` — Руководство и API универсального модального окна ИИ-ассистента.
-- `../../.agents/skills/cert-installer/` — Генерация и установка доверенных SSL-сертификатов.
-- `../../.agents/skills/doc-generator/` — Автоматическая генерация, валидация и синхронизация документации.
-- `../../.agents/skills/dormant-software-auditor/` — Аудит неиспользуемых и редко запускаемых программ.
-- `../../.agents/skills/file-saver/` — Безопасное сохранение файлов и верификация путей.
-- `../../.agents/skills/folder-sharing-manager/` — Управление сетевыми общими папками и SMB-ресурсами.
-- `../../.agents/skills/hardware-monitor/` — Снятие телеметрии датчиков, температур, напряжений и частот.
-- `../../.agents/skills/hardware-production-date-agent/` — Определение даты производства оборудования по серийным номерам.
-- `../../.agents/skills/mouse-history-inspector/` — Анализ телеметрии и истории активности манипулятора мыши.
-- `../../.agents/skills/network-analyzer/` — Анализ сетевого трафика и сетевых пакетов.
-- `../../.agents/skills/network-ports-auditor/` — Аудит открытых портов и сетевых соединений.
-- `../../.agents/skills/pdf-exporter/` — Экспорт документации и отчетов в PDF-формат.
-- `../../.agents/skills/printers-inspector/` — Диагностика и инспекция службы печати и принтеров.
-- `../../.agents/skills/project-installer/` — Настройка рабочего окружения и проверка зависимостей.
-- `../../.agents/skills/services-status-inspector/` — Инспекция, аудит автозапуска и управление службами Windows.
-- `../../.agents/skills/skill-factory/` — Создание, сборка и валидация новых навыков.
-- `../../.agents/skills/smtp-mail-agent/` — Отправка email, HTML-отчетов и тестирование почтовых серверов.
-- `../../.agents/skills/storage-controller/` — Управление дисками, томами, SMART-диагностика и клонирование.
-- `../../.agents/skills/system-control/` — Базовые системные операции управления Windows.
-- `../../.agents/skills/system-updater/` — Проверка обновлений, создание резервных копий и миграции.
-- `../../.agents/skills/telemetry-process-inspector/` — Запросы состояния процессов и датчиков через БД телеметрии.
-- `../../.agents/skills/usb-device-auditor/` — Аудит подключенных USB-устройств.
-- `../../.agents/skills/webgui-developer/` — Архитектурные стандарты и API веб-интерфейса.
-- `../../.agents/skills/webgui-sitemap-maintainer/` — Актуализация интерактивной карты сайта и реестров вкладок.
-- `../../.agents/skills/windows-admin-toolkit/` — Набор утилит системного администратора Windows.
-- `../../.agents/skills/windows-system-controller/` — Высокоуровневый контроллер ОС Windows.
-
-*Регламент работы с навыками:* Перед решением задачи найди релевантный навык в `../../.agents/skills/<skill-name>/` и прочитай его `SKILL.md`.
+При запуске из директории `scripts/cli/` корень проекта находится на два уровня выше (`../../`). Используй указанные ниже относительные пути для доступа к инструментам, навыкам и документации.
 
 ---
 
-### 2. Единый CLI инструментов управления — `../../manage_tools.py`
-Запуск готовых инструментов и утилит осуществляется через централизованный CLI:
-`py ../../manage_tools.py <группа> <команда> [аргументы]`
+### 1. Универсальный CLI инструментов — `../../manage_tools.py`
+Единая точка входа для запуска проектных операций:
 
-Основные группы инструментов:
-- `skills` — Реестр и управление навыками (`py ../../manage_tools.py skills list`).
-- `rag` — Управление базой знаний RAG (`rebuild`, `query`, `status`).
-- `agents` — Запуск и инспекция декларативных агентов (`py ../../manage_tools.py agents list`).
-- `telemetry` — Опрос датчиков, сбор метрик 1Hz, аудит оборудования (`status`, `poll`).
-- `network` — Захват сетевого трафика и анализ пакетов через TShark.
-- `sys-param` — Безопасное управление системными параметрами Windows и точками восстановления.
-- `docs` — Управление и генерация документации (`py ../../manage_tools.py docs generate`).
-- `db` — Проверка целостности и миграции БД SQLite (`status`, `migrate`).
-- `ui` — Инструменты захвата и аудита веб-интерфейса.
-- `assist` — Управление ассистентом и проверка статуса провайдеров.
+```powershell
+# Общий синтаксис
+py ../../manage_tools.py <группа> <команда> [аргументы]
+
+# Основные команды
+py ../../manage_tools.py skills list                # Список доступных навыков
+py ../../manage_tools.py rag build                  # Пересборка векторного индекса знаний FAISS
+py ../../manage_tools.py db check-integrity         # Проверка целостности SQLite баз знаний
+py ../../manage_tools.py docs generate              # Генерация документации
+```
 
 ---
 
-### 3. База внутренних знаний и документация
-- **Инструкции и стандарты:** `../../.ai/instructions/`
-  - `standards/` — Обязательные инженерные стандарты (`ENGINEERING.md`, `DOCUMENTATION.md`, `REUSE.md`, `FILE_HEADERS.md`, `WEBGUI.md`, `WORKSPACE_ROUTING.md`).
-  - `workflows/` — Протоколы разработки и тестирования (`TDD.md`, `TESTING.md`).
-  - `roles/` — Ролевые модели поведения (`ADMINISTRATOR.md`, `TECHNICIAN.md`, `SECRETARY.md`).
-  - `guides/` — Руководства по инструментам (`CLI_TOOLS.md`) и вспомогательным скриптам (`MODEL_SCRIPTS.md`).
-- **Справочная документация приложений и ядра:**
-  - `../../README.md` — Главный обзор репозитория и архитектуры.
-  - `../../apps/ai_assistant/README.md` и `../../apps/ai_assistant/TECHNICAL_SPECIFICATION.md` — Документация и ТЗ основного приложения AI Assistant.
-  - `../../apps/ai_assistant/core/README.md` — Вычислительное ядро (Git, носимый USB-режим, NLP, SQLite, FAISS, WikiLLM).
-  - `../../apps/ai_assistant/api/webgui/README.md` — Архитектура и каталог вкладок веб-интерфейса.
-  - `../../src/README.md` — Инфраструктурное ядро и провайдеры ИИ (`src/ai`).
+### 2. Навыки агента (Agent Skills) — `../../.agents/skills/`
+Каждый навык находится в собственной поддиректории `../../.agents/skills/<имя_навыка>/SKILL.md` и содержит готовые скрипты в `scripts/`:
+
+- **Веб-интерфейс и рабочие области:**
+  - `workspace-url-routing` (`../../.agents/skills/workspace-url-routing/SKILL.md`) — маршрутизация рабочих пространств через URL `#tab-workspace#panel-files#workspace=<id>`.
+  - `webgui-menu-maintainer` (`../../.agents/skills/webgui-menu-maintainer/SKILL.md`) — поддержание двухуровневых меню субпанелей и блоков WebGUI с тултипами и i18n.
+  - `webgui-developer` (`../../.agents/skills/webgui-developer/SKILL.md`) — разработка и модификация вкладок `tab_<tab_id>` в `apps/ai_assistant/api/webgui`.
+  - `ai-modal-assistant` (`../../.agents/skills/ai-modal-assistant/SKILL.md`) — интеграция универсального модального окна ИИ-ассистента (`#universal-ai-table-modal`).
+- **Персональный секретарь и коммуникации:**
+  - `google-mail` (`../../.agents/skills/google-mail/SKILL.md`) — чтение, поиск и отправка писем через Gmail API.
+  - `google-calendar` (`../../.agents/skills/google-calendar/SKILL.md`) — расписание, события и встречи в Google Calendar.
+  - `google-drive` (`../../.agents/skills/google-drive/SKILL.md`) — поиск, загрузка и организация файлов в Google Drive.
+  - `google-contacts` (`../../.agents/skills/google-contacts/SKILL.md`) — поиск и синхронизация контактов Google People API.
+  - `smtp-mail-agent` (`../../.agents/skills/smtp-mail-agent/SKILL.md`) — автономная отправка писем и отчетов по SMTP.
+- **Документация, файлы и обслуживание:**
+  - `file-saver` (`../../.agents/skills/file-saver/SKILL.md`) — безопасное сохранение файлов и проверка целостности записи.
+  - `doc-generator` (`../../.agents/skills/doc-generator/SKILL.md`) — генерация и валидация проектной документации.
+  - `tdd-doc-gen` (`../../.agents/skills/tdd-doc-gen/SKILL.md`) — генерация тестов и TDD-документации.
+  - `pdf-exporter` (`../../.agents/skills/pdf-exporter/SKILL.md`) — экспорт кода и документации в PDF-книги.
+  - `skill-factory` (`../../.agents/skills/skill-factory/SKILL.md`) — создание и упаковка новых навыков.
+  - `cert-installer` (`../../.agents/skills/cert-installer/SKILL.md`) — генерация и установка локальных SSL-сертификатов.
+  - `project-installer` (`../../.agents/skills/project-installer/SKILL.md`) — установка окружения и зависимостей проекта.
+  - `system-updater` (`../../.agents/skills/system-updater/SKILL.md`) — резервное копирование и обновление системы.
 
 ---
 
-### 4. Серверы Model Context Protocol (MCP) — `../../.mcp/`
-Каталог серверов MCP для интеграции с внешними источниками данных, поисковыми движками и браузером:
-- `../../.mcp/` — MCP-серверы поиска, базы знаний и playwright-автоматизации.
+### 3. Проектные инструкции и ролевые профили — `../../.ai/instructions/`
+- **Главный навигатор**: `../../.ai/instructions/README.md`
+- **Ролевые профили**:
+  - Техник (Git, БД знаний, RAG, провайдеры ИИ): `../../.ai/instructions/roles/TECHNICIAN.md`
+  - Персональный секретарь (почта, календарь, контакты, документы): `../../.ai/instructions/roles/SECRETARY.md`
+  - Администратор (рабочие области, ключи, конфигурация): `../../.ai/instructions/roles/ADMINISTRATOR.md`
+- **Стандарты**:
+  - `../../.ai/instructions/standards/ENGINEERING.md` — инженерный стандарт кода.
+  - `../../.ai/instructions/standards/WEBGUI.md` — стандарт веб-интерфейса (`apps/ai_assistant/api/webgui`).
+  - `../../.ai/instructions/standards/SUBTABS_AND_BLOCKS_MENU.md` — стандарт меню субпанелей и блоков.
+  - `../../.ai/instructions/standards/WORKSPACE_ROUTING.md` — маршрутизация рабочих пространств.
 
 ---
 
-### 5. Декларативные манифесты агентов — `../../.agents/`
-- `../../.agents/windows_controller_agent.json` — Декларативный манифест агента управления Windows (содержит каталог из 80+ нативных системных инструментов прямого взаимодействия с ОС).
+### 4. Серверы контекста (MCP) — `../../.mcp/`
+- `../../.mcp/` — MCP-серверы поиска, базы знаний и браузерной автоматизации.
 
 ---
 
 ## 📌 Правила поведения модели
-1. **Не влезай в исходный код**: Данный файл не предназначен для разработки ПО. Кодовая база скрыта; решай задачи через готовые инструменты, навыки и знания.
-2. **Всегда используй префикс `../../`**: Текущая рабочая директория находится на два уровня ниже корня проекта. Все пути к навыкам, скриптам и документации должны начинаться с `../../`.
-3. **Опирайся на навыки (`SKILL.md`)**: При получении задачи обратись к соответствующему навыку в `../../.agents/skills/<навык>/SKILL.md`.
-4. **Используй CLI инструментов**: Для выполнения системных задач вызывай `py ../../manage_tools.py <группа> <команда>`.
-5. **Языковой стандарт**: Все ответы, пояснения и отчеты формируются строго на **русском языке**.
+1. **Опирайся на навыки (`SKILL.md`)**: При получении задачи обратись к соответствующему навыку в `../../.agents/skills/<навык>/SKILL.md`.
+2. **Используй CLI инструментов**: Для выполнения проектных задач вызывай `py ../../manage_tools.py <группа> <команда>`.
+3. **Языковой стандарт**: Все ответы, пояснения и отчеты формируются строго на **русском языке**.

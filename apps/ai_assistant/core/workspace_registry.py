@@ -23,6 +23,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
+# Updated: 2026-11-06 23:05:00
 # Updated: 2026-10-28 20:00:00
 # =============================================================================
 
@@ -69,6 +70,37 @@ def normalize_workspace_language(language: Optional[str] = None) -> str:
     return raw or "ru"
 
 
+WORKSPACE_DEFAULT_DESCRIPTIONS: Dict[str, str] = {
+    "ru": "Рабочее пространство создано в AI-Assistant.",
+    "en": "Workspace created in AI-Assistant.",
+    "he": "מרחב עבודה נוצר ב-AI-Assistant.",
+    "ua": "Робочий простір створено в AI-Assistant.",
+}
+
+WORKSPACE_LOCALES: Dict[str, Dict[str, str]] = {
+    "ru": {
+        "title_default": "Рабочее пространство",
+        "desc_header": "Описание",
+        "desc_default": WORKSPACE_DEFAULT_DESCRIPTIONS["ru"],
+    },
+    "en": {
+        "title_default": "Workspace",
+        "desc_header": "Description",
+        "desc_default": WORKSPACE_DEFAULT_DESCRIPTIONS["en"],
+    },
+    "he": {
+        "title_default": "מרחב עבודה",
+        "desc_header": "תיאור",
+        "desc_default": WORKSPACE_DEFAULT_DESCRIPTIONS["he"],
+    },
+    "ua": {
+        "title_default": "Робочий простір",
+        "desc_header": "Опис",
+        "desc_default": WORKSPACE_DEFAULT_DESCRIPTIONS["ua"],
+    },
+}
+
+
 def generate_workspace_readme(
     name: str,
     description: str = "",
@@ -85,29 +117,7 @@ def generate_workspace_readme(
         str: Текст файла README.md в формате Markdown.
     """
     lang = normalize_workspace_language(language)
-    locales = {
-        "ru": {
-            "title_default": "Рабочее пространство",
-            "desc_header": "Описание",
-            "desc_default": "Рабочее пространство создано в AI Windows Admin.",
-        },
-        "en": {
-            "title_default": "Workspace",
-            "desc_header": "Description",
-            "desc_default": "Workspace created in AI Windows Admin.",
-        },
-        "he": {
-            "title_default": "מרחב עבודה",
-            "desc_header": "תיאור",
-            "desc_default": "מרחב עבודה נוצר ב-AI Windows Admin.",
-        },
-        "ua": {
-            "title_default": "Робочий простір",
-            "desc_header": "Опис",
-            "desc_default": "Робочий простір створено в AI Windows Admin.",
-        },
-    }
-    loc = locales.get(lang, locales["en"])
+    loc = WORKSPACE_LOCALES.get(lang, WORKSPACE_LOCALES["en"])
     ws_title = (name or "").strip() or loc["title_default"]
     ws_desc = (description or "").strip() or loc["desc_default"]
 
@@ -151,7 +161,7 @@ def parse_workspace_readme(readme_path: Path) -> Dict[str, str]:
             if line.startswith("## "):
                 capturing = True
                 continue
-            elif capturing and line.startswith("#"):
+            elif capturing and (line.startswith("#") or line.startswith("<!--") or line.startswith("---")):
                 break
             elif capturing and line:
                 desc_lines.append(line)
@@ -497,7 +507,12 @@ class WorkspaceRegistry:
             parsed = parse_workspace_readme(readme_file)
             eff_lang = norm_lang or parsed.get("language") or cfg.get("language") or "ru"
             eff_name = name or parsed.get("name") or cfg.get("name") or workspace_id
-            eff_desc = description if description else (parsed.get("description") or cfg.get("description", ""))
+            raw_desc = (description or parsed.get("description") or cfg.get("description", "")).strip()
+            # Если описание пустое или совпадает с дефолтным описанием на любом другом языке, переводим на новый язык
+            if not raw_desc or raw_desc in WORKSPACE_DEFAULT_DESCRIPTIONS.values():
+                eff_desc = WORKSPACE_DEFAULT_DESCRIPTIONS.get(eff_lang, WORKSPACE_DEFAULT_DESCRIPTIONS["en"])
+            else:
+                eff_desc = raw_desc
             readme_file.write_text(generate_workspace_readme(eff_name, eff_desc, eff_lang), encoding="utf-8")
         else:
             self.ensure_workspace_readme(ws_path, name=name, description=description, language=norm_lang)

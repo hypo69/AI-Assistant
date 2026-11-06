@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 20:38:00
+# Updated: 2026-11-06 23:15:00
 # =============================================================================
 
 from __future__ import annotations
@@ -91,6 +91,11 @@ class WorkspaceManager:
         self.registry = WorkspaceRegistry(self.workspaces_dir)
 
         self.faiss_dir = self.base_dir / "faiss_indices"
+        self._rag_instances: Dict[str, TextRAG] = {}
+        self._stores: Dict[str, KnowledgeStore] = {}
+        self._graphs: Dict[str, TemporalCodeGraph] = {}
+        self._default_graph: Optional[TemporalCodeGraph] = temporal_graph
+
         # Директории индексов и БД создаются изолированно внутри каждого рабочего пространства (.workspace/)
         fallback_store = self.base_dir / "knowledge_store.db"
         self.store = knowledge_store or KnowledgeStore(
@@ -98,20 +103,12 @@ class WorkspaceManager:
             workspaces_dir=self.workspaces_dir,
         )
         self.analyzers = analyzer_registry or AnalyzerRegistry()
-        fallback_graph = self.base_dir / "temporal_graph.db"
-        self.graph = temporal_graph or TemporalCodeGraph(
-            db_path=fallback_graph,
-            workspaces_dir=self.workspaces_dir,
-        )
         self.wiki_linker = WikiLLMVersionLinker(
             db_path=":memory:",
             temporal_graph=self.graph,
         )
         self.extractor = content_extractor or ContentExtractor()
         self.obsidian = ObsidianVaultBuilder(self)
-        self._rag_instances: Dict[str, TextRAG] = {}
-        self._stores: Dict[str, KnowledgeStore] = {}
-        self._graphs: Dict[str, TemporalCodeGraph] = {}
 
         # Автоматическая миграция существующих глобальных БД в локальные директории пространств
         try:
@@ -147,6 +144,20 @@ class WorkspaceManager:
             self._graphs[workspace_id] = TemporalCodeGraph(db_path=graph_path)
         return self._graphs[workspace_id]
 
+    @property
+    def graph(self) -> TemporalCodeGraph:
+        """Возвращает темпоральный граф связей активной рабочей области или временный изолированный экземпляр."""
+        active_ws = self.get_active_workspace_id()
+        if active_ws:
+            return self.get_workspace_graph(active_ws)
+        if self._default_graph is None:
+            self._default_graph = TemporalCodeGraph(db_path=":memory:")
+        return self._default_graph
+
+    @graph.setter
+    def graph(self, val: Optional[TemporalCodeGraph]) -> None:
+        self._default_graph = val
+
     def migrate_legacy_databases_to_workspaces(self) -> None:
         """Переносит записи существующих рабочих пространств из глобальных БД в локальные .workspace/."""
         import sqlite3
@@ -156,11 +167,6 @@ class WorkspaceManager:
             if alt.exists():
                 legacy_store_path = alt
 
-        legacy_graph_path = self.base_dir / "temporal_graph.db"
-        if not legacy_graph_path.exists():
-            alt = Path("data/ai_assistant/temporal_graph.db").resolve()
-            if alt.exists():
-                legacy_graph_path = alt
 
         for ws in self.registry.list_workspaces():
             ws_id = ws["workspace_id"]
@@ -200,28 +206,7 @@ class WorkspaceManager:
                 except Exception as exc:
                     logger.warning(f"[WorkspaceManager] Ошибка переноса SQLite для '{ws_id}': {exc}")
 
-            ws_graph = ws_meta / "temporal_graph.db"
-            if not ws_graph.exists() and legacy_graph_path.exists():
-                try:
-                    target_graph = TemporalCodeGraph(db_path=ws_graph)
-                    src_conn = sqlite3.connect(str(legacy_graph_path))
-                    dst_conn = sqlite3.connect(str(ws_graph))
-                    with dst_conn:
-                        rows = src_conn.execute("SELECT * FROM temporal_evidence_links").fetchall()
-                        if rows:
-                            cols = [c[0] for c in src_conn.execute("SELECT * FROM temporal_evidence_links LIMIT 0").description]
-                            placeholders = ", ".join(["?"] * len(cols))
-                            col_names = ", ".join(cols)
-                            for r in rows:
-                                dst_conn.execute(
-                                    f"INSERT OR IGNORE INTO temporal_evidence_links ({col_names}) VALUES ({placeholders})",
-                                    tuple(r)
-                                )
-                    src_conn.close()
-                    dst_conn.close()
-                    logger.info(f"[WorkspaceManager] Перенесён SQLite граф для '{ws_id}' в {ws_graph}")
-                except Exception as exc:
-                    logger.warning(f"[WorkspaceManager] Ошибка переноса графа для '{ws_id}': {exc}")
+
 
     def get_workspace_faiss_dir(self, workspace_id: str) -> Path:
         """Возвращает путь к каталогу хранения векторного индекса FAISS внутри рабочего пространства."""
@@ -486,8 +471,20 @@ class WorkspaceManager:
         return saved
 
     def get_workspace(self, workspace_id: str) -> Optional[Dict[str, Any]]:
-        """Возвращает описание рабочей области из файлового реестра или None."""
-        return self.registry.get_workspace(workspace_id)
+        """Возвращает описание рабочей области по файловому реестру со статистикой или None."""
+        ws = self.registry.get_workspace(workspace_id)
+        if not ws:
+            return None
+        stats = {"documents_count": 0, "active_facts_count": 0}
+        try:
+            stats = self.store.get_workspace_stats(workspace_id)
+        except Exception as exc:
+            logger.debug(f"[WorkspaceManager] Не удалось получить статистику для '{workspace_id}': {exc}")
+        return {
+            **ws,
+            "documents_count": stats.get("documents_count", 0),
+            "active_facts_count": stats.get("active_facts_count", 0),
+        }
 
     def delete_workspace(self, workspace_id: str) -> Dict[str, Any]:
         """Удаляет рабочую область, сбрасывает связанные кэши и переключает активную область.
@@ -536,7 +533,7 @@ class WorkspaceManager:
         }
 
     def list_workspaces(self) -> List[Dict[str, Any]]:
-        """Возвращает список рабочих пространств из data/workspaces с отметкой активного."""
+        """Возвращает список рабочих пространств из data/workspaces со статистикой документов/фактов."""
         active_id = self.get_active_workspace_id()
         try:
             raw_list = self.registry.list_workspaces()
@@ -547,8 +544,15 @@ class WorkspaceManager:
         workspaces: List[Dict[str, Any]] = []
         for ws in raw_list:
             ws_id = ws.get("workspace_id", "")
+            stats = {"documents_count": 0, "active_facts_count": 0}
+            try:
+                stats = self.store.get_workspace_stats(ws_id)
+            except Exception as exc:
+                logger.debug(f"[WorkspaceManager] Не удалось получить статистику для '{ws_id}': {exc}")
             workspaces.append({
                 **ws,
+                "documents_count": stats.get("documents_count", 0),
+                "active_facts_count": stats.get("active_facts_count", 0),
                 "is_active": (ws_id == active_id) if active_id else False,
             })
         return workspaces
@@ -613,10 +617,12 @@ class WorkspaceManager:
             total_vectors=rag.count(),
         )
 
+        ws_graph = self.get_workspace_graph(workspace_id)
         if commit_hash:
-            # Мягко инвалидируем прежние связи документа в темпоральном графе перед записью новых
-            self.graph.supersede_links_by_source(source_id=doc_id, invalidating_commit=commit_hash)
-            self.wiki_linker.auto_link_commit(
+            # Мягко инвалидируем прежние связи документа в темпоральном графе рабочей области
+            ws_graph.supersede_links_by_source(source_id=doc_id, invalidating_commit=commit_hash)
+            ws_linker = WikiLLMVersionLinker(temporal_graph=ws_graph)
+            ws_linker.auto_link_commit(
                 commit_hash=commit_hash,
                 files=[doc_id],
                 message=commit_message or f"Индексация {doc_id}",
@@ -624,7 +630,7 @@ class WorkspaceManager:
             for ent in analysis.get("entities", []):
                 norm_ent = ent.get("normalized", "")
                 if norm_ent:
-                    self.graph.add_link(
+                    ws_graph.add_link(
                         source_id=doc_id,
                         target_id=norm_ent,
                         relation_type="documents",
@@ -757,7 +763,21 @@ class WorkspaceManager:
         safe_doc_id = "/".join(rel_parts) if rel_parts else Path(document_id).name
         file_full_path = ws_path / safe_doc_id
         file_full_path.parent.mkdir(parents=True, exist_ok=True)
-        file_full_path.write_text(content, encoding="utf-8")
+
+        binary_exts = {
+            ".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac",
+            ".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff", ".gif",
+            ".xlsx", ".xls", ".docx",
+        }
+        if file_full_path.suffix.lower() not in binary_exts:
+            file_full_path.write_text(content, encoding="utf-8")
+        else:
+            companion_path = file_full_path.with_name(f"{file_full_path.name}.md")
+            if content:
+                try:
+                    companion_path.write_text(content, encoding="utf-8")
+                except Exception as comp_err:
+                    logger.debug(f"[WorkspaceManager] Не удалось записать companion .md: {comp_err}")
 
         is_in_assets = safe_doc_id.startswith("assets/") or (len(rel_parts) > 0 and rel_parts[0] == "assets")
         if not is_in_assets:
@@ -1454,6 +1474,11 @@ class WorkspaceManager:
         """Удаляет файл или директорию из рабочей области с коммитом в Git."""
         from apps.ai_assistant.core.workspace_file_ops import WorkspaceFileOps
         return WorkspaceFileOps.delete_item(wm=self, workspace_id=workspace_id, rel_path=rel_path)
+
+    def get_workspace_raw_file_path(self, workspace_id: str, rel_path: str) -> Tuple[str, Path, str]:
+        """Возвращает проверенный абсолютный путь к файлу рабочей области и его MIME-тип."""
+        from apps.ai_assistant.core.workspace_file_ops import WorkspaceFileOps
+        return WorkspaceFileOps.get_raw_file_path(wm=self, workspace_id=workspace_id, rel_path=rel_path)
 
     def get_workspace_file_content(self, workspace_id: str, rel_path: str) -> Dict[str, Any]:
         """Считывает текстовое содержимое файла из рабочей области."""

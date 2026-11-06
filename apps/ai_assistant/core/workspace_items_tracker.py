@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 05:01:00
+# Updated: 2026-11-06 23:22:00
 # =============================================================================
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from apps.ai_assistant.core.workspace_registry import (
     get_current_host_name,
     parse_host_qualified_path,
 )
+from apps.ai_assistant.core.service_file_authenticator import ServiceFileAuthenticator
 
 if TYPE_CHECKING:
     from apps.ai_assistant.core.workspace_manager import WorkspaceManager
@@ -358,6 +359,8 @@ class WorkspaceItemsTracker:
                 "git_head": "",
                 "branch": "master",
                 "total_files": 0,
+                "user_files_count": 0,
+                "system_files_count": 0,
                 "total_size_bytes": 0,
                 "items": [],
             }
@@ -396,6 +399,23 @@ class WorkspaceItemsTracker:
                 continue
 
             rel_path = str(p.relative_to(ws_path)).replace("\\", "/")
+            is_sys = ServiceFileAuthenticator.is_service_file(rel_path, file_path=p)
+
+            # Определяем тип генератора для служебного файла Obsidian
+            generator_type = ""
+            if is_sys:
+                if (p.name.startswith(".") and p.suffix.lower() == ".md") or p.name in ("_Knowledge_Base.md", "_Index.md"):
+                    generator_type = "ai_assistant_obsidian"
+                elif p.is_file() and p.suffix.lower() == ".md":
+                    try:
+                        with p.open("r", encoding="utf-8", errors="ignore") as f_chk:
+                            header_snippet = f_chk.read(512)
+                        if ServiceFileAuthenticator.is_service_content(header_snippet):
+                            generator_type = "ai_assistant_obsidian"
+                    except Exception:
+                        pass
+
+
             is_dir = p.is_dir()
             size = p.stat().st_size if not is_dir else 0
             if not is_dir:
@@ -442,6 +462,9 @@ class WorkspaceItemsTracker:
                 "qualified_path": format_host_qualified_path(p, cur_host),
                 "is_current_host": True,
                 "source_mode": "local",
+                "role": "system" if is_sys else "user",
+                "is_system": is_sys,
+                "generator": generator_type,
                 "is_dir": is_dir,
                 "extension": p.suffix.lower() if not is_dir else "dir",
                 "size_bytes": size,
@@ -513,6 +536,7 @@ class WorkspaceItemsTracker:
 
                     total_size += size
                     size_formatted = f"{size} B" if size < 1024 else (f"{size / 1024:.1f} KB" if size < 1048576 else f"{size / 1048576:.2f} MB")
+                    ext_is_sys = ServiceFileAuthenticator.is_service_file(ext_p) or ServiceFileAuthenticator.is_service_file(doc_id)
                     items.append({
                         "name": ext_p.name or doc_id,
                         "rel_path": doc_id,
@@ -523,6 +547,9 @@ class WorkspaceItemsTracker:
                         "is_current_host": is_same_host,
                         "source_mode": "linked",
                         "is_dir": False,
+                        "is_external": True,
+                        "is_system": ext_is_sys,
+
                         "extension": ext_p.suffix.lower(),
                         "size_bytes": size,
                         "size_formatted": size_formatted,
@@ -535,6 +562,234 @@ class WorkspaceItemsTracker:
                     })
             except Exception as man_err:
                 logger.warning(f"[WorkspaceItemsTracker] Ошибка чтения .tracked_sources.json в {ws_path}: {man_err}")
+
+        # Включаем присоединенные внешние источники (файлы и папки) из реестра рабочей области
+        try:
+            sources = self.wm.list_sources(workspace_id)
+            existing_local_paths = {
+                str(Path(i.get("local_path") or i.get("external_path") or "").resolve()).lower(): i
+                for i in items
+                if i.get("local_path") or i.get("external_path")
+            }
+            existing_rel_paths = {i["rel_path"]: i for i in items}
+
+            for s in sources:
+                src_type = s.get("source_type")
+                raw_src_path = str(s.get("source_path", "")).strip()
+                if not raw_src_path:
+                    continue
+                s_host = s.get("host_name") or cur_host
+                is_same_host = (s_host.upper() == cur_host.upper())
+                qual_path = s.get("qualified_path") or format_host_qualified_path(raw_src_path, s_host)
+                src_name = s.get("name") or Path(raw_src_path).name or raw_src_path
+
+                if src_type == "directory":
+                    dir_p = Path(raw_src_path)
+                    if is_same_host and dir_p.exists() and dir_p.is_dir():
+                        dir_mtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(dir_p.stat().st_mtime))
+                        # Добавляем саму директорию, если ещё не добавлена
+                        if src_name not in existing_rel_paths:
+                            dir_item = {
+                                "name": src_name,
+                                "rel_path": src_name,
+                                "host_name": s_host,
+                                "local_path": str(dir_p.resolve()),
+                                "qualified_path": qual_path,
+                                "external_path": qual_path,
+                                "is_current_host": True,
+                                "source_mode": "linked",
+                                "is_dir": True,
+                                "is_external": True,
+                                "is_system": False,
+                                "extension": "dir",
+                                "size_bytes": 0,
+                                "size_formatted": "внешняя папка",
+                                "modified": dir_mtime,
+                                "git_status": "Внешняя директория",
+                                "git_code": "L",
+                                "tracked_by_git": True,
+                            }
+                            items.append(dir_item)
+                            existing_rel_paths[src_name] = dir_item
+                        else:
+                            exist_d = existing_rel_paths[src_name]
+                            exist_d["source_mode"] = "linked"
+                            exist_d["is_external"] = True
+                            exist_d["local_path"] = str(dir_p.resolve())
+                            exist_d["external_path"] = qual_path
+                            exist_d["qualified_path"] = qual_path
+                            exist_d["git_status"] = "Внешняя директория"
+                            exist_d["git_code"] = "L"
+
+                        # Сканируем элементы внутри внешней папки
+                        for child in sorted(dir_p.rglob("*")):
+                            if child.name.startswith("~") or child.name.startswith("."):
+                                continue
+                            if any(part.startswith(".") or part.startswith("~") for part in child.parts):
+                                continue
+
+                            child_key = str(child.resolve()).lower()
+                            rel_sub = str(child.relative_to(dir_p)).replace("\\", "/")
+                            child_rel = f"{src_name}/{rel_sub}"
+                            if child_key in existing_local_paths:
+                                old_item = existing_local_paths[child_key]
+                                old_item["is_external"] = True
+                                old_rel = str(old_item.get("rel_path") or "")
+                                if old_rel and "/" not in old_rel:
+                                    old_item["rel_path"] = child_rel
+                                    old_item["parent_source"] = src_name
+                                    existing_rel_paths[child_rel] = old_item
+                                continue
+                            if child_rel in existing_rel_paths:
+                                exist_c = existing_rel_paths[child_rel]
+                                exist_c["source_mode"] = "linked"
+                                exist_c["is_external"] = True
+                                exist_c["local_path"] = str(child.resolve())
+                                exist_c["external_path"] = format_host_qualified_path(child, s_host)
+                                exist_c["qualified_path"] = format_host_qualified_path(child, s_host)
+                                continue
+
+                            is_c_dir = child.is_dir()
+                            c_st = child.stat()
+                            c_sz = c_st.st_size if not is_c_dir else 0
+                            c_m = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(c_st.st_mtime))
+                            c_sz_fmt = "папка" if is_c_dir else (f"{c_sz} B" if c_sz < 1024 else (f"{c_sz / 1024:.1f} KB" if c_sz < 1048576 else f"{c_sz / 1048576:.2f} MB"))
+                            c_qual = format_host_qualified_path(child, s_host)
+
+                            child_is_sys = ServiceFileAuthenticator.is_service_file(child) or ServiceFileAuthenticator.is_service_file(child_rel)
+
+                            child_item = {
+                                "name": child.name,
+                                "rel_path": child_rel,
+                                "host_name": s_host,
+                                "local_path": str(child.resolve()),
+                                "qualified_path": c_qual,
+                                "external_path": c_qual,
+                                "is_current_host": True,
+                                "source_mode": "linked",
+                                "is_dir": is_c_dir,
+                                "is_external": True,
+                                "is_system": child_is_sys,
+                                "extension": child.suffix.lower() if not is_c_dir else "dir",
+                                "size_bytes": c_sz,
+                                "size_formatted": c_sz_fmt,
+                                "modified": c_m,
+                                "git_status": "Отслеживается (на диске)",
+                                "git_code": "L",
+                                "tracked_by_git": True,
+                            }
+                            items.append(child_item)
+                            existing_local_paths[child_key] = child_item
+                            existing_rel_paths[child_rel] = child_item
+                            if not is_c_dir:
+                                total_size += c_sz
+                    elif not is_same_host:
+                        if src_name not in existing_rel_paths:
+                            items.append({
+                                "name": src_name,
+                                "rel_path": src_name,
+                                "host_name": s_host,
+                                "local_path": raw_src_path,
+                                "qualified_path": qual_path,
+                                "external_path": qual_path,
+                                "is_current_host": False,
+                                "source_mode": "linked",
+                                "is_dir": True,
+                                "is_external": True,
+                                "is_system": False,
+                                "extension": "dir",
+                                "size_bytes": 0,
+                                "size_formatted": "внешняя папка",
+                                "modified": "",
+                                "git_status": f"На другом ПК ({s_host})",
+                                "git_code": "H",
+                                "tracked_by_git": True,
+                            })
+                            existing_rel_paths[src_name] = items[-1]
+                elif src_type == "file":
+                    file_p = Path(raw_src_path)
+                    f_key = str(file_p.resolve()).lower() if is_same_host and file_p.exists() else raw_src_path.lower()
+                    if is_same_host and file_p.exists() and file_p.is_file():
+                        if src_name in existing_rel_paths:
+                            exist_f = existing_rel_paths[src_name]
+                            exist_f["source_mode"] = "linked"
+                            exist_f["is_external"] = True
+                            exist_f["local_path"] = str(file_p.resolve())
+                            exist_f["external_path"] = qual_path
+                            exist_f["qualified_path"] = qual_path
+                            exist_f["git_status"] = "Внешний файл"
+                            exist_f["git_code"] = "L"
+                            continue
+                    if f_key in existing_local_paths or src_name in existing_rel_paths:
+                        continue
+                    if is_same_host and file_p.exists() and file_p.is_file():
+                        st = file_p.stat()
+                        f_sz = st.st_size
+                        f_m = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime))
+                        f_sz_fmt = f"{f_sz} B" if f_sz < 1024 else (f"{f_sz / 1024:.1f} KB" if f_sz < 1048576 else f"{f_sz / 1048576:.2f} MB")
+                        file_item = {
+                            "name": src_name,
+                            "rel_path": src_name,
+                            "host_name": s_host,
+                            "local_path": str(file_p.resolve()),
+                            "qualified_path": qual_path,
+                            "external_path": qual_path,
+                            "is_current_host": True,
+                            "source_mode": "linked",
+                            "is_dir": False,
+                            "is_external": True,
+                            "is_system": False,
+                            "extension": file_p.suffix.lower(),
+                            "size_bytes": f_sz,
+                            "size_formatted": f_sz_fmt,
+                            "modified": f_m,
+                            "git_status": "Отслеживается (на диске)",
+                            "git_code": "L",
+                            "tracked_by_git": True,
+                        }
+                        items.append(file_item)
+                        existing_local_paths[f_key] = file_item
+                        existing_rel_paths[src_name] = file_item
+                        total_size += f_sz
+        except Exception as src_err:
+            logger.warning(f"[WorkspaceItemsTracker] Ошибка добавления внешних источников: {src_err}")
+
+        user_files = [i for i in items if not i["is_dir"] and not i.get("is_system", False)]
+        system_files = [i for i in items if not i["is_dir"] and i.get("is_system", False)]
+
+        # Синхронизируем единый манифест содержимого (.workspace/manifest.json) внутри рабочей области
+        meta_dir = ws_path / ".workspace"
+        if meta_dir.exists():
+            try:
+                manifest_items: Dict[str, Any] = {}
+                for itm in items:
+                    m_key = itm.get("rel_path") or itm.get("name")
+                    if m_key:
+                        manifest_items[m_key] = {
+                            "name": itm.get("name"),
+                            "rel_path": itm.get("rel_path"),
+                            "role": itm.get("role") or ("system" if itm.get("is_system") else "user"),
+                            "is_system": bool(itm.get("is_system")),
+                            "source_mode": itm.get("source_mode", "local"),
+                            "is_dir": bool(itm.get("is_dir")),
+                            "is_external": bool(itm.get("is_external", False)),
+                            "local_path": itm.get("local_path"),
+                            "qualified_path": itm.get("qualified_path"),
+                            "host_name": itm.get("host_name"),
+                            "generator": itm.get("generator", ""),
+                            "tracked_by_git": bool(itm.get("tracked_by_git", True)),
+                        }
+                manifest_obj = {
+                    "workspace_id": workspace_id,
+                    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                    "user_files_count": len(user_files),
+                    "system_files_count": len(system_files),
+                    "items": manifest_items,
+                }
+                (meta_dir / "manifest.json").write_text(json.dumps(manifest_obj, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception as man_exc:
+                logger.debug(f"[WorkspaceItemsTracker] Запись .workspace/manifest.json: {man_exc}")
+
 
         return {
             "workspace_id": workspace_id,
@@ -674,6 +929,41 @@ class WorkspaceItemsTracker:
             "workspace_id": workspace_id,
             "rel_path": clean_rel,
             "path": str(target_path),
+            "method": method,
+            "opened": success,
+        }
+
+    def open_workspace_folder(self, workspace_id: str) -> Dict[str, Any]:
+        """Открывает корневую директорию рабочей области в нативном Проводнике Windows."""
+        self.ensure_workspace_folder(workspace_id)
+        ws, ws_path = self._resolve_workspace_path(workspace_id)
+        if not ws_path.exists():
+            raise FileNotFoundError(f"Папка рабочей области '{workspace_id}' не найдена: {ws_path}")
+
+        success = False
+        method = "startfile"
+        try:
+            if hasattr(os, "startfile"):
+                os.startfile(str(ws_path))  # type: ignore[attr-defined]
+                success = True
+            else:
+                subprocess.Popen(["explorer.exe", str(ws_path)], shell=False)
+                success = True
+                method = "explorer"
+        except Exception as exc:
+            logger.warning(f"[WorkspaceItemsTracker] Ошибка открытия папки '{ws_path}' через startfile: {exc}")
+            try:
+                subprocess.Popen(["explorer.exe", str(ws_path)], shell=False)
+                success = True
+                method = "explorer_fallback"
+            except Exception as e_exc:
+                logger.error(f"[WorkspaceItemsTracker] Ошибка fallback открытия проводника: {e_exc}")
+                raise RuntimeError(f"Не удалось открыть папку рабочей области '{workspace_id}': {exc}; {e_exc}")
+
+        return {
+            "status": "ok",
+            "workspace_id": workspace_id,
+            "path": str(ws_path),
             "method": method,
             "opened": success,
         }

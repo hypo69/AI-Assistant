@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 23:50:00
+# Updated: 2026-11-01 21:13:00
 # =============================================================================
 
 from __future__ import annotations
@@ -141,10 +141,10 @@ async def test_tab_workspace_markup_served_correctly() -> None:
         assert header_title is not None
         assert header_title.get("data-i18n") == "workspace.headerTitle"
 
-        subtab_step1 = soup.find(id="subtab-ws-step1-text")
+        subtab_step1 = soup.find(id="subtab-ws-files-text")
         assert subtab_step1 is not None
         assert subtab_step1.get("data-i18n") == "workspace.subtabs.files"
 
-        create_btn = soup.find(id="ws-create-btn-text")
-        assert create_btn is not None
-        assert create_btn.get("data-i18n") == "workspace.createBtn"
+        folder_badge = soup.find(id="ws-folder-badge-text")
+        assert folder_badge is not None
+        assert folder_badge.get("data-i18n") == "workspace.folderChecking"

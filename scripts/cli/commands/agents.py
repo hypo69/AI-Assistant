@@ -3,19 +3,19 @@
 # Process Name: AI-Windows-Admin Scripts Cli Commands - Agents
 # =============================================================================
 # Description:
-#   Команды управления и запуска AI-агентов платформы AI Windows Admin из каталога .agents.
+#   Команды управления и запуска AI-агентов платформы AI-Assistant из каталога .agents.
 #
 # Usage Examples:
 #   CLI:
 #     py manage_tools.py agents list
-#     py manage_tools.py agents run --name windows_controller_agent --query "Проверь диски"
+#     py manage_tools.py agents run --name workspace_agent --query "Проверь диски"
 #
 # File: agents.py
 # Project: ai-windows-admin
 # Package: scripts.cli.commands
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 22:22:44
+# Updated: 2026-11-01 17:40:00
 # =============================================================================
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def register_agents_parser(subparsers: argparse._SubParsersAction) -> None:
     agents_subparsers = agents_parser.add_subparsers(dest='subcommand', help='Subcommands')
     agents_subparsers.add_parser('list', help='List available AI agents')
     agents_run = agents_subparsers.add_parser('run', help='Execute an AI agent')
-    agents_run.add_argument('--name', required=True, help='Agent name, ID or manifest (e.g. windows_controller_agent, travel_agent, system_logs_agent)')
+    agents_run.add_argument('--name', required=True, help='Agent name, ID or manifest (e.g. workspace_agent, travel_agent, system_logs_agent)')
     agents_run.add_argument('--query', default='', help='Query or task for the agent')
 
 

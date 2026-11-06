@@ -8,17 +8,17 @@
 #
 # Usage Examples:
 #   FastAPI Endpoint:
-#     GET /api/v1/history?file_path=apps/windows/main.py&limit=10
-#     GET /api/v1/diff?commit_hash=a1b2c3&file_path=apps/windows/main.py
-#     GET /api/v1/timeline?file_path=apps/windows/main.py
-#     GET /api/v1/blame?file_path=apps/windows/main.py
+#     GET /api/v1/history?file_path=apps/ai_assistant/main.py&limit=10
+#     GET /api/v1/diff?commit_hash=a1b2c3&file_path=apps/ai_assistant/main.py
+#     GET /api/v1/timeline?file_path=apps/ai_assistant/main.py
+#     GET /api/v1/blame?file_path=apps/ai_assistant/main.py
 #
 # File: router_file_history.py
 # Project: ai-windows-admin
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-22 16:15:00
+# Updated: 2026-11-01 17:40:00
 # =============================================================================
 
 from __future__ import annotations
