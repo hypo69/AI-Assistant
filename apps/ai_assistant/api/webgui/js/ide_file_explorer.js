@@ -40,7 +40,7 @@
 
  * Copyright: © 2026 hypo69
 
- * Updated: 2026-11-06 23:14:00
+ * Updated: 2026-11-06 23:23:00
 
  * =============================================================================
 
@@ -1344,19 +1344,7 @@ export function initIdeFileExplorer() {
 
 
 
-  const switchShowAll = document.getElementById('ide-switch-show-all');
 
-  if (switchShowAll && !switchShowAll._bound) {
-
-    switchShowAll._bound = true;
-
-    switchShowAll.addEventListener('change', (e) => {
-
-      setShowAllFiles(e.target.checked);
-
-    });
-
-  }
 
 
 
