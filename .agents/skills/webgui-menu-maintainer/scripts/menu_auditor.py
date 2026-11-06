@@ -26,7 +26,7 @@ File: menu_auditor.py
 Package: .agents/skills/webgui-menu-maintainer/scripts
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-11-01 13:30:00
+Updated: 2026-11-06 23:40:00
 =============================================================================
 """
 
@@ -81,6 +81,17 @@ class WebGUIMenuAuditor:
             dict_file.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         except Exception as e:
             print(f"⚠️ Не удалось сохранить {lang}.json: {e}")
+
+    def _has_locale_key(self, key: str) -> bool:
+        if key in self.ru_dict:
+            return True
+
+        value: Any = self.ru_dict
+        for part in key.split('.'):
+            if not isinstance(value, dict) or part not in value:
+                return False
+            value = value[part]
+        return True
 
     def discover_tab_directories(self) -> List[Path]:
         """Ищет все директории вкладок tab_* в проекте."""
@@ -165,7 +176,7 @@ class WebGUIMenuAuditor:
                     title_key_m = re.search(r'data-i18n-title="([^"]+)"', btn)
                     if title_key_m and self.ru_dict:
                         key = title_key_m.group(1)
-                        if key not in self.ru_dict:
+                        if not self._has_locale_key(key):
                             issues.append(f"Ключ тултипа '{key}' отсутствует в ru.json")
 
         # 4. Проверка поддержки URL-хэша в JS
