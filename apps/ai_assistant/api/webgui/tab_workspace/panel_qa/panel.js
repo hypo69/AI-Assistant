@@ -11,11 +11,11 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace/panel_qa
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-17 00:45:00
+ * Updated: 2026-10-30 15:58:00
  * =============================================================================
  */
 
-import { fetchJson } from '../common/ui_utils.js';
+import { fetchJson, t } from '../common/ui_utils.js';
 
 let currentWsId = 'default';
 
@@ -38,9 +38,9 @@ export async function executeAskQuestion(questionText = null, workspaceId = null
   const sourcesBox = document.getElementById('qa-sources-list');
   const jsonViewer = document.getElementById('ws-fact-json-viewer');
 
-  if (statusInd) statusInd.textContent = 'Анализ вопроса и поиск фактов...';
+  if (statusInd) statusInd.textContent = t('workspace.qaAnalyzingStatus', 'Анализ вопроса и поиск фактов...');
   if (ansBox) ansBox.style.display = 'block';
-  if (ansMain) ansMain.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Обработка...';
+  if (ansMain) ansMain.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${t('workspace.qaProcessing', 'Обработка...')}`;
 
   try {
     const res = await fetchJson('/api/v1/ask', {
@@ -55,17 +55,17 @@ export async function executeAskQuestion(questionText = null, workspaceId = null
       }),
     });
 
-    if (ansMain) ansMain.textContent = res.answer || 'Нет ответа';
-    if (statusInd) statusInd.textContent = `Выполнено за ${res.processing?.latency_ms || 0} мс`;
+    if (ansMain) ansMain.textContent = res.answer || t('workspace.qaNoAnswer', 'Нет ответа');
+    if (statusInd) statusInd.textContent = `${t('workspace.qaCompletedIn', 'Выполнено за')} ${res.processing?.latency_ms || 0} ${t('workspace.msUnit', 'мс')}`;
 
     if (ansBadges) {
       const gForm = res.grammatical_details?.grammatical_form || 'base';
-      const cloudUsed = res.processing?.cloud_used ? '☁️ Облако (src/ai)' : '⚡ Локальный NLP + SQLite';
+      const cloudUsed = res.processing?.cloud_used ? `☁️ ${t('workspace.qaCloudSrcAi', 'Облако (src/ai)')}` : `⚡ ${t('workspace.qaLocalNlpSqlite', 'Локальный NLP + SQLite')}`;
       ansBadges.innerHTML = `
-        <span class="badge bg-primary-subtle text-primary border">Язык: ${res.language}</span>
-        <span class="badge bg-success-subtle text-success border">Форма: ${gForm}</span>
+        <span class="badge bg-primary-subtle text-primary border">${t('workspace.qaLangLabel', 'Язык')}: ${res.language}</span>
+        <span class="badge bg-success-subtle text-success border">${t('workspace.qaFormLabel', 'Форма')}: ${gForm}</span>
         <span class="badge bg-info-subtle text-info border">${cloudUsed}</span>
-        <span class="badge bg-secondary-subtle text-secondary border">${res.processing?.latency_ms || 0} мс</span>
+        <span class="badge bg-secondary-subtle text-secondary border">${res.processing?.latency_ms || 0} ${t('workspace.msUnit', 'мс')}</span>
       `;
     }
 
@@ -74,27 +74,27 @@ export async function executeAskQuestion(questionText = null, workspaceId = null
       const qa = res.question_analysis;
       if (gd) {
         grammarBox.innerHTML = `
-          Тип вопроса: <code>${qa?.intent || ''}</code> |
-          Целевая роль: <code>${qa?.target_role || ''}</code> |
-          Каноническая сущность (лемма): <strong>${gd.canonical_entity || ''}</strong> |
-          Исходная словоформа в тексте: <strong>${gd.surface_form || ''}</strong> &rarr;
-          Форма ответа: <strong>${res.answer}</strong>
+          ${t('workspace.qaIntentLabel', 'Тип вопроса')}: <code>${qa?.intent || ''}</code> |
+          ${t('workspace.qaTargetRoleLabel', 'Целевая роль')}: <code>${qa?.target_role || ''}</code> |
+          ${t('workspace.qaCanonicalLemmaLabel', 'Каноническая сущность (лемма)')}: <strong>${gd.canonical_entity || ''}</strong> |
+          ${t('workspace.qaSurfaceFormLabel', 'Исходная словоформа в тексте')}: <strong>${gd.surface_form || ''}</strong> &rarr;
+          ${t('workspace.qaAnswerFormLabel', 'Форма ответа')}: <strong>${res.answer}</strong>
         `;
       } else {
-        grammarBox.textContent = `Тип вопроса: ${qa?.intent || 'общий'} (${res.status})`;
+        grammarBox.textContent = `${t('workspace.qaIntentLabel', 'Тип вопроса')}: ${qa?.intent || t('workspace.qaGeneralIntent', 'общий')} (${res.status})`;
       }
     }
 
     if (sourcesBox) {
       const srcs = res.sources || [];
       if (srcs.length === 0) {
-        sourcesBox.innerHTML = '<span class="text-muted">Подтверждённых источников по данному вопросу не найдено.</span>';
+        sourcesBox.innerHTML = `<span class="text-muted">${t('workspace.qaNoSourcesFound', 'Подтверждённых источников по данному вопросу не найдено.')}</span>`;
       } else {
         sourcesBox.innerHTML = srcs.map(s => `
           <div class="p-1.5 px-2 rounded bg-body border d-flex flex-wrap align-items-center justify-content-between gap-2">
             <div>
               <i class="bi bi-file-earmark-check text-success me-1"></i>
-              <strong>${s.document_id}</strong> (предложение #${s.sentence_index})
+              <strong>${s.document_id}</strong> (${t('workspace.qaSentenceHash', 'предложение #')}${s.sentence_index})
               — <em>«${s.quote || ''}»</em>
             </div>
             <span class="badge bg-secondary-subtle text-secondary border font-monospace">
@@ -109,8 +109,8 @@ export async function executeAskQuestion(questionText = null, workspaceId = null
       jsonViewer.textContent = JSON.stringify(res.matched_fact, null, 2);
     }
   } catch (err) {
-    if (ansMain) ansMain.textContent = `Ошибка: ${err.message}`;
-    if (statusInd) statusInd.textContent = 'Ошибка';
+    if (ansMain) ansMain.textContent = `${t('workspace.errorLabel', 'Ошибка:')} ${err.message}`;
+    if (statusInd) statusInd.textContent = t('workspace.errorStatus', 'Ошибка');
   }
 }
 

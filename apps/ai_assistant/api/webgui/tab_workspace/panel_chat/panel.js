@@ -12,14 +12,17 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace/panel_chat
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-23 17:27:00
+ * Updated: 2026-10-30 15:58:00
  * =============================================================================
  */
 
-import { fetchJson } from '../common/ui_utils.js';
+import { fetchJson, t } from '../common/ui_utils.js';
 import { getCurrentWorkspaceId } from '../panel_workspace_select/panel.js';
 
 let isSending = false;
+let getWorkspaceIdCallback = null;
+
+
 
 /**
  * Экранирует HTML-спецсимволы для безопасного отображения пользовательского ввода.
@@ -90,7 +93,7 @@ function appendMessage(sender, text, isPending = false) {
     msgDiv.innerHTML = `
       <div class="d-flex align-items-center gap-2 text-secondary small py-1">
         <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
-        <span>ИИ формирует ответ...</span>
+        <span>${t('workspace.chatAiThinking', 'ИИ формирует ответ...')}</span>
       </div>
     `;
   } else {
@@ -117,8 +120,63 @@ export function clearChatHistory() {
     emptyState.classList.remove('d-none');
   }
   if (statusEl) {
-    statusEl.textContent = 'Готов к диалогу';
+    statusEl.textContent = t('workspace.chatReadyStatus', 'Готов к диалогу');
   }
+}
+
+/**
+ * Извлекает активный идентификатор рабочего пространства с многоуровневым fallback.
+ * @returns {string|null}
+ */
+export function resolveCurrentWorkspaceId() {
+  // 1. Коллбек, переданный при инициализации (из main.js)
+  let wsId = typeof getWorkspaceIdCallback === 'function' ? getWorkspaceIdCallback() : null;
+  if (wsId) return String(wsId).trim().normalize('NFC');
+
+  // 2. Модуль панели выбора рабочей области
+  wsId = getCurrentWorkspaceId();
+  if (wsId) return String(wsId).trim().normalize('NFC');
+
+  // 3. Глобальная переменная на объекте window
+  if (typeof window !== 'undefined' && window.currentWorkspaceId) {
+    return String(window.currentWorkspaceId).trim().normalize('NFC');
+  }
+
+  // 4. Верхний селектор рабочего пространства
+  if (typeof window !== 'undefined' && typeof window.getActiveWorkspaceId === 'function') {
+    const act = window.getActiveWorkspaceId();
+    if (act) return String(act).trim().normalize('NFC');
+  }
+
+  // 5. Разбор URL hash (#tab-workspace#panel-chat#workspace=<wsId>)
+  if (typeof location !== 'undefined' && location.hash) {
+    const match = location.hash.match(/workspace=([^&/#]+)/i);
+    if (match && match[1]) {
+      try {
+        return decodeURIComponent(match[1]).trim().normalize('NFC');
+      } catch (_) {
+        return match[1].trim().normalize('NFC');
+      }
+    }
+  }
+
+  // 6. DOM-селектор рабочих областей #ws-selector
+  if (typeof document !== 'undefined') {
+    const selector = document.getElementById('ws-selector');
+    if (selector && selector.value) {
+      return String(selector.value).trim().normalize('NFC');
+    }
+  }
+
+  // 7. Сохраненное значение в localStorage
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('ai_assistant_active_workspace');
+      if (stored) return String(stored).trim().normalize('NFC');
+    } catch (_) {}
+  }
+
+  return null;
 }
 
 /**
@@ -137,7 +195,7 @@ export async function sendChatMessage() {
   isSending = true;
   if (inputEl) inputEl.value = '';
   if (sendBtn) sendBtn.disabled = true;
-  if (statusEl) statusEl.textContent = 'Отправка запроса...';
+  if (statusEl) statusEl.textContent = t('workspace.chatSendingStatus', 'Отправка запроса...');
 
   // 1. Отображаем сообщение пользователя
   appendMessage('user', text);
@@ -145,14 +203,14 @@ export async function sendChatMessage() {
   // 2. Отображаем временный блок ожидания ответа
   const pendingBubble = appendMessage('assistant', '', true);
 
-  const wsId = getCurrentWorkspaceId();
+  const wsId = resolveCurrentWorkspaceId();
   let responseText = '';
   let durationMs = 0;
 
   try {
     // Fail-Fast: чат работает строго в контексте выбранной рабочей области
     if (!wsId) {
-      throw new Error('Не выбрана рабочая область');
+      throw new Error(t('workspace.chatErrorNoWorkspace', 'Не выбрана рабочая область'));
     }
 
     // Ответ формируется ТОЛЬКО по документам рабочей области (контур /api/v1/ask).
@@ -167,13 +225,14 @@ export async function sendChatMessage() {
       }),
     });
 
-    responseText = askRes && askRes.answer ? askRes.answer : 'Ответ не получен.';
+    responseText = askRes && askRes.answer ? askRes.answer : t('workspace.chatNoAnswer', 'Ответ не получен.');
     durationMs = (askRes && askRes.processing && askRes.processing.latency_ms) || 0;
 
     // Цитаты источников из документов рабочей области
+    const docFallback = t('workspace.chatDocumentFallback', 'документ');
     const quotes = ((askRes && askRes.sources) || [])
       .filter((s) => s && s.quote)
-      .map((s) => `> ${s.quote}\n>\n> — *${s.document_id || 'документ'}*`);
+      .map((s) => `> ${s.quote}\n>\n> — *${s.document_id || docFallback}*`);
     if (quotes.length) {
       responseText += `\n\n${quotes.join('\n\n')}`;
     }
@@ -184,20 +243,22 @@ export async function sendChatMessage() {
       pendingBubble.innerHTML = renderMessageContent(responseText);
     }
     if (statusEl) {
-      statusEl.textContent = durationMs > 0 ? `Ответ получен (${durationMs} мс)` : 'Ответ получен';
+      const succText = t('workspace.chatSuccessStatus', 'Ответ получен');
+      statusEl.textContent = durationMs > 0 ? `${succText} (${durationMs} мс)` : succText;
     }
   } catch (err) {
     if (pendingBubble) {
       pendingBubble.removeAttribute('data-pending');
+      const errPrefix = t('workspace.chatErrorGeneration', 'Ошибка генерации ответа:');
       pendingBubble.innerHTML = `
         <div class="text-danger small d-flex align-items-center gap-1.5">
           <i class="bi bi-exclamation-triangle-fill"></i>
-          <span>Ошибка генерации ответа: ${escapeHtml(err.message || String(err))}</span>
+          <span>${errPrefix} ${escapeHtml(err.message || String(err))}</span>
         </div>
       `;
     }
     if (statusEl) {
-      statusEl.textContent = 'Ошибка генерации';
+      statusEl.textContent = t('workspace.chatErrorStatus', 'Ошибка генерации');
     }
   } finally {
     isSending = false;
@@ -209,8 +270,13 @@ export async function sendChatMessage() {
 
 /**
  * Инициализирует обработчики событий панели чата.
+ * @param {Function|null} [getWorkspaceIdFn=null] - Функция получения ID активного рабочего пространства.
  */
-export function initChatPanel() {
+export function initChatPanel(getWorkspaceIdFn = null) {
+  if (typeof getWorkspaceIdFn === 'function') {
+    getWorkspaceIdCallback = getWorkspaceIdFn;
+  }
+
   const sendBtn = document.getElementById('ws-chat-send-btn');
   const inputEl = document.getElementById('ws-chat-input');
   const clearBtn = document.getElementById('ws-chat-clear-btn');

@@ -11,11 +11,12 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace/panel_commits
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-25 21:15:00
+ * Updated: 2026-10-30 15:58:00
  * =============================================================================
  */
 
 import { registerPanelRenderer, loadPanelData } from '../../js/panel-loader.js';
+import { t } from '../common/ui_utils.js';
 
 let allCommits = [];
 
@@ -28,10 +29,10 @@ export function renderCommitsTable(commits) {
   const countBadge = document.getElementById('commits-count-badge');
   if (!tbody) return;
 
-  if (countBadge) countBadge.textContent = `${commits ? commits.length : 0} коммитов`;
+  if (countBadge) countBadge.textContent = `${commits ? commits.length : 0} ${t('workspace.commitsCountSuffix', 'коммитов')}`;
 
   if (!commits || commits.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted">Коммиты не найдены</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-muted">${t('workspace.commitsNotFound', 'Коммиты не найдены')}</td></tr>`;
     return;
   }
 
@@ -39,7 +40,7 @@ export function renderCommitsTable(commits) {
     const hash = c.short_hash || (c.commit_hash ? c.commit_hash.slice(0, 8) : '---');
     const fullHash = c.commit_hash || '';
     const date = c.timestamp ? c.timestamp.replace('T', ' ').slice(0, 19) : '';
-    const author = c.author || 'Неизвестно';
+    const author = c.author || t('workspace.authorUnknown', 'Неизвестно');
     const msg = c.message || '';
 
     return `

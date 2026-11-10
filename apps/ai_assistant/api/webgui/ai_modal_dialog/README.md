@@ -6,7 +6,7 @@ Description:
   Документация универсального компонента всплывающего окна ИИ-анализатора (ai_modal_dialog).
 
 File: README.md
-Project: ai-windows-admin
+Project: ai-assistant
 # Author: hypo69
 # Copyright: © 2026 hypo69
 # Updated: 2026-10-20 13:15:00
