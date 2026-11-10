@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-30 15:37:00
+# Updated: 2026-11-10 13:35:00
 # =============================================================================
 
 from __future__ import annotations
@@ -264,6 +264,12 @@ async def test_tab_create_workspace_assets_and_navigation():
         assert 'id="btn-browse-watch-file"' in tab_html
         assert 'id="create-ws-sources-list"' in tab_html
         assert "Файлы и директории остаются на своих местах" in tab_html
+        # Блок отслеживания отображается сразу (без пошагового скрытия d-none)
+        assert 'id="create-ws-tracking-card"' in tab_html
+        assert 'id="create-ws-tracking-card" class="card bg-body border-secondary-subtle shadow-sm mb-3 d-none"' not in tab_html
+        # Элементы шагов скрыты от пользователя
+        assert 'class="d-none" data-i18n="ui.cws.txt_de59a272"' in tab_html
+        assert 'class="d-none" data-i18n="ui.cws.txt_144fa97c"' in tab_html
 
         js_tab_res = await client.get("/html/tab_create_workspace/main.js")
         assert js_tab_res.status_code == 200
@@ -271,6 +277,8 @@ async def test_tab_create_workspace_assets_and_navigation():
         assert "copy_to_workspace: false" in js_tab_res.text
         assert "browse-folder" in js_tab_res.text
         assert "btn-browse-ws-path" in js_tab_res.text
+        assert "stagedItems" in js_tab_res.text
+        assert "renderStagedSources" in js_tab_res.text
 
         # 5. Раздача компонента выпадающего списка пространств
         top_dropdown_res = await client.get("/html/js/top_workspace_dropdown.js")

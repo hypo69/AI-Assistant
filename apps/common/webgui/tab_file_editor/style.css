@@ -12,7 +12,7 @@
  * Package: apps/common/webgui/tab_file_editor
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-28 17:05:00
+ * Updated: 2026-11-07 00:35:00
  * =============================================================================
  */
 
@@ -39,6 +39,7 @@
   min-height: 38px;
 }
 
+.wasm-tab-item,
 .wasm-open-file-tab {
   display: inline-flex;
   align-items: center;
@@ -55,11 +56,13 @@
   transition: border-color 0.15s ease;
 }
 
+.wasm-tab-item.active,
 .wasm-open-file-tab.active {
   border-color: var(--ui-accent, var(--bs-primary));
   font-weight: 600;
 }
 
+.wasm-tab-close,
 .wasm-open-file-tab-close {
   border: none;
   background: transparent;

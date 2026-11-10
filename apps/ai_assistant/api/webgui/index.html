@@ -26,7 +26,7 @@ Author: hypo69
 
 Copyright: © 2026 hypo69
 
-Updated: 2026-11-06 23:14:00
+Updated: 2026-11-10 12:58:00
 
 =============================================================================
 
@@ -122,8 +122,8 @@ Updated: 2026-11-06 23:14:00
 <script src="/html/js/panel-loader.js?v=20261025_v4" type="module"></script>
 <script src="https://cdn.jsdelivr.net/npm/i18next@23.11.5/i18next.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="/html/js/global-i18n.js?v=20261103_v1"></script>
-<script src="/html/js/global-tooltips-i18n.js?v=20261103_v1"></script>
+<script src="/html/js/global-i18n.js?v=20261107_v1"></script>
+<script src="/html/js/global-tooltips-i18n.js?v=20261107_v1"></script>
 </head>
 <body>
 <!-- Вертикальная панель навигации в стиле стандартных IDE (Activity Bar: VS Code / JetBrains / Cursor) -->
@@ -158,6 +158,10 @@ Updated: 2026-11-06 23:14:00
 <!-- 6. Интерактивный граф знаний (Graph View) -->
 <button class="ide-activity-item" data-i18n-title="titles.ide.title_18727fff" data-tab="tab-graph" id="ide-nav-graph" title="Темпоральный граф знаний и зависимостей (Graph) [Alt+6]" type="button">
 <i class="bi bi-diagram-3"></i>
+</button>
+<!-- 7. Каталог ИИ-моделей и провайдеров -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.title_d0dd2aa9" data-tab="tab-models" id="ide-nav-models" title="Каталог ИИ-моделей и провайдеров (AI Models) [Alt+7]" type="button">
+<i class="bi bi-cpu"></i>
 </button>
 <!-- 8. 5-этапный поиск RAG -->
 <button class="ide-activity-item" data-i18n-title="titles.ide.title_75187948" data-tab="tab-rag" id="ide-nav-rag" title="Глобальный 5-этапный поиск RAG (Search) [Alt+8]" type="button">
@@ -220,6 +224,9 @@ Updated: 2026-11-06 23:14:00
 <span class="ide-status-dot"></span>
 </button>
 <!-- Редактор тем / Оформление -->
+<button class="ide-activity-item" data-i18n-title="titles.ide.tooltipsEditor" data-tab="tab-tooltips" id="ide-nav-tooltips-btn" title="Редактор подсказок интерфейса" type="button">
+<i class="bi bi-chat-square-quote"></i>
+</button>
 <button class="ide-activity-item" data-i18n-title="titles.ide.title_38086b54" data-tab="tab-theme-editor" id="ide-nav-theme-btn" title="Оформление и темы интерфейса" type="button">
 <i class="bi bi-palette"></i>
 </button>
@@ -337,13 +344,37 @@ Updated: 2026-11-06 23:14:00
 </a>
 </div>
 <!-- Центр: Раскрывающееся окно выбора рабочего пространства как в Command Center VS Code -->
-<div class="ide-command-center d-none d-md-flex" id="ide-command-center">
+<div class="ide-command-center d-none d-md-flex align-items-center gap-2" id="ide-command-center">
 <button class="ide-command-center-btn shadow-sm" data-i18n-title="titles.ide.title_d7853526" id="ide-workspace-picker-btn" title="Выбрать рабочее пространство Git (Ctrl+O / Клик для раскрытия окна)" type="button">
 <i class="bi bi-folder2-open text-primary me-2"></i>
 <span class="ide-ws-title fw-bold" data-i18n="ui.ide.txt_fe01ce2a" id="ide-command-center-ws-name">demo</span>
 <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-2 font-size-75" data-i18n="ui.ide.txt_eb0a1917" id="ide-command-center-branch">master</span>
 <i class="bi bi-chevron-down ms-2 text-muted small"></i>
 </button>
+<div class="ide-search-box-wrapper w-100 position-relative" id="ide-search-box-wrapper">
+  <div class="input-group input-group-sm ide-command-search-group shadow-sm" id="ide-workspace-search-group">
+    <span class="input-group-text bg-body-tertiary border-end-0 py-1 text-muted" id="ide-search-icon-addon">
+      <i class="bi bi-search"></i>
+    </span>
+    <input autocomplete="off" class="form-control ide-command-search-input border-start-0 border-end-0 py-1" data-i18n-placeholder="placeholders.ide.workspaceSearch" data-i18n-title="titles.ide.workspaceSearchTitle" id="ide-workspace-search-input" placeholder="Поиск по рабочей области (Ctrl+P)..." title="Поиск по рабочей области (Ctrl+P)" type="text"/>
+    <button class="btn btn-sm btn-link text-muted p-0 px-2 d-none ide-search-clear-btn" data-i18n-title="ui.ide.clearSearch" id="ide-search-clear-btn" title="Очистить поиск" type="button">
+      <i class="bi bi-x-circle-fill"></i>
+    </button>
+    <span class="input-group-text bg-body-tertiary border-start-0 py-1 text-muted font-size-75 font-monospace d-none d-lg-inline" id="ide-search-kbd-addon">
+      <kbd class="bg-body-secondary text-body border px-1">Ctrl+P</kbd>
+    </span>
+  </div>
+  <!-- Выпадающее окно быстрых результатов поиска по рабочей области (VS Code Quick Open) -->
+  <div class="ide-search-results-dropdown shadow-lg d-none" id="ide-search-results-dropdown">
+    <div class="ide-search-results-header px-3 py-1.5 border-bottom border-secondary-subtle d-flex justify-content-between align-items-center font-size-75 text-muted bg-body-tertiary">
+      <span data-i18n="ui.ide.searchResults" id="ide-search-results-count">Результаты поиска</span>
+      <span class="font-monospace" data-i18n="ui.ide.escToClose" id="ide-search-esc-hint">Esc для закрытия</span>
+    </div>
+    <div class="ide-search-results-list list-group list-group-flush" id="ide-search-results-list">
+      <!-- Результаты генерируются динамически через ide_file_explorer.js -->
+    </div>
+  </div>
+</div>
 </div>
 <!-- Правая часть: бейджи, кеш, справка, настройки профиля -->
 <div class="d-flex align-items-center gap-1.5 flex-shrink-0 ms-auto nav-actions-right">
@@ -465,10 +496,10 @@ Updated: 2026-11-06 23:14:00
 <!--
 <button class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-1.5 px-3 text-muted small" data-bs-target="#modal-create-workspace-wizard" data-bs-toggle="modal" id="menu-btn-create-workspace" type="button">
 <span class="fs-6">⚙️</span>
--->
-
 <span data-i18n="ui.ide.txt_53be1f12" id="ide-span-53be1f12">Мастер: Создать рабочую область. Дать ей имя</span>
 </button>
+-->
+
 </div>
 </div>
 <!-- Группа: Статус и Диагностика (разделы, не представленные на панели Activity Bar) -->
@@ -546,6 +577,8 @@ Updated: 2026-11-06 23:14:00
 <div class="tab-pane fade" id="tab-obsidian"></div>
 <div class="tab-pane fade" id="tab-doc-categorizer"></div>
 <div class="tab-pane fade" id="tab-tasks"></div>
+<div class="tab-pane fade" id="tab-instruments"></div>
+<div class="tab-pane fade" id="tab-tooltips"></div>
 </div>
 </div>
 <!-- Модальное окно настроек пользователя (Тема и Язык) -->
@@ -1579,10 +1612,10 @@ Updated: 2026-11-06 23:14:00
 <script src="/html/ai_modal_dialog/main.js?v=20261020_v1"></script>
 <script src="/html/components/system_tour/system_tour.js?v=20261020_v1"></script>
 <script src="/html/js/workspace_wizard.js?v=20261020_v1" type="module"></script>
-<script src="/html/js/ide_file_explorer.js?v=20261106_v1" type="module"></script>
+<script src="/html/js/ide_file_explorer.js?v=20261106_v2" type="module"></script>
 <script src="/html/js/table-resizer.js?v=20261103_v1"></script>
 <script src="/html/js/table-template.js?v=20261103_v1"></script>
-<script src="/html/js/main.js?v=20261106_v2" type="module"></script>
+<script src="/html/js/main.js?v=20261110_v2" type="module"></script>
 <script>
 
     function switchToApp(appName, event) {

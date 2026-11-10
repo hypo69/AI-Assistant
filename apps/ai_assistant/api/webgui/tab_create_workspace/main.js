@@ -4,21 +4,23 @@
  * =============================================================================
  * Description:
  *   Клиентский скрипт вкладки создания нового рабочего пространства:
- *   - Создание пространства с именем, описанием и рабочей директорией (Git init)
- *   - Выбор директорий и файлов для непрерывного отслеживания изменений на месте
- *   - Объекты остаются на своих исходных местах без перемещения (copy_to_workspace = false)
+ *   - Единый интерфейс создания пространства с именем, описанием и Git-репозиторием
+ *   - Подключение внешних директорий и файлов для слежения на месте (copy_to_workspace = false)
+ *   - Поддержка предварительного выбора (staging) источников до нажатия кнопки создания
+ *   - Мгновенное добавление при выборе через диалог или ручной ввод (с поддержкой Enter)
  *   - Интеграция с роутером вкладок и селектором пространств.
  *
  * File: main.js
  * Package: apps/ai_assistant/api/webgui/tab_create_workspace
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-28 20:04:00
+ * Updated: 2026-11-10 13:35:00
  * =============================================================================
  */
 
 let currentCreatedWorkspaceId = '';
 let currentCreatedWorkspaceName = '';
+let stagedItems = []; // Внешние директории и файлы, выбранные до создания пространства
 
 /**
  * Вспомогательный метод выполнения JSON-запросов к API.
@@ -56,11 +58,73 @@ function showStatusBanner(text, type = 'info') {
 }
 
 /**
+ * Отображает список предварительно добавленных (staged) источников до создания пространства.
+ */
+function renderStagedSources() {
+  const container = document.getElementById('create-ws-sources-list');
+  const countBadge = document.getElementById('create-ws-tracked-count-badge');
+
+  if (countBadge) {
+    countBadge.textContent = stagedItems.length > 0
+      ? `${stagedItems.length} к подключению`
+      : '0 объектов';
+  }
+
+  if (!container) return;
+
+  if (stagedItems.length === 0) {
+    container.innerHTML = `
+      <div class="p-3 text-center text-muted small bg-body-tertiary">
+        <i class="bi bi-pin-angle text-secondary fs-4 d-block mb-1"></i>
+        Директории и файлы пока не добавлены. Введите путь выше или нажмите кнопку «Обзор...» для выбора.
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = stagedItems.map((item, idx) => {
+    const isDir = item.type === 'directory';
+    const icon = isDir ? 'bi-folder2-open text-warning' : 'bi-file-earmark-check text-info';
+    return `
+      <div class="list-group-item d-flex align-items-center justify-content-between p-2 mb-1 rounded border">
+        <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+          <i class="bi ${icon} fs-5 flex-shrink-0"></i>
+          <div class="text-truncate">
+            <div class="fw-semibold text-truncate text-body">${item.path}</div>
+            <div class="text-muted font-monospace small text-truncate">К подключению на месте (без перемещения)</div>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+          <span class="badge bg-warning-subtle text-warning border font-size-75">
+            <i class="bi bi-clock-history me-1"></i>Ожидает создания
+          </span>
+          <button class="btn btn-sm btn-outline-danger py-0 px-1.5 font-size-75 btn-remove-staged" data-index="${idx}" title="Удалить из списка">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.btn-remove-staged').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.currentTarget.getAttribute('data-index'), 10);
+      if (!isNaN(idx) && idx >= 0 && idx < stagedItems.length) {
+        stagedItems.splice(idx, 1);
+        renderStagedSources();
+      }
+    });
+  });
+}
+
+/**
  * Загружает и отображает список отслеживаемых на месте объектов пространства.
  * @param {string} wsId 
  */
 export async function loadTrackedSources(wsId) {
-  if (!wsId) return;
+  if (!wsId) {
+    renderStagedSources();
+    return;
+  }
   const container = document.getElementById('create-ws-sources-list');
   const countBadge = document.getElementById('create-ws-tracked-count-badge');
   const gitHeadBadge = document.getElementById('create-ws-git-head-badge');
@@ -147,18 +211,28 @@ export async function loadTrackedSources(wsId) {
 /**
  * Добавляет указанный путь на диске для отслеживания изменений на месте (без перемещения).
  * @param {string} targetPath 
+ * @param {'directory'|'file'} [itemType='directory']
  */
-async function addTrackedItemInPlace(targetPath) {
-  if (!currentCreatedWorkspaceId) {
-    showStatusBanner('Сначала создайте или выберите пространство на Шаге 1.', 'warning');
-    return;
-  }
+async function addTrackedItemInPlace(targetPath, itemType = 'directory') {
   const cleanPath = (targetPath || '').trim();
   if (!cleanPath) {
-    showStatusBanner('Пожалуйста, укажите абсолютный путь на диске.', 'warning');
+    showStatusBanner('Пожалуйста, укажите путь на диске.', 'warning');
     return;
   }
 
+  // Если пространство еще не создано — добавляем в список предварительного подключения (staged)
+  if (!currentCreatedWorkspaceId) {
+    if (stagedItems.some(it => it.path.toLowerCase() === cleanPath.toLowerCase())) {
+      showStatusBanner(`Путь <code>${cleanPath}</code> уже добавлен в список для подключения.`, 'info');
+      return;
+    }
+    stagedItems.push({ path: cleanPath, type: itemType });
+    renderStagedSources();
+    showStatusBanner(`Объект <code>${cleanPath}</code> добавлен в список для подключения к новому пространству.`, 'info');
+    return;
+  }
+
+  // Если пространство уже создано — немедленно подключаем через REST API
   showStatusBanner(`Подключение объекта <code>${cleanPath}</code> для слежения на месте...`, 'info');
 
   try {
@@ -220,6 +294,7 @@ async function navigateToCreatedWorkspace() {
  */
 export function initCreateWorkspaceTab() {
   const submitBtn = document.getElementById('btn-create-ws-submit');
+  const submitBtnBottom = document.getElementById('btn-create-ws-submit-bottom');
   const nameInput = document.getElementById('create-ws-name-input');
   const langSelect = document.getElementById('create-ws-lang-select');
   const pathInput = document.getElementById('create-ws-path-input');
@@ -246,6 +321,13 @@ export function initCreateWorkspaceTab() {
   const backBtn = document.getElementById('btn-back-to-workspaces');
   const goToWsBtn = document.getElementById('btn-go-to-workspace');
 
+  // Начальная отрисовка списка источников (staged или уже созданных)
+  if (currentCreatedWorkspaceId) {
+    loadTrackedSources(currentCreatedWorkspaceId);
+  } else {
+    renderStagedSources();
+  }
+
   // Установка языка интерфейса программы по умолчанию в селекторе
   if (langSelect && !langSelect._initialized) {
     langSelect._initialized = true;
@@ -266,7 +348,7 @@ export function initCreateWorkspaceTab() {
     }
   }
 
-  // Кнопка выбора рабочей директории на компьютере (Шаг 1)
+  // Кнопка выбора рабочей директории на компьютере
   const browseWsPathBtn = document.getElementById('btn-browse-ws-path');
   const wsPathPicker = document.getElementById('picker-create-ws-path');
 
@@ -309,7 +391,7 @@ export function initCreateWorkspaceTab() {
     });
   }
 
-  // Кнопка выбора директории для слежения (Шаг 2)
+  // Кнопка выбора директории для слежения
   const browseWatchDirBtn = document.getElementById('btn-browse-watch-dir');
   const watchDirPicker = document.getElementById('picker-watch-dir');
 
@@ -321,7 +403,8 @@ export function initCreateWorkspaceTab() {
         browseWatchDirBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Выбор...';
         const res = await apiFetch('/api/v1/workspaces/browse-folder', { method: 'POST' });
         if (res && res.status === 'ok' && res.path) {
-          if (dirInput) dirInput.value = res.path;
+          if (dirInput) dirInput.value = '';
+          await addTrackedItemInPlace(res.path, 'directory');
           return;
         }
       } catch (err) {
@@ -336,23 +419,27 @@ export function initCreateWorkspaceTab() {
 
   if (watchDirPicker && !watchDirPicker._bound) {
     watchDirPicker._bound = true;
-    watchDirPicker.addEventListener('change', (e) => {
+    watchDirPicker.addEventListener('change', async (e) => {
       const files = e.target.files;
       if (files && files.length > 0) {
         const first = files[0];
         const folderName = (first.webkitRelativePath || '').split('/')[0] || first.name;
+        let dir = '';
         if (first.path) {
-          const dir = first.path.substring(0, Math.max(first.path.lastIndexOf('\\'), first.path.lastIndexOf('/')));
-          if (dirInput) dirInput.value = dir;
-        } else if (dirInput && !dirInput.value) {
-          dirInput.value = folderName;
+          dir = first.path.substring(0, Math.max(first.path.lastIndexOf('\\'), first.path.lastIndexOf('/')));
+        } else {
+          dir = folderName;
+        }
+        if (dir) {
+          if (dirInput) dirInput.value = '';
+          await addTrackedItemInPlace(dir, 'directory');
         }
       }
       watchDirPicker.value = '';
     });
   }
 
-  // Кнопка выбора файла для слежения (Шаг 2)
+  // Кнопка выбора файла для слежения
   const browseWatchFileBtn = document.getElementById('btn-browse-watch-file');
   const watchFilePicker = document.getElementById('picker-watch-file');
 
@@ -364,7 +451,8 @@ export function initCreateWorkspaceTab() {
         browseWatchFileBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Выбор...';
         const res = await apiFetch('/api/v1/workspaces/browse-file', { method: 'POST' });
         if (res && res.status === 'ok' && res.path) {
-          if (fileInput) fileInput.value = res.path;
+          if (fileInput) fileInput.value = '';
+          await addTrackedItemInPlace(res.path, 'file');
           return;
         }
       } catch (err) {
@@ -379,121 +467,187 @@ export function initCreateWorkspaceTab() {
 
   if (watchFilePicker && !watchFilePicker._bound) {
     watchFilePicker._bound = true;
-    watchFilePicker.addEventListener('change', (e) => {
+    watchFilePicker.addEventListener('change', async (e) => {
       const files = e.target.files;
       if (files && files.length > 0) {
         const first = files[0];
-        if (first.path) {
-          if (fileInput) fileInput.value = first.path;
-        } else if (fileInput && !fileInput.value) {
-          fileInput.value = first.name;
+        const filePath = first.path || first.name;
+        if (filePath) {
+          if (fileInput) fileInput.value = '';
+          await addTrackedItemInPlace(filePath, 'file');
         }
       }
       watchFilePicker.value = '';
     });
   }
 
-  // Шаг 1: Создание рабочего пространства
-  if (submitBtn && !submitBtn._bound) {
-    submitBtn._bound = true;
-    submitBtn.addEventListener('click', async () => {
-      const nameVal = nameInput ? nameInput.value.trim() : '';
-      const pathVal = pathInput ? pathInput.value.trim() : '';
-      const descVal = descInput ? descInput.value.trim() : '';
-      let langVal = langSelect ? langSelect.value : 'ru';
-      if (langVal === 'uk') langVal = 'ua';
-
-      if (!nameVal) {
-        showStatusBanner('Пожалуйста, укажите имя рабочего пространства.', 'warning');
-        if (nameInput) nameInput.focus();
-        return;
-      }
-
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Инициализация Git и README.md...';
-
-      try {
-        // Поддержка всех символов Unicode (иврит, кириллица, латиница) с нормализацией разделителей
-        const cleanId = nameVal
-          .trim()
-          .replace(/[^\p{L}\p{N}_-]+/gu, '_')
-          .replace(/^_+|_+$/g, '') || 'workspace';
-        const res = await apiFetch('/api/v1/workspaces', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            workspace_id: cleanId,
-            name: nameVal,
-            custom_path: pathVal || null,
-            description: descVal,
-            language: langVal,
-          }),
-        });
-
-        currentCreatedWorkspaceId = res.workspace?.workspace_id || cleanId;
-        currentCreatedWorkspaceName = res.workspace?.name || nameVal;
-
-        if (idBadge) {
-          idBadge.textContent = `ID: ${currentCreatedWorkspaceId}`;
-          idBadge.className = 'badge bg-success-subtle text-success border font-monospace small';
+  // Быстрый ввод путей по клавише Enter
+  if (dirInput && !dirInput._boundEnter) {
+    dirInput._boundEnter = true;
+    dirInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = dirInput.value.trim();
+        if (val) {
+          await addTrackedItemInPlace(val, 'directory');
+          dirInput.value = '';
         }
-
-        if (trackingCard) {
-          trackingCard.classList.remove('d-none');
-        }
-
-        const headSha = res.workspace?.git_head ? res.workspace.git_head.slice(0, 8) : 'HEAD';
-        const wsDiskPath = res.workspace?.path || pathVal || 'auto-path';
-
-        showStatusBanner(`
-          <strong>Пространство &laquo;${currentCreatedWorkspaceName}&raquo; успешно создано!</strong>
-          <div>Git-репозиторий инициализирован в <code>${wsDiskPath}</code>. Создан файл <code>README.md</code> (lang=${langVal}). Начальный HEAD: <code>${headSha}</code>. Теперь укажите папки или файлы на Шаге 2 для мониторинга изменений на месте.</div>
-        `, 'success');
-
-        await loadTrackedSources(currentCreatedWorkspaceId);
-
-        // Обновляем выпадающий список рабочих пространств в верхней панели навигации
-        if (typeof window.updateTopWorkspaceDropdown === 'function') {
-          window.updateTopWorkspaceDropdown(currentCreatedWorkspaceId);
-        }
-
-        // Плавная прокрутка к Шагу 2
-        if (trackingCard) {
-          trackingCard.scrollIntoView({ behavior: 'smooth' });
-        }
-      } catch (err) {
-        showStatusBanner(`Ошибка создания пространства: ${err.message}`, 'danger');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Создать пространство и инициализировать Git';
       }
     });
   }
 
-  // Шаг 2: Добавление директории для слежения на месте
+  if (fileInput && !fileInput._boundEnter) {
+    fileInput._boundEnter = true;
+    fileInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = fileInput.value.trim();
+        if (val) {
+          await addTrackedItemInPlace(val, 'file');
+          fileInput.value = '';
+        }
+      }
+    });
+  }
+
+  // Создание рабочего пространства
+  const handleCreateWorkspace = async () => {
+    const nameVal = nameInput ? nameInput.value.trim() : '';
+    const pathVal = pathInput ? pathInput.value.trim() : '';
+    const descVal = descInput ? descInput.value.trim() : '';
+    let langVal = langSelect ? langSelect.value : 'ru';
+    if (langVal === 'uk') langVal = 'ua';
+
+    if (!nameVal) {
+      showStatusBanner('Пожалуйста, укажите имя рабочего пространства.', 'warning');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+
+    const setButtonsLoading = (loading) => {
+      [submitBtn, submitBtnBottom].forEach(btn => {
+        if (!btn) return;
+        btn.disabled = loading;
+        btn.innerHTML = loading
+          ? '<span class="spinner-border spinner-border-sm me-1"></span>Инициализация Git и создание пространства...'
+          : '<i class="bi bi-check2-circle me-1"></i>Создать пространство и инициализировать Git';
+      });
+    };
+
+    setButtonsLoading(true);
+
+    try {
+      // Поддержка всех символов Unicode (иврит, кириллица, латиница) с нормализацией разделителей
+      const cleanId = nameVal
+        .trim()
+        .replace(/[^\p{L}\p{N}_-]+/gu, '_')
+        .replace(/^_+|_+$/g, '') || 'workspace';
+      const res = await apiFetch('/api/v1/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: cleanId,
+          name: nameVal,
+          custom_path: pathVal || null,
+          description: descVal,
+          language: langVal,
+        }),
+      });
+
+      currentCreatedWorkspaceId = res.workspace?.workspace_id || cleanId;
+      currentCreatedWorkspaceName = res.workspace?.name || nameVal;
+
+      if (idBadge) {
+        idBadge.textContent = `ID: ${currentCreatedWorkspaceId}`;
+        idBadge.className = 'badge bg-success-subtle text-success border font-monospace small';
+      }
+
+      // Если были предварительно выбраны директории или файлы — сразу подключаем их оптом
+      let stagedAddedCount = 0;
+      if (stagedItems.length > 0) {
+        try {
+          const linkRes = await apiFetch(`/api/v1/workspaces/${encodeURIComponent(currentCreatedWorkspaceId)}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: stagedItems.map(it => it.path),
+              copy_to_workspace: false, // Файлы остаются на своих местах!
+              commit_message: `Подключение внешних объектов (${stagedItems.length}) для слежения на месте`,
+            }),
+          });
+          stagedAddedCount = linkRes.files_added || stagedItems.length;
+          stagedItems = [];
+        } catch (linkErr) {
+          console.error('[CreateWorkspaceTab] Ошибка подключения предварительных объектов:', linkErr);
+          showStatusBanner(`Пространство создано, но возникла ошибка при подключении объектов: ${linkErr.message}`, 'warning');
+        }
+      }
+
+      const headSha = res.workspace?.git_head ? res.workspace.git_head.slice(0, 8) : 'HEAD';
+      const wsDiskPath = res.workspace?.path || pathVal || 'auto-path';
+
+      showStatusBanner(`
+        <strong>Пространство &laquo;${currentCreatedWorkspaceName}&raquo; успешно создано!</strong>
+        <div>Git-репозиторий инициализирован в <code>${wsDiskPath}</code>. Создан файл <code>README.md</code> (lang=${langVal}). Начальный HEAD: <code>${headSha}</code>.${stagedAddedCount > 0 ? ` Подключено к слежению объектов: ${stagedAddedCount}.` : ''}</div>
+      `, 'success');
+
+      await loadTrackedSources(currentCreatedWorkspaceId);
+
+      // Обновляем выпадающий список рабочих пространств в верхней панели навигации
+      if (typeof window.updateTopWorkspaceDropdown === 'function') {
+        window.updateTopWorkspaceDropdown(currentCreatedWorkspaceId);
+      }
+
+      // Отображаем кнопку перехода в рабочую область
+      if (goToWsBtn) {
+        goToWsBtn.classList.remove('d-none');
+      }
+      const syncStatusMsg = document.getElementById('create-ws-sync-status-msg');
+      if (syncStatusMsg) {
+        syncStatusMsg.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i><span>Пространство настроено. Вы можете сразу перейти к работе с ним.</span>';
+      }
+
+    } catch (err) {
+      showStatusBanner(`Ошибка создания пространства: ${err.message}`, 'danger');
+    } finally {
+      setButtonsLoading(false);
+    }
+  };
+
+  if (submitBtn && !submitBtn._bound) {
+    submitBtn._bound = true;
+    submitBtn.addEventListener('click', handleCreateWorkspace);
+  }
+
+  if (submitBtnBottom && !submitBtnBottom._bound) {
+    submitBtnBottom._bound = true;
+    submitBtnBottom.addEventListener('click', handleCreateWorkspace);
+  }
+
+  // Добавление директории для слежения на месте
   if (addDirBtn && !addDirBtn._bound) {
     addDirBtn._bound = true;
     addDirBtn.addEventListener('click', async () => {
-      const val = dirInput ? dirInput.value : '';
+      const val = dirInput ? dirInput.value.trim() : '';
       if (!val) {
         showStatusBanner('Укажите путь к директории для слежения.', 'warning');
         return;
       }
-      await addTrackedItemInPlace(val);
+      await addTrackedItemInPlace(val, 'directory');
       if (dirInput) dirInput.value = '';
     });
   }
 
-  // Шаг 2: Добавление файла для слежения на месте
+  // Добавление файла для слежения на месте
   if (addFileBtn && !addFileBtn._bound) {
     addFileBtn._bound = true;
     addFileBtn.addEventListener('click', async () => {
-      const val = fileInput ? fileInput.value : '';
+      const val = fileInput ? fileInput.value.trim() : '';
       if (!val) {
         showStatusBanner('Укажите путь к файлу для слежения.', 'warning');
         return;
       }
-      await addTrackedItemInPlace(val);
+      await addTrackedItemInPlace(val, 'file');
       if (fileInput) fileInput.value = '';
     });
   }
@@ -502,7 +656,11 @@ export function initCreateWorkspaceTab() {
   if (refreshSourcesBtn && !refreshSourcesBtn._bound) {
     refreshSourcesBtn._bound = true;
     refreshSourcesBtn.addEventListener('click', async () => {
-      await loadTrackedSources(currentCreatedWorkspaceId);
+      if (currentCreatedWorkspaceId) {
+        await loadTrackedSources(currentCreatedWorkspaceId);
+      } else {
+        renderStagedSources();
+      }
     });
   }
 

@@ -17,7 +17,7 @@
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 17:34:00
+ * Updated: 2026-11-07 00:56:00
  * =============================================================================
  */
 
@@ -531,6 +531,9 @@ export function setupTabClicks() {
         window.switchTab(btn.dataset.tab);
       } else {
         switchTab(btn.dataset.tab);
+      }
+      if (btn.dataset.panel && typeof window.switchWorkspaceSubTab === 'function') {
+        window.switchWorkspaceSubTab(btn.dataset.panel, true);
       }
     }
   }, true);

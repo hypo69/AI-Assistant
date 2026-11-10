@@ -11,7 +11,7 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace/common
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 15:58:00
+ * Updated: 2026-11-10 13:15:00
  * =============================================================================
  */
 
@@ -64,6 +64,9 @@ export function isWorkspaceTabActive() {
 export function normalizeSubTabId(subtabId) {
   if (!subtabId) return 'panel-chat';
   const s = String(subtabId).toLowerCase().trim().replace(/^#/, '');
+  if (s.includes('file-editor') || s.includes('editor')) {
+    return 'panel-file-editor';
+  }
   if (s.includes('chat') || s.includes('talk') || s.includes('dialog')) {
     return 'panel-chat';
   }
@@ -268,21 +271,78 @@ export function updateUrlWithPanel(panelId, workspaceId = null, blockId = null) 
   }
 }
 
+const inFlightRequests = new Map();
+
 /**
- * Выполняет сетевой запрос с автоматической распаковкой JSON и обработкой ошибок.
+ * Нормализует идентификатор рабочего пространства:
+ * декодирование URL, приведение к NFC, удаление префикса ws-, замена пробелов на _, нижний регистр.
+ * @param {string|null} id
+ * @returns {string}
+ */
+export function normalizeWorkspaceId(id) {
+  if (!id) return '';
+  let clean = String(id).trim();
+  try {
+    clean = decodeURIComponent(clean);
+  } catch (_) {}
+  return clean
+    .normalize('NFC')
+    .replace(/^ws-/, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .toLowerCase();
+}
+
+/**
+ * Проверяет эквивалентность двух идентификаторов рабочих областей независимо от пробелов, подчеркиваний и URL-кодирования.
+ * @param {string|null} id1
+ * @param {string|null} id2
+ * @returns {boolean}
+ */
+export function areWorkspacesEqual(id1, id2) {
+  if (!id1 && !id2) return true;
+  if (!id1 || !id2) return false;
+  return normalizeWorkspaceId(id1) === normalizeWorkspaceId(id2);
+}
+
+if (typeof window !== 'undefined') {
+  window.normalizeWorkspaceId = normalizeWorkspaceId;
+  window.areWorkspacesEqual = areWorkspacesEqual;
+}
+
+/**
+ * Выполняет сетевой запрос с автоматической распаковкой JSON, обработкой ошибок и дедупликацией GET-запросов на лету.
  * @param {string} url - URL эндпоинта
  * @param {Object} [options] - Параметры fetch
  * @returns {Promise<any>}
  */
 export async function fetchJson(url, options = {}) {
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const err = await res.json();
-      if (err.detail) detail = err.detail;
-    } catch (_) {}
-    throw new Error(detail);
+  const isGet = !options.method || options.method.toUpperCase() === 'GET';
+  if (isGet && inFlightRequests.has(url)) {
+    return inFlightRequests.get(url);
   }
-  return res.json();
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try {
+          const err = await res.json();
+          if (err.detail) detail = err.detail;
+        } catch (_) {}
+        throw new Error(detail);
+      }
+      return await res.json();
+    } finally {
+      if (isGet) {
+        inFlightRequests.delete(url);
+      }
+    }
+  })();
+
+  if (isGet) {
+    inFlightRequests.set(url, promise);
+  }
+  return promise;
 }

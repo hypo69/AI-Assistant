@@ -47,16 +47,16 @@ Updated: 2026-10-30 16:45:00
 
     <!-- Статистика хранилища (Vault Summary Badges) -->
     <div class="d-flex align-items-center flex-wrap gap-1" id="obs-stats-bar">
-      <span class="badge bg-body-secondary text-body border" id="obs-badge-notes-count" title="Всего заметок в хранилище">
+      <span class="badge bg-body-secondary text-body border" id="obs-badge-notes-count" title="Всего заметок в хранилище" data-i18n-title="obsidian.badgeNotesCountTitle">
         📄 <span id="obs-stat-notes-val">0</span> <span data-i18n="obsidian.stats.notes">заметок</span>
       </span>
-      <span class="badge bg-body-secondary text-body border" id="obs-badge-links-count" title="Всего связей между заметками">
+      <span class="badge bg-body-secondary text-body border" id="obs-badge-links-count" title="Всего связей между заметками" data-i18n-title="obsidian.badgeLinksCountTitle">
         🔗 <span id="obs-stat-links-val">0</span> <span data-i18n="obsidian.stats.links">связей</span>
       </span>
-      <span class="badge bg-body-secondary text-body border" id="obs-badge-tags-count" title="Уникальных тегов">
+      <span class="badge bg-body-secondary text-body border" id="obs-badge-tags-count" title="Уникальных тегов" data-i18n-title="obsidian.badgeTagsCountTitle">
         🏷️ <span id="obs-stat-tags-val">0</span> <span data-i18n="obsidian.stats.tags">тегов</span>
       </span>
-      <span class="badge bg-body-secondary text-body border" id="obs-badge-orphans-count" title="Заметки без связей">
+      <span class="badge bg-body-secondary text-body border" id="obs-badge-orphans-count" title="Заметки без связей" data-i18n-title="obsidian.badgeOrphansCountTitle">
         🏝️ <span id="obs-stat-orphans-val">0</span> <span data-i18n="obsidian.stats.orphans">сирот</span>
       </span>
     </div>
@@ -97,24 +97,24 @@ Updated: 2026-10-30 16:45:00
   <!-- 2. Панель инструментов Markdown форматирования -->
   <div class="d-flex align-items-center flex-wrap gap-1 px-2 py-1 border rounded bg-body-tertiary" id="obs-markdown-tools-bar">
     <div class="btn-group btn-group-sm" role="group">
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-h1" title="Заголовок H1">H1</button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-h2" title="Заголовок H2">H2</button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-h3" title="Заголовок H3">H3</button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-h1" title="Заголовок H1" data-i18n-title="obsidian.toolH1Title">H1</button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-h2" title="Заголовок H2" data-i18n-title="obsidian.toolH2Title">H2</button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-h3" title="Заголовок H3" data-i18n-title="obsidian.toolH3Title">H3</button>
     </div>
     <div class="btn-group btn-group-sm" role="group">
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-bold" title="Жирный текст (**текст**)"><strong>B</strong></button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-italic" title="Курсив (*текст*)"><em>I</em></button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-strike" title="Зачеркнутый (~~текст~~)"><s>S</s></button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-bold" title="Жирный текст (**текст**)" data-i18n-title="obsidian.toolBoldTitle"><strong>B</strong></button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-italic" title="Курсив (*текст*)" data-i18n-title="obsidian.toolItalicTitle"><em>I</em></button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-strike" title="Зачеркнутый (~~текст~~)" data-i18n-title="obsidian.toolStrikeTitle"><s>S</s></button>
       <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-quote" title="Цитата (> цитата)">&rdquo;</button>
     </div>
     <div class="btn-group btn-group-sm" role="group">
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-wikilink" title="Вставить вики-ссылку [[Заметка]]">[[ ]]</button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-tag" title="Вставить тег #тег">#</button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-task" title="Вставить чекбокс задачи (- [ ])">☑</button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-wikilink" title="Вставить вики-ссылку [[Заметка]]" data-i18n-title="obsidian.toolWikilinkTitle">[[ ]]</button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-tag" title="Вставить тег #тег" data-i18n-title="obsidian.toolTagTitle">#</button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-task" title="Вставить чекбокс задачи (- [ ])" data-i18n-title="obsidian.toolTaskTitle">☑</button>
       <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-callout" title="Вставить блок Callout (> [!NOTE])">📌</button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-code" title="Блок кода (```)"><code>&lt;/&gt;</code></button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-table" title="Вставить Markdown таблицу">▦</button>
-      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-math" title="Формула LaTeX ($$)">∑</button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-code" title="Блок кода (```)" data-i18n-title="obsidian.toolCodeTitle"><code>&lt;/&gt;</code></button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-table" title="Вставить Markdown таблицу" data-i18n-title="titles.auto.markdown">▦</button>
+      <button type="button" class="btn btn-outline-secondary px-2" id="obs-tool-math" title="Формула LaTeX ($$)" data-i18n-title="titles.auto.latex">∑</button>
     </div>
     <span class="ms-auto small text-muted font-monospace" id="obs-editor-stats-counter">Слов: 0 | Символов: 0</span>
   </div>
@@ -128,14 +128,14 @@ Updated: 2026-10-30 16:45:00
       <div class="input-group input-group-sm mb-2" id="obs-search-input-group">
         <span class="input-group-text bg-transparent">🔍</span>
         <input type="text" class="form-control" id="obs-search-notes-input" placeholder="Поиск заметок и тегов..." data-i18n-placeholder="obsidian.searchPlaceholder">
-        <button class="btn btn-outline-secondary" type="button" id="obs-btn-clear-search" title="Очистить поиск">✕</button>
+        <button class="btn btn-outline-secondary" type="button" id="obs-btn-clear-search" title="Очистить поиск" data-i18n-title="titles.auto.">✕</button>
       </div>
 
       <!-- Облако тегов -->
       <div class="obs-tag-cloud-wrapper mb-2 border-bottom pb-2" id="obs-tag-cloud-container">
         <div class="d-flex justify-content-between align-items-center mb-1">
           <span class="small fw-semibold text-muted" data-i18n="obsidian.tagsTitle">Теги хранилища</span>
-          <button class="btn btn-link btn-xs p-0 text-decoration-none text-muted" id="obs-btn-reset-tag-filter" title="Сбросить фильтр тегов">Все</button>
+          <button class="btn btn-link btn-xs p-0 text-decoration-none text-muted" id="obs-btn-reset-tag-filter" title="Сбросить фильтр тегов" data-i18n-title="titles.auto.">Все</button>
         </div>
         <div class="obs-tag-pills d-flex flex-wrap gap-1" id="obs-tag-pills-list"></div>
       </div>
@@ -161,8 +161,8 @@ Updated: 2026-10-30 16:45:00
           </div>
         </div>
         <div class="d-flex align-items-center gap-1" id="obs-active-note-actions">
-          <button class="btn btn-xs btn-outline-danger" id="obs-btn-delete-note" title="Удалить текущую заметку">🗑️</button>
-          <button class="btn btn-xs btn-outline-secondary" id="obs-btn-toggle-inspector" title="Показать/скрыть связи">🔗 Связи</button>
+          <button class="btn btn-xs btn-outline-danger" id="obs-btn-delete-note" title="Удалить текущую заметку" data-i18n-title="titles.auto.">🗑️</button>
+          <button class="btn btn-xs btn-outline-secondary" id="obs-btn-toggle-inspector" title="Показать/скрыть связи" data-i18n-title="titles.auto.">🔗 Связи</button>
         </div>
       </div>
 
@@ -188,9 +188,9 @@ Updated: 2026-10-30 16:45:00
         <div class="obs-graph-overlay-controls position-absolute top-0 end-0 m-3 p-2 border rounded bg-body-tertiary d-flex flex-column gap-1 shadow-sm">
           <span class="small fw-semibold text-muted text-center">Граф связей</span>
           <div class="btn-group-vertical btn-group-sm">
-            <button class="btn btn-outline-secondary" id="obs-graph-zoom-in" title="Приблизить">➕</button>
-            <button class="btn btn-outline-secondary" id="obs-graph-zoom-out" title="Отдалить">➖</button>
-            <button class="btn btn-outline-secondary" id="obs-graph-zoom-reset" title="Сбросить масштаб">🎯</button>
+            <button class="btn btn-outline-secondary" id="obs-graph-zoom-in" title="Приблизить" data-i18n-title="titles.auto.">➕</button>
+            <button class="btn btn-outline-secondary" id="obs-graph-zoom-out" title="Отдалить" data-i18n-title="titles.auto.">➖</button>
+            <button class="btn btn-outline-secondary" id="obs-graph-zoom-reset" title="Сбросить масштаб" data-i18n-title="titles.auto.">🎯</button>
           </div>
           <button class="btn btn-xs btn-outline-primary mt-1" id="obs-graph-close-btn">Закрыть граф</button>
         </div>

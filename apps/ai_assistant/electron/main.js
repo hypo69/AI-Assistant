@@ -17,7 +17,7 @@
  * Package: apps/ai_assistant/electron
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 12:16:00
+ * Updated: 2026-11-07 00:55:00
  * =============================================================================
  */
 
@@ -62,6 +62,29 @@ function getWorkspacesDir() {
   if (process.env.AI_ASSISTANT_WORKSPACES_DIR) {
     return path.resolve(process.env.AI_ASSISTANT_WORKSPACES_DIR);
   }
+
+  // Считываем путь из apps/ai_assistant/config.json или root config.json
+  const candidateConfigs = [
+    path.resolve(PROJECT_ROOT_DIR, 'apps', 'ai_assistant', 'config.json'),
+    path.resolve(PROJECT_ROOT_DIR, 'config.json'),
+  ];
+  for (const cfgFile of candidateConfigs) {
+    try {
+      if (fs.existsSync(cfgFile)) {
+        const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
+        const customDir = (cfg.storage && (cfg.storage.workspaces_dir || cfg.storage.workspaces)) || cfg.workspaces_dir;
+        if (customDir && typeof customDir === 'string') {
+          let clean = customDir.trim().replace(/^[\/\\]+/, '');
+          if (clean === 'data' || clean === '') clean = 'data/workspaces';
+          const resolved = path.resolve(PROJECT_ROOT_DIR, clean);
+          if (fs.existsSync(resolved)) {
+            return resolved;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   const wsSubDir = path.resolve(ROOT_DATA_DIR, 'workspaces');
   if (fs.existsSync(wsSubDir)) {
     return wsSubDir;

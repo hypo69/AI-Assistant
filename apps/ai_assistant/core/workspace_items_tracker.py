@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:22:00
+# Updated: 2026-11-07 00:24:00
 # =============================================================================
 
 from __future__ import annotations
@@ -798,6 +798,8 @@ class WorkspaceItemsTracker:
             "git_head": head[:8] if head else "init",
             "branch": branch,
             "total_files": len([i for i in items if not i["is_dir"]]),
+            "user_files_count": len(user_files),
+            "system_files_count": len(system_files),
             "total_size_bytes": total_size,
             "items": items,
         }

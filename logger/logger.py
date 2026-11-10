@@ -21,7 +21,7 @@
 # Package: logger
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-01 17:40:00
+# Updated: 2026-11-07 00:37:00
 # =============================================================================
 
 from __future__ import annotations
@@ -55,6 +55,7 @@ TEXT_COLORS: Dict[str, str] = {
     'magenta': colorama.Fore.MAGENTA,
     'cyan': colorama.Fore.CYAN,
     'white': colorama.Fore.WHITE,
+    'gray': colorama.Fore.LIGHTBLACK_EX,
     'light_gray': colorama.Fore.LIGHTBLACK_EX,
     'light_red': colorama.Fore.LIGHTRED_EX,
     'light_green': colorama.Fore.LIGHTGREEN_EX,
@@ -73,6 +74,7 @@ BG_COLORS: Dict[str, str] = {
     'magenta': colorama.Back.MAGENTA,
     'cyan': colorama.Back.CYAN,
     'white': colorama.Back.WHITE,
+    'gray': colorama.Back.LIGHTBLACK_EX,
     'light_gray': colorama.Back.LIGHTBLACK_EX,
     'light_red': colorama.Back.LIGHTRED_EX,
     'light_green': colorama.Back.LIGHTGREEN_EX,
@@ -283,6 +285,24 @@ class Logger(metaclass=SingletonMeta):
     Обеспечивает цветной консольный вывод, JSON-журналирование и автоматическую
     маршрутизацию в отдельные файлы подсистем с ротацией.
     """
+
+    # Цветовые константы текста и фона для вызовов logger.console(...)
+    black: str = 'black'
+    red: str = 'red'
+    green: str = 'green'
+    yellow: str = 'yellow'
+    blue: str = 'blue'
+    magenta: str = 'magenta'
+    cyan: str = 'cyan'
+    white: str = 'white'
+    gray: str = 'gray'
+    light_gray: str = 'light_gray'
+    light_red: str = 'light_red'
+    light_green: str = 'light_green'
+    light_yellow: str = 'light_yellow'
+    light_blue: str = 'light_blue'
+    light_magenta: str = 'light_magenta'
+    light_cyan: str = 'light_cyan'
 
     def __init__(
         self,

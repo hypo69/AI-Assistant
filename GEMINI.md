@@ -85,6 +85,26 @@
 
 - Уровни выполнения: Windows AI, Foundry Local, ONNX/DirectML, Ollama, Gemini
 
+### 5. **Системная инженерия и надежность (Beyond Vibe Coding)**
+
+📄 [`.ai/instructions/standards/SYSTEM_ENGINEERING.md`](.ai/instructions/standards/SYSTEM_ENGINEERING.md)
+
+- Защита Event Loop и неблокирующий I/O; гарантированное закрытие файловых/сетевых ресурсов; контроль утечек памяти и GC
+
+- Алгоритмическая сложность: $O(1)$ Hash Map/Set поиск вместо $O(N^2)$, предотвращение N+1 запросов в ORM через Eager Loading
+
+- Строгая типобезопасность на границах: запрет `float` для денег (только `int`/`BigInt` в неделимых единицах или `Decimal`), строгий UTC ISO 8601, рантайм-схемы (Pydantic/Zod)
+
+- Защита от Lost Update в БД: атомарные SQL-операции, оптимистические версии или пессимистические блокировки (`FOR UPDATE`)
+
+- Отказоустойчивость сетей: обязательные таймауты (connect/read), Exponential Backoff + Jitter, Circuit Breaker, Idempotency-Key
+
+- Надежная асинхронная доставка: паттерн Transactional Outbox против проблем Dual-Write
+
+- Безопасность: проверка владения ресурсом (защита от BOLA/IDOR), параметризованные запросы против инъекций, хеширование паролей через Argon2id/bcrypt
+
+- Наблюдаемость (Observability): структурированные JSON-логи, метрики RED, перцентили p95/p99 вместо среднего, распределенная трассировка OpenTelemetry
+
 ---
 
 ## 👤 Ролевые инструкции
@@ -218,9 +238,9 @@ pytest tests/ --cov                # Pytest с отчётом о покрыти�
 
 **Status:** ✅ Active (Русский стандарт)  
 
-**Version:** 3.7  
+**Version:** 3.8  
 
-**Updated:** 2026-10-26 01:58:00
+**Updated:** 2026-11-10 13:35:00  
 
 **Author:** hypo69
 

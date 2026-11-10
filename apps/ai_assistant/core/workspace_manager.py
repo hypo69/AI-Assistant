@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:15:00
+# Updated: 2026-11-07 00:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ class WorkspaceManager:
         self.base_dir = p.resolve()
 
         # Каталог рабочих пространств: явный параметр или config.json приложения
-        self.workspaces_dir = Path(workspaces_dir).resolve() if workspaces_dir else resolve_workspaces_dir()
+        self.workspaces_dir = resolve_workspaces_dir(workspaces_dir)
         self.registry = WorkspaceRegistry(self.workspaces_dir)
 
         self.faiss_dir = self.base_dir / "faiss_indices"
@@ -1448,6 +1448,10 @@ class WorkspaceManager:
     def ensure_workspace_folder(self, workspace_id: str) -> Dict[str, Any]:
         """Создаёт рабочую папку на диске и инициализирует Git-репозиторий."""
         return self.items_tracker.ensure_workspace_folder(workspace_id)
+
+    def open_workspace_folder(self, workspace_id: str) -> Dict[str, Any]:
+        """Открывает физическую директорию рабочей области в нативном Проводнике Windows."""
+        return self.items_tracker.open_workspace_folder(workspace_id)
 
     def open_workspace_file(self, workspace_id: str, rel_path: str) -> Dict[str, Any]:
         """Открывает файл рабочей области в ассоциированном приложении / редакторе по умолчанию."""

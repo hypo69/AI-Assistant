@@ -12,7 +12,7 @@
 # Package: apps.common
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 14:00:00
+# Updated: 2026-11-07 00:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -104,9 +104,14 @@ class CommonWorkspaceResolver:
             _, ws_root = wm._get_or_create_workspace(target_ws)
             return target_ws, ws_root.resolve()
 
-        from header import __root__
+        try:
+            from apps.ai_assistant.core.workspace_registry import resolve_workspaces_dir
+            ws_dir = resolve_workspaces_dir()
+        except Exception:
+            from header import __root__
+            ws_dir = __root__ / "data" / "workspaces"
         resolved_ws = workspace_id or "demo"
-        ws_root = (__root__ / "data" / "workspaces" / resolved_ws).resolve()
+        ws_root = (ws_dir / resolved_ws).resolve()
         ws_root.mkdir(parents=True, exist_ok=True)
         return resolved_ws, ws_root
 

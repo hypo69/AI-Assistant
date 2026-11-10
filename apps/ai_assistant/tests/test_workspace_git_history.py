@@ -15,7 +15,7 @@
 # Package: apps/ai_assistant/tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-01 20:06:00
+# Updated: 2026-11-10 13:14:00
 # =============================================================================
 
 from __future__ import annotations
@@ -62,33 +62,38 @@ def test_active_workspace_endpoints_and_persistence() -> None:
 
     # 1. Убеждаемся, что есть хотя бы одна рабочая область
     wm = WorkspaceManager()
+    orig_active = wm.get_active_workspace_id()
     workspaces = wm.list_workspaces()
     if not workspaces:
         wm.seed_demo_workspace("test_demo_ws")
         workspaces = wm.list_workspaces()
     target_ws = workspaces[0]["workspace_id"]
 
-    # 2. Фиксируем целевую область как активную через POST API
-    post_res = client.post("/api/v1/workspaces/active", json={"workspace_id": target_ws})
-    assert post_res.status_code == 200
-    post_data = post_res.json()
-    assert post_data["status"] == "ok"
-    assert post_data["workspace_id"] == target_ws
+    try:
+        # 2. Фиксируем целевую область как активную через POST API
+        post_res = client.post("/api/v1/workspaces/active", json={"workspace_id": target_ws})
+        assert post_res.status_code == 200
+        post_data = post_res.json()
+        assert post_data["status"] == "ok"
+        assert post_data["workspace_id"] == target_ws
 
-    # 3. Запрашиваем текущее активное пространство через GET API
-    get_res = client.get("/api/v1/workspaces/active")
-    assert get_res.status_code == 200
-    get_data = get_res.json()
-    assert get_data["status"] == "ok"
-    assert get_data["workspace_id"] == target_ws
+        # 3. Запрашиваем текущее активное пространство через GET API
+        get_res = client.get("/api/v1/workspaces/active")
+        assert get_res.status_code == 200
+        get_data = get_res.json()
+        assert get_data["status"] == "ok"
+        assert get_data["workspace_id"] == target_ws
 
-    # 4. Проверяем флаг is_active в списке всех областей
-    list_res = client.get("/api/v1/workspaces")
-    assert list_res.status_code == 200
-    list_data = list_res.json()
-    ws_item = next((w for w in list_data["workspaces"] if w["workspace_id"] == target_ws), None)
-    assert ws_item is not None
-    assert ws_item.get("is_active") is True
+        # 4. Проверяем флаг is_active в списке всех областей
+        list_res = client.get("/api/v1/workspaces")
+        assert list_res.status_code == 200
+        list_data = list_res.json()
+        ws_item = next((w for w in list_data["workspaces"] if w["workspace_id"] == target_ws), None)
+        assert ws_item is not None
+        assert ws_item.get("is_active") is True
+    finally:
+        if orig_active:
+            wm.set_active_workspace(orig_active)
 
 
 def test_git_maintenance_active_repo_endpoints(tmp_path: Path) -> None:
@@ -104,23 +109,30 @@ def test_git_maintenance_active_repo_endpoints(tmp_path: Path) -> None:
     assert get_data["status"] == "ok"
     assert "repo_path" in get_data
     assert "repo_name" in get_data
+    orig_repo_path = get_data.get("repo_path")
+    orig_ws_id = get_data.get("workspace_id")
 
-    # 2. Глобальная установка активного репозитория
-    test_repo = tmp_path / "test_active_git"
-    test_repo.mkdir()
-    post_res = client.post(
-        "/api/v1/git/maintenance/active-repo",
-        json={"repo_path": str(test_repo), "workspace_id": "test_active_ws"},
-    )
-    assert post_res.status_code == 200
-    post_data = post_res.json()
-    assert post_data["status"] == "ok"
-    assert post_data["workspace_id"] == "test_active_ws"
+    try:
+        # 2. Глобальная установка активного репозитория
+        test_repo = tmp_path / "test_active_git"
+        test_repo.mkdir()
+        post_res = client.post(
+            "/api/v1/git/maintenance/active-repo",
+            json={"repo_path": str(test_repo), "workspace_id": "test_active_ws"},
+        )
+        assert post_res.status_code == 200
+        post_data = post_res.json()
+        assert post_data["status"] == "ok"
+        assert post_data["workspace_id"] == "test_active_ws"
 
-    # 3. Повторная проверка через GET
-    get_res2 = client.get("/api/v1/git/maintenance/active-repo")
-    assert get_res2.status_code == 200
-    assert get_res2.json()["workspace_id"] == "test_active_ws"
+        # 3. Повторная проверка через GET
+        get_res2 = client.get("/api/v1/git/maintenance/active-repo")
+        assert get_res2.status_code == 200
+        assert get_res2.json()["workspace_id"] == "test_active_ws"
+    finally:
+        if orig_repo_path and Path(orig_repo_path).exists():
+            from apps.ai_assistant.api.routers.router_knowledge import _workspace_manager as wm
+            wm.store.set_active_repo(orig_repo_path, orig_ws_id)
 
 
 def test_panel_router_workspace_id_integration(tmp_path: Path) -> None:

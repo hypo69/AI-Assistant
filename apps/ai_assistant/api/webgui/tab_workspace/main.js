@@ -12,7 +12,7 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 17:28:00
+ * Updated: 2026-11-10 13:17:00
  * =============================================================================
  */
 
@@ -26,7 +26,8 @@ import {
   normalizeBlockId,
   getWorkspaceIdFromHash,
   updateUrlWithPanel,
-} from './common/ui_utils.js';
+  areWorkspacesEqual,
+} from './common/ui_utils.js?v=20261110_v1';
 
 import {
   initWorkspaceSelectPanel,
@@ -35,7 +36,7 @@ import {
   getCurrentWorkspaceId,
   setCurrentWorkspaceId,
   deleteCurrentWorkspace,
-} from './panel_workspace_select/panel.js';
+} from './panel_workspace_select/panel.js?v=20261107_v1';
 import {
   initDocumentsPanel,
   loadDocuments,
@@ -53,6 +54,11 @@ import {
   initTreePanel,
   loadWorkspaceTreePanel,
 } from './panel_tree/panel.js';
+import {
+  initFileEditorTab,
+  openDocumentInTab,
+  saveActiveDocument,
+} from '/html/tab_file_editor/main.js?v=20261110_v1';
 
 let initialized = false;
 
@@ -63,17 +69,22 @@ let initialized = false;
 export async function selectWorkspaceInTab(wsId, force = false) {
   if (!wsId) return;
   const cleanId = String(wsId).trim().normalize('NFC');
-  const isDifferent = (getCurrentWorkspaceId() || '').normalize('NFC') !== cleanId;
+  const currentId = getCurrentWorkspaceId();
+  const isDifferent = !areWorkspacesEqual(cleanId, currentId);
+
+  if (!isDifferent && !force) {
+    return;
+  }
+
   setCurrentWorkspaceId(cleanId);
   const selector = document.getElementById('ws-selector');
   if (selector && selector.value !== cleanId) {
     selector.value = cleanId;
   }
-  if (isDifferent || force) {
-    await loadWorkspaces(cleanId, false);
-    // Опрашиваем СТРОГО активную суб-панель на вкладке
-    await fetchActiveSubTabOnly(true);
-  }
+
+  await loadWorkspaces(cleanId, false);
+  // Опрашиваем СТРОГО активную суб-панель на вкладке
+  await fetchActiveSubTabOnly(true);
 }
 
 /**
@@ -85,7 +96,11 @@ export async function fetchActiveSubTabOnly(force = false) {
   const wsId = getCurrentWorkspaceId();
   if (!wsId) return;
 
-  if (activeSub === 'panel-files' || activeSub === 'panel-workspace' || activeSub === 'panel-workspace-select') {
+  if (activeSub === 'panel-file-editor' || activeSub === 'panel-editor') {
+    if (typeof initFileEditorTab === 'function') {
+      await initFileEditorTab();
+    }
+  } else if (activeSub === 'panel-files' || activeSub === 'panel-workspace' || activeSub === 'panel-workspace-select') {
     // API запросы строго для активной панели Файлы (директория Git, источники: loadWorkspaces(), loadSources)
     await Promise.all([
       loadDirectoryContents(wsId),
@@ -181,6 +196,11 @@ export function switchWorkspaceSubTab(subtabId, updateUrl = true, blockId = null
   let targetPaneId = 'subpane-ws-step1';
 
   switch (canonical) {
+    case 'panel-file-editor':
+    case 'panel-editor':
+      targetBtnId = 'subtab-ws-file-editor-btn';
+      targetPaneId = 'subpane-ws-file-editor';
+      break;
     case 'panel-tree':
       targetBtnId = 'subtab-ws-tree-btn';
       targetPaneId = 'subpane-ws-tree';
@@ -258,6 +278,21 @@ export async function initWorkspaceTab() {
   if (initialized) return;
   initialized = true;
 
+  const editorContainer = document.getElementById('ws-embedded-editor-container');
+  if (editorContainer && !editorContainer.hasChildNodes()) {
+    try {
+      const res = await fetch('/html/tab_file_editor/index.html?v=20261107_v1');
+      if (res.ok) {
+        editorContainer.innerHTML = await res.text();
+      }
+    } catch (err) {
+      console.warn('[Workspace Tab] Ошибка загрузки шаблона редактора:', err);
+    }
+  }
+  if (typeof initFileEditorTab === 'function') {
+    await initFileEditorTab();
+  }
+
   const getWorkspaceId = () => getCurrentWorkspaceId();
 
   const handleWorkspaceChange = async (wsId) => {
@@ -321,7 +356,7 @@ export async function initWorkspaceTab() {
 
   const syncWorkspaceFromUrl = async () => {
     const wsId = getWorkspaceIdFromHash();
-    if (wsId && wsId !== (getCurrentWorkspaceId() || '').normalize('NFC')) {
+    if (wsId && !areWorkspacesEqual(wsId, getCurrentWorkspaceId())) {
       await selectWorkspaceInTab(wsId);
     }
   };
@@ -367,10 +402,8 @@ export async function initWorkspaceTab() {
   const handleContextOrWorkspaceChanged = async (e) => {
     if (!isWorkspaceTabActive()) return;
     const wsId = e.detail?.workspaceId || getWorkspaceIdFromHash();
-    if (wsId) {
+    if (wsId && !areWorkspacesEqual(wsId, getCurrentWorkspaceId())) {
       await selectWorkspaceInTab(wsId);
-    } else {
-      await fetchActiveSubTabOnly(true);
     }
   };
   document.addEventListener('context:changed', handleContextOrWorkspaceChanged);

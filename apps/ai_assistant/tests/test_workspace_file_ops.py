@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-26 00:54:00
+# Updated: 2026-11-10 13:14:00
 # =============================================================================
 
 from __future__ import annotations
@@ -119,31 +119,35 @@ def test_rest_api_file_ops_endpoints():
     client = TestClient(app)
     ws_id = "test_rest_ops_ws"
 
-    # Создаём рабочее пространство
-    init_res = client.post("/api/v1/workspaces", json={"workspace_id": ws_id, "name": "REST Ops WS"})
-    assert init_res.status_code == 200
+    try:
+        # Создаём рабочее пространство
+        init_res = client.post("/api/v1/workspaces", json={"workspace_id": ws_id, "name": "REST Ops WS"})
+        assert init_res.status_code == 200
 
-    # 1. POST /items/create
-    post_res = client.post(
-        f"/api/v1/workspaces/{ws_id}/items/create",
-        json={"rel_path": "api_test.txt", "is_dir": False, "content": "Hello REST API"},
-    )
-    assert post_res.status_code == 200
-    assert post_res.json()["status"] == "ok"
+        # 1. POST /items/create
+        post_res = client.post(
+            f"/api/v1/workspaces/{ws_id}/items/create",
+            json={"rel_path": "api_test.txt", "is_dir": False, "content": "Hello REST API"},
+        )
+        assert post_res.status_code == 200
+        assert post_res.json()["status"] == "ok"
 
-    # 2. GET /file-content
-    get_res = client.get(f"/api/v1/workspaces/{ws_id}/file-content?rel_path=api_test.txt")
-    assert get_res.status_code == 200
-    assert get_res.json()["content"] == "Hello REST API"
+        # 2. GET /file-content
+        get_res = client.get(f"/api/v1/workspaces/{ws_id}/file-content?rel_path=api_test.txt")
+        assert get_res.status_code == 200
+        assert get_res.json()["content"] == "Hello REST API"
 
-    # 3. POST /file-content (Edit/Save)
-    edit_res = client.post(
-        f"/api/v1/workspaces/{ws_id}/file-content",
-        json={"rel_path": "api_test.txt", "content": "Modified REST API text", "commit_message": "Edit via API"},
-    )
-    assert edit_res.status_code == 200
+        # 3. POST /file-content (Edit/Save)
+        edit_res = client.post(
+            f"/api/v1/workspaces/{ws_id}/file-content",
+            json={"rel_path": "api_test.txt", "content": "Modified REST API text", "commit_message": "Edit via API"},
+        )
+        assert edit_res.status_code == 200
 
-    # 4. DELETE /items
-    del_res = client.delete(f"/api/v1/workspaces/{ws_id}/items?rel_path=api_test.txt")
-    assert del_res.status_code == 200
-    assert del_res.json()["deleted"] == "api_test.txt"
+        # 4. DELETE /items
+        del_res = client.delete(f"/api/v1/workspaces/{ws_id}/items?rel_path=api_test.txt")
+        assert del_res.status_code == 200
+        assert del_res.json()["deleted"] == "api_test.txt"
+    finally:
+        # Очищаем временную тестовую область
+        client.delete(f"/api/v1/workspaces/{ws_id}")

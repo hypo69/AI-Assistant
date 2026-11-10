@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:05:00
+# Updated: 2026-11-07 00:24:00
 # =============================================================================
 
 from __future__ import annotations
@@ -359,20 +359,22 @@ def _open_folder_dialog(initial_dir: Optional[str] = None) -> str:
         return ""
 
 
-def _open_file_dialog(initial_dir: Optional[str] = None) -> str:
-    """Открывает нативное окно Tkinter для выбора файла на диске."""
+def _open_file_dialog(initial_dir: Optional[str] = None) -> Union[str, List[str]]:
+    """Открывает нативное окно Tkinter для выбора одного или нескольких файлов на диске."""
     try:
         import tkinter as tk
         from tkinter import filedialog
         root = tk.Tk()
         root.withdraw()
         root.attributes('-topmost', True)
-        selected_file = filedialog.askopenfilename(
+        selected_files = filedialog.askopenfilenames(
             initialdir=initial_dir or None,
-            title="Выберите файл на компьютере для отслеживания"
+            title="Выберите файлы на компьютере для отслеживания"
         )
         root.destroy()
-        return selected_file or ""
+        if selected_files:
+            return list(selected_files)
+        return ""
     except Exception as dialog_err:
         logger.warning(f"[browse_file] Ошибка вызова Tkinter диалога: {dialog_err}")
         return ""
@@ -407,8 +409,14 @@ async def browse_workspace_file(initial_dir: Optional[str] = Query(None, descrip
             timeout=60.0
         )
         if selected_file_path:
-            return {"status": "ok", "path": selected_file_path}
-        return {"status": "cancelled", "path": ""}
+            if isinstance(selected_file_path, (list, tuple)):
+                first_path = selected_file_path[0] if selected_file_path else ""
+                all_paths = [str(p) for p in selected_file_path]
+            else:
+                first_path = str(selected_file_path)
+                all_paths = [first_path] if first_path else []
+            return {"status": "ok", "path": first_path, "paths": all_paths}
+        return {"status": "cancelled", "path": "", "paths": []}
     except asyncio.TimeoutError:
         return {"status": "timeout", "path": ""}
     except Exception as exc:

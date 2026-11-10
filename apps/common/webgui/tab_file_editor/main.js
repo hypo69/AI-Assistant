@@ -16,7 +16,7 @@
  * Package: apps/common/webgui/tab_file_editor
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-06 23:15:00
+ * Updated: 2026-11-10 13:07:00
  * =============================================================================
  */
 
@@ -74,10 +74,7 @@ function getFileIconClass(fileName, isMedia, mediaType) {
 /**
  * Инициализирует модуль редактора при первом монтировании вкладки.
  */
-export function initFileEditorTab() {
-  if (isInitialized) return;
-  isInitialized = true;
-
+function initFileEditorTab() {
   bindToolbarEvents();
   bindEditorEvents();
   renderTabsBar();
@@ -88,9 +85,22 @@ export function initFileEditorTab() {
  * Привязывает обработчики кнопок верхней и нижней панелей.
  */
 function bindToolbarEvents() {
+  const root = document.getElementById('wasm-file-editor-root');
+  if (root && root.dataset.toolbarBound === 'true') return;
+  if (root) root.dataset.toolbarBound = 'true';
   // Кнопка сохранения Ctrl+S
   document.getElementById('fe-btn-save')?.addEventListener('click', () => {
     saveActiveDocument();
+  });
+
+  // Кнопка Сохранить как...
+  document.getElementById('fe-btn-save-as')?.addEventListener('click', () => {
+    saveActiveDocumentAs();
+  });
+
+  // Кнопка Сохранить все
+  document.getElementById('fe-btn-save-all')?.addEventListener('click', () => {
+    saveAllDocuments();
   });
 
   // Кнопка нового файла (+)
@@ -126,7 +136,8 @@ function bindToolbarEvents() {
 function bindEditorEvents() {
   const textarea = document.getElementById('fe-code-textarea');
   const gutter = document.getElementById('fe-line-gutter');
-  if (!textarea) return;
+  if (!textarea || textarea.dataset.editorBound === 'true') return;
+  textarea.dataset.editorBound = 'true';
 
   textarea.addEventListener('input', () => {
     const doc = getActiveDoc();
@@ -172,7 +183,7 @@ function bindEditorEvents() {
  * @param {string} [wsId] - ID рабочей области
  * @param {boolean} [switchSubtab=true] - Переключить ли субвкладку на panel-file-editor
  */
-export async function openDocumentInTab(relPath, wsId, switchSubtab = true) {
+async function openDocumentInTab(relPath, wsId, switchSubtab = true) {
   if (!relPath) return;
   const currentWs = wsId || getActiveWorkspaceId();
   const docKey = makeDocKey(currentWs, relPath);
@@ -207,12 +218,17 @@ export async function openDocumentInTab(relPath, wsId, switchSubtab = true) {
     try {
       const url = `/api/v1/workspaces/${encodeURIComponent(currentWs)}/file-content?rel_path=${encodeURIComponent(relPath)}`;
       const res = await fetch(url);
-      if (!res.ok) {
+      if (res.ok) {
+        const data = await res.json();
+        isBinary = Boolean(data.is_binary);
+        initialContent = isBinary ? '' : (data.content ?? '');
+      } else if (res.status === 404) {
+        // Новый файл, ещё не сохранённый на диске
+        isBinary = false;
+        initialContent = '';
+      } else {
         throw new Error(`Ошибка HTTP ${res.status}`);
       }
-      const data = await res.json();
-      isBinary = Boolean(data.is_binary);
-      initialContent = isBinary ? '' : (data.content ?? '');
     } catch (err) {
       console.warn(`[FileEditor] Не удалось загрузить содержимое ${relPath}:`, err);
       notifyToast(`Не удалось прочитать файл: ${err.message}`, 'danger');
@@ -248,8 +264,11 @@ export async function openDocumentInTab(relPath, wsId, switchSubtab = true) {
  * Переключает навигацию рабочей области на суб-панель редактора.
  */
 function switchToEditorSubtab() {
+  if (typeof window.switchTab === 'function' && typeof window.isTabActive === 'function' && !window.isTabActive('tab-workspace')) {
+    window.switchTab('tab-workspace');
+  }
   if (typeof window.switchWorkspaceSubTab === 'function') {
-    window.switchWorkspaceSubTab('panel-file-editor');
+    window.switchWorkspaceSubTab('panel-file-editor', true);
     return;
   }
   const btn = document.getElementById('subtab-ws-file-editor-btn');
@@ -296,6 +315,13 @@ function renderTabsBar() {
       activeDocKey = key;
       renderTabsBar();
       renderActiveDocument();
+    });
+
+    // Правый клик (ПКМ) по вкладке — вызов контекстного меню вкладки (VS Code Style)
+    tabEl.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showTabContextMenu(e.clientX, e.clientY, key);
     });
 
     // Клик по крестику — закрытие вкладки
@@ -639,7 +665,280 @@ function updateActiveTabDirtyIndicator() {
 /**
  * Сохраняет активный документ через POST /api/v1/workspaces/{workspace_id}/file-content.
  */
-export async function saveActiveDocument() {
+
+/**
+ * Закрывает все открытые вкладки, кроме указанной.
+ * @param {string} keepKey
+ */
+function closeOtherDocuments(keepKey) {
+  for (const key of Array.from(openDocuments.keys())) {
+    if (key !== keepKey) {
+      closeDocument(key);
+    }
+  }
+}
+
+/**
+ * Сохраняет активный документ под новым именем/путем (Save As, Ctrl+Shift+S).
+ */
+async function saveActiveDocumentAs() {
+  const doc = getActiveDoc();
+  if (!doc) return;
+  const currentWs = doc.wsId || getActiveWorkspaceId();
+  const defaultName = doc.relPath;
+  const newPath = prompt('Сохранить файл как (укажите путь/имя файла):', defaultName);
+  if (!newPath || !newPath.trim()) return;
+
+  const cleanPath = newPath.trim().replace(/^[\\/]+/, '');
+  if (cleanPath === doc.relPath) {
+    await saveActiveDocument();
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(currentWs)}/file-content`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rel_path: cleanPath,
+        content: doc.content,
+        commit_message: `Сохранить как ${cleanPath}`,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    notifyToast(`Файл сохранён как "${cleanPath}"`, 'success');
+    await openDocumentInTab(cleanPath, currentWs, true);
+    if (typeof window.refreshFileTree === 'function') {
+      await window.refreshFileTree(currentWs);
+    }
+  } catch (err) {
+    console.error('[FileEditor] Ошибка Save As:', err);
+    notifyToast(`Не удалось сохранить как: ${err.message}`, 'danger');
+  }
+}
+
+/**
+ * Сохраняет все измененные документы рабочей области (Save All, Ctrl+Alt+S / Ctrl+K S).
+ */
+async function saveAllDocuments() {
+  const dirtyDocs = [];
+  for (const doc of openDocuments.values()) {
+    if (doc.isDirty && !doc.isBinary && !doc.isMedia) {
+      dirtyDocs.push(doc);
+    }
+  }
+
+  if (dirtyDocs.length === 0) {
+    notifyToast('Все файлы уже сохранены', 'info');
+    return;
+  }
+
+  let savedCount = 0;
+  for (const doc of dirtyDocs) {
+    try {
+      const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(doc.wsId)}/file-content`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rel_path: doc.relPath,
+          content: doc.content,
+          commit_message: `Сохранить все: ${doc.fileName}`,
+        }),
+      });
+      if (res.ok) {
+        doc.initialContent = doc.content;
+        doc.isDirty = false;
+        savedCount++;
+      }
+    } catch (err) {
+      console.warn(`[FileEditor] Не удалось сохранить ${doc.fileName}:`, err);
+    }
+  }
+
+  renderTabsBar();
+  renderActiveDocument();
+  notifyToast(`Успешно сохранено файлов: ${savedCount} из ${dirtyDocs.length}`, 'success');
+
+  const cur = getActiveDoc();
+  if (cur && typeof window.refreshFileTree === 'function') {
+    await window.refreshFileTree(cur.wsId);
+  }
+}
+
+/**
+ * Отображает всплывающее контекстное меню по ПКМ для вкладки редактора.
+ */
+function showTabContextMenu(clientX, clientY, docKey) {
+  let menu = document.getElementById('fe-tab-context-menu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'fe-tab-context-menu';
+    menu.className = 'custom-context-menu shadow-lg';
+    document.body.appendChild(menu);
+  }
+
+  const doc = openDocuments.get(docKey);
+  if (!doc) return;
+
+  menu.innerHTML = `
+    <div class="custom-context-menu-header">${doc.fileName}</div>
+    <div class="custom-context-menu-item" data-tab-action="close">
+      <span class="custom-context-menu-icon"><i class="bi bi-x-lg"></i></span>
+      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.closeTab">Закрыть</span>
+      <span class="custom-context-menu-shortcut font-monospace text-muted font-size-75">Ctrl+W</span>
+    </div>
+    <div class="custom-context-menu-item" data-tab-action="close-others">
+      <span class="custom-context-menu-icon"><i class="bi bi-x-square"></i></span>
+      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.closeOtherTabs">Закрыть другие</span>
+    </div>
+    <div class="custom-context-menu-item" data-tab-action="close-all">
+      <span class="custom-context-menu-icon"><i class="bi bi-trash"></i></span>
+      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.closeAllTabs">Закрыть все</span>
+    </div>
+    <div class="custom-context-menu-divider"></div>
+    <div class="custom-context-menu-item" data-tab-action="save">
+      <span class="custom-context-menu-icon"><i class="bi bi-floppy text-primary"></i></span>
+      <span class="custom-context-menu-label" data-i18n="fileEditor.saveBtn">Сохранить</span>
+      <span class="custom-context-menu-shortcut font-monospace text-muted font-size-75">Ctrl+S</span>
+    </div>
+    <div class="custom-context-menu-item" data-tab-action="save-as">
+      <span class="custom-context-menu-icon"><i class="bi bi-save2 text-info"></i></span>
+      <span class="custom-context-menu-label" data-i18n="fileEditor.saveAsBtn">Сохранить как...</span>
+      <span class="custom-context-menu-shortcut font-monospace text-muted font-size-75">Ctrl+Shift+S</span>
+    </div>
+    <div class="custom-context-menu-item" data-tab-action="save-all">
+      <span class="custom-context-menu-icon"><i class="bi bi-collection text-success"></i></span>
+      <span class="custom-context-menu-label" data-i18n="fileEditor.saveAllBtn">Сохранить все</span>
+      <span class="custom-context-menu-shortcut font-monospace text-muted font-size-75">Ctrl+Alt+S</span>
+    </div>
+    <div class="custom-context-menu-divider"></div>
+    <div class="custom-context-menu-item" data-tab-action="copy-path">
+      <span class="custom-context-menu-icon"><i class="bi bi-clipboard"></i></span>
+      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.copyPath">Копировать путь</span>
+    </div>
+    <div class="custom-context-menu-item" data-tab-action="copy-rel-path">
+      <span class="custom-context-menu-icon"><i class="bi bi-clipboard-check"></i></span>
+      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.copyRelPath">Копировать относительный путь</span>
+    </div>
+    <div class="custom-context-menu-item" data-tab-action="reveal">
+      <span class="custom-context-menu-icon"><i class="bi bi-box-arrow-up-right"></i></span>
+      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.reveal">Показать в проводнике</span>
+    </div>
+  `;
+
+  menu.style.position = 'fixed';
+  menu.style.left = `${Math.min(clientX, window.innerWidth - 240)}px`;
+  menu.style.top = `${Math.min(clientY, window.innerHeight - 340)}px`;
+  menu.style.zIndex = '10500';
+  menu.classList.remove('d-none');
+
+  const closeMenu = () => {
+    menu.classList.add('d-none');
+    document.removeEventListener('click', closeMenu);
+    document.removeEventListener('keydown', onEsc);
+  };
+  const onEsc = (e) => { if (e.key === 'Escape') closeMenu(); };
+  setTimeout(() => {
+    document.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', onEsc);
+  }, 10);
+
+  menu.onclick = async (e) => {
+    const item = e.target.closest('.custom-context-menu-item');
+    if (!item) return;
+    const action = item.dataset.tabAction;
+    closeMenu();
+    activeDocKey = docKey;
+    renderTabsBar();
+    renderActiveDocument();
+
+    switch (action) {
+      case 'close':
+        closeDocument(docKey);
+        break;
+      case 'close-others':
+        closeOtherDocuments(docKey);
+        break;
+      case 'close-all':
+        closeAllDocuments();
+        break;
+      case 'save':
+        await saveActiveDocument();
+        break;
+      case 'save-as':
+        await saveActiveDocumentAs();
+        break;
+      case 'save-all':
+        await saveAllDocuments();
+        break;
+      case 'copy-path':
+        await navigator.clipboard.writeText(doc.relPath);
+        notifyToast(`Путь скопирован: ${doc.relPath}`, 'info');
+        break;
+      case 'copy-rel-path':
+        await navigator.clipboard.writeText(doc.relPath);
+        notifyToast(`Относительный путь скопирован: ${doc.relPath}`, 'info');
+        break;
+      case 'reveal':
+        handleOpenSystem();
+        break;
+    }
+  };
+}
+
+// Глобальные клавиатурные сокращения Studio Code
+let chordPending = false;
+let chordTimeout = null;
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', (e) => {
+    const editorRoot = document.getElementById('wasm-file-editor-root');
+    if (!editorRoot || editorRoot.offsetParent === null) return;
+
+    // Аккорд Ctrl+K S (Save All)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      chordPending = true;
+      clearTimeout(chordTimeout);
+      chordTimeout = setTimeout(() => { chordPending = false; }, 1500);
+      return;
+    }
+
+    if (chordPending && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      chordPending = false;
+      saveAllDocuments();
+      return;
+    }
+
+    // Сохранить (Ctrl+S), Сохранить как (Ctrl+Shift+S), Сохранить все (Ctrl+Alt+S)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      if (e.shiftKey) {
+        saveActiveDocumentAs();
+      } else if (e.altKey) {
+        saveAllDocuments();
+      } else {
+        saveActiveDocument();
+      }
+      return;
+    }
+
+    // Закрыть активную вкладку (Ctrl+W)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'w' || e.key === 'W')) {
+      e.preventDefault();
+      const active = getActiveDoc();
+      if (active) {
+        closeDocument(activeDocKey);
+      }
+      return;
+    }
+  });
+}
+
+async function saveActiveDocument() {
   const doc = getActiveDoc();
   if (!doc || doc.isBinary || doc.isMedia) return;
 
@@ -728,11 +1027,30 @@ async function handleOpenSystem() {
 }
 
 // Экспорт для глобального использования из дерева файлов и контекстного меню
-window.openFileInCentralEditor = openDocumentInTab;
-window.openFileInWasmEditor = openDocumentInTab;
+if (typeof window !== 'undefined') {
+  window.initFileEditorTab = initFileEditorTab;
+  window.openFileInCentralEditor = openDocumentInTab;
+  window.openFileInWasmEditor = openDocumentInTab;
+}
+
+export {
+  initFileEditorTab,
+  openDocumentInTab,
+  saveActiveDocument,
+  saveActiveDocumentAs,
+  saveAllDocuments,
+  closeOtherDocuments,
+  openDocumentInTab as openFileInWasmEditor,
+  openDocumentInTab as openFileInCentralEditor,
+};
 
 export default {
   initFileEditorTab,
   openDocumentInTab,
   saveActiveDocument,
+  saveActiveDocumentAs,
+  saveAllDocuments,
+  closeOtherDocuments,
+  openFileInWasmEditor: openDocumentInTab,
+  openFileInCentralEditor: openDocumentInTab,
 };

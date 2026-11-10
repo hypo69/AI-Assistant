@@ -14,7 +14,7 @@ File: index.html
 Package: apps/ai_assistant/api/webgui/tab_workspace
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-10-30 17:28:00
+Updated: 2026-11-07 00:36:00
 =============================================================================
 -->
 <div class="container-fluid p-3" id="tab-workspace-container">
@@ -30,36 +30,44 @@ Updated: 2026-10-30 17:28:00
 </div>
 </div>
 <div class="d-flex align-items-center gap-2" id="ws-header-actions-container">
+<button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" data-ai-tooltip="true" data-i18n-title="workspace.seedDemoBtn" data-term="seed_demo" id="ws-seed-demo-btn" type="button">
+<i class="bi bi-magic"></i>
+<span data-i18n="workspace.seedDemoBtn" id="ws-seed-demo-btn-text">Демо данные</span>
+</button>
 <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" data-ai-tooltip="true" data-i18n-title="workspace.rebuildFaissBtn" data-term="rebuild_faiss" id="ws-rebuild-faiss-btn" type="button">
 <i class="bi bi-cpu"></i>
 <span data-i18n="workspace.rebuildFaissBtn" id="ws-rebuild-faiss-btn-text">Перестроить FAISS</span>
 </button>
 </div>
 </div>
-<!-- Меню суб-вкладок  -->
+<!-- Блок меню переключения панелей на вкладке. Выбранная панель добавляется в url -->
 <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-secondary border-opacity-25 flex-wrap gap-2" id="ws-subtabs-nav-wrapper">
 <div class="d-flex align-items-center gap-1 flex-wrap" id="workspace-subtabs-nav" role="tablist">
-<button class="btn btn-sm btn-outline-primary active d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-step1" data-bs-toggle="pill" data-panel-id="panel-files" data-term="ws-subtab-step1" id="subtab-ws-step1-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary active d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-file-editor" data-bs-toggle="pill" data-panel-id="panel-file-editor" data-term="ws-subtab-file-editor" data-i18n-title="workspace.subtabs.editorTitle" id="subtab-ws-file-editor-btn" role="tab" type="button" title="Универсальный редактор файлов рабочей области (Studio Code)">
+<i class="bi bi-code-square text-primary"></i>
+<span data-i18n="workspace.subtabs.editor" id="subtab-ws-file-editor-text">Редактор файлов</span>
+</button>
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-files" data-bs-toggle="pill" data-panel-id="panel-files" data-term="ws-subtab-step1" data-i18n-title="workspace.subtabs.panel-filesTitle" id="subtab-ws-files-btn" role="tab" type="button" title="Раздел: Файлы">
 <i class="bi bi-folder2-open text-primary"></i>
-<span data-i18n="workspace.subtabs.files" id="subtab-ws-step1-text">Файлы</span>
+<span data-i18n="workspace.subtabs.files" id="subtab-ws-files-text">Файлы</span>
 </button>
-<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-step2" data-bs-toggle="pill" data-panel-id="panel-documents" data-term="ws-subtab-step2" id="subtab-ws-step2-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-documents" data-bs-toggle="pill" data-panel-id="panel-documents" data-term="ws-subtab-step2" data-i18n-title="workspace.subtabs.panel-documentsTitle" id="subtab-ws-documents-btn" role="tab" type="button" title="Раздел: Документы и факты (Git)">
 <i class="bi bi-file-earmark-code text-info"></i>
-<span data-i18n="workspace.subtabs.documents" id="subtab-ws-step2-text">Шаг 2: Документы и факты (Git)</span>
+<span data-i18n="workspace.subtabs.documents" id="subtab-ws-documents-text">Шаг 2: Документы и факты (Git)</span>
 </button>
-<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-step3" data-bs-toggle="pill" data-panel-id="panel-qa" data-term="ws-subtab-step3" id="subtab-ws-step3-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-qa" data-bs-toggle="pill" data-panel-id="panel-qa" data-term="ws-subtab-step3" data-i18n-title="workspace.subtabs.panel-qaTitle" id="subtab-ws-qa-btn" role="tab" type="button" title="Раздел: Вопрос-Ответ (QA)">
 <i class="bi bi-chat-dots text-success"></i>
-<span data-i18n="workspace.subtabs.qa" id="subtab-ws-step3-text">Шаг 3: Вопрос-Ответ (QA)</span>
+<span data-i18n="workspace.subtabs.qa" id="subtab-ws-qa-text">Шаг 3: Вопрос-Ответ (QA)</span>
 </button>
-<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" onclick="window.switchTab('tab-chat')" data-panel-id="panel-chat" data-term="ws-subtab-chat" id="subtab-ws-chat-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" onclick="window.switchTab('tab-chat')" data-panel-id="panel-chat" data-term="ws-subtab-chat" data-i18n-title="workspace.subtabs.chatTitle" id="subtab-ws-chat-btn" role="tab" type="button" title="Раздел: Чат">
 <i class="bi bi-chat-square-text text-primary"></i>
 <span data-i18n="workspace.subtabs.chat" id="subtab-ws-chat-text">Чат</span>
 </button>
-<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-commits" data-bs-toggle="pill" data-panel-id="panel-commits" data-term="ws-subtab-commits" id="subtab-ws-commits-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-commits" data-bs-toggle="pill" data-panel-id="panel-commits" data-term="ws-subtab-commits" data-i18n-title="workspace.subtabs.panel-commitsTitle" id="subtab-ws-commits-btn" role="tab" type="button" title="Раздел: Коммиты">
 <i class="bi bi-git text-danger"></i>
 <span data-i18n="workspace.subtabs.commits" id="subtab-ws-commits-text">Коммиты</span>
 </button>
-<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-tree" data-bs-toggle="pill" data-panel-id="panel-tree" data-term="ws-subtab-tree" id="subtab-ws-tree-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-ai-tooltip="true" data-bs-target="#subpane-ws-tree" data-bs-toggle="pill" data-panel-id="panel-tree" data-term="ws-subtab-tree" data-i18n-title="workspace.subtabs.panel-treeTitle" id="subtab-ws-tree-btn" role="tab" type="button" title="Раздел: Дерево файлов">
 <i class="bi bi-diagram-3 text-warning"></i>
 <span data-i18n="workspace.subtabs.tree" id="subtab-ws-tree-text">Дерево файлов</span>
 </button>
@@ -67,8 +75,12 @@ Updated: 2026-10-30 17:28:00
 </div>
 <!-- Subtabs Content Panes -->
 <div class="tab-content" id="workspace-subtabs-content">
+<!-- Subpane 0: Редактор файлов рабочей области (Studio Code Rust+Wasm) -->
+<div class="tab-pane fade show active" data-panel-id="panel-file-editor" id="subpane-ws-file-editor" role="tabpanel">
+  <div id="ws-embedded-editor-container"></div>
+</div>
 <!-- Subpane 1: Файлы (Git, файлы, конвертация и источники) -->
-<div class="tab-pane fade show active" data-panel-id="panel-files" id="subpane-ws-step1" role="tabpanel">
+<div class="tab-pane fade" data-panel-id="panel-files" id="subpane-ws-files" role="tabpanel">
 <!-- ПАНЕЛЬ: ФАЙЛЫ -->
 <div class="card bg-body border-secondary-subtle shadow-sm mb-3" data-panel-id="panel-files" id="panel-files">
 <div class="card-header bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between py-2 px-3" id="panel-files-header">
@@ -153,19 +165,19 @@ Updated: 2026-10-30 17:28:00
 <!-- Меню переключения подсекций: Содержимое Git, Добавление в слежение, Obsidian Vault, Внешние источники -->
 <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-secondary border-opacity-25 flex-wrap gap-2" id="ws-files-subtabs-nav-wrapper">
 <div class="d-flex align-items-center gap-1.5 flex-wrap" id="ws-files-subtabs-nav" role="tablist">
-<button class="btn btn-sm btn-outline-primary active d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#subpane-ws-files-dir" data-bs-toggle="pill" id="subtab-ws-files-dir-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary active d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-block-id="block-dir" data-bs-target="#subpane-ws-files-dir" data-bs-toggle="pill" id="subtab-ws-files-dir-btn" role="tab" type="button" title="Содержимое репозитория (Git)" data-i18n-title="workspace.blocks.block-dirTitle">
 <i class="bi bi-hdd-rack text-primary"></i>
 <span data-i18n="workspace.filesSubtabs.repoContents" id="subtab-ws-files-dir-text">Содержимое репозитория (Git)</span>
 </button>
-<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#subpane-ws-files-track" data-bs-toggle="pill" id="subtab-ws-files-track-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-block-id="block-track" data-bs-target="#subpane-ws-files-track" data-bs-toggle="pill" id="subtab-ws-files-track-btn" role="tab" type="button" title="Добавление файлов в слежение" data-i18n-title="workspace.blocks.block-trackTitle">
 <i class="bi bi-plus-square-dotted text-success"></i>
 <span data-i18n="workspace.filesSubtabs.addTracking" id="subtab-ws-files-track-text">Добавление файлов в слежение</span>
 </button>
-<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#subpane-ws-files-obsidian" data-bs-toggle="pill" id="subtab-ws-files-obsidian-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-block-id="block-obsidian" data-bs-target="#subpane-ws-files-obsidian" data-bs-toggle="pill" id="subtab-ws-files-obsidian-btn" role="tab" type="button" title="Раздел: Obsidian Vault" data-i18n-title="workspace.blocks.block-obsidianTitle">
 <i class="bi bi-journal-richtext text-info"></i>
 <span data-i18n="workspace.filesSubtabs.obsidianVault" id="subtab-ws-files-obsidian-text">Obsidian Vault</span>
 </button>
-<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-bs-target="#subpane-ws-files-sources" data-bs-toggle="pill" id="subtab-ws-files-sources-btn" role="tab" type="button">
+<button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-1 px-2.5 rounded" data-block-id="block-sources" data-bs-target="#subpane-ws-files-sources" data-bs-toggle="pill" id="subtab-ws-files-sources-btn" role="tab" type="button" title="Раздел: Внешние источники" data-i18n-title="workspace.blocks.block-sourcesTitle">
 <i class="bi bi-folder-symlink-fill text-warning"></i>
 <span data-i18n="workspace.filesSubtabs.externalSources" id="subtab-ws-files-sources-text">Внешние источники</span>
 </button>
@@ -183,6 +195,10 @@ Updated: 2026-10-30 17:28:00
 </div>
 <div class="d-flex align-items-center gap-2" id="ws-dir-contents-actions-wrap">
 <span class="badge bg-secondary-subtle text-secondary border font-monospace small" data-i18n="workspace.loadingFiles" id="ws-dir-summary-badge">Загрузка файлов...</span>
+<button class="btn btn-sm btn-outline-secondary py-0.5 px-2 d-flex align-items-center gap-1" id="btn-toggle-system-files" type="button" title="Показать или скрыть служебные файлы (.git, .gitignore, README.md и др.)" data-i18n-title="workspace.toggleSystemFilesTitle">
+<i class="bi bi-eye"></i>
+<span data-i18n="workspace.showAllFiles" id="btn-toggle-system-files-text">Показать все</span>
+</button>
 <button class="btn btn-sm btn-outline-primary py-0.5 px-2 d-flex align-items-center gap-1" data-i18n-title="workspace.refreshDirTitle" id="btn-refresh-dir-contents" title="Обновить содержимое директории" type="button">
 <i class="bi bi-arrow-clockwise"></i>
 <span data-i18n="common.refresh" id="btn-refresh-dir-contents-text">Обновить</span>
@@ -231,7 +247,12 @@ Updated: 2026-10-30 17:28:00
 <i class="bi bi-shield-check text-success"></i>
 <span data-i18n="workspace.stagedItemsTitle" id="ws-staged-items-title">Выбранные файлы и папки для включения в слежение:</span>
 </div>
+<div class="d-flex align-items-center gap-1.5">
+<button class="btn btn-sm btn-outline-primary py-0.5 px-2 d-none" id="btn-track-add-path-to-list" type="button">
+<i class="bi bi-plus-lg me-1"></i><span data-i18n="workspace.addPathToList">Добавить в список</span>
+</button>
 <span class="badge bg-info-subtle text-info border font-size-75" id="ws-staged-count-badge">0 объектов</span>
+</div>
 </div>
 <div class="list-group list-group-flush border rounded overflow-auto font-size-80 max-h-220" id="ws-staged-items-list">
 <div class="p-3 text-center text-muted small bg-body-tertiary" data-i18n="workspace.stagedEmptyMsg" id="ws-staged-empty-msg">
@@ -340,6 +361,38 @@ Updated: 2026-10-30 17:28:00
 <span data-i18n="workspace.trackAddItemsBtn" id="btn-track-add-items-text">Добавить в Git и начать слежение</span>
 </button>
 </div>
+<!-- Сводная таблица файлов и папок на Git-слежении -->
+<div class="card bg-body-tertiary border mt-3" id="ws-tracked-items-card">
+<div class="card-header bg-body d-flex flex-wrap align-items-center justify-content-between py-2 px-3" id="ws-tracked-items-card-header">
+<div class="fw-semibold small d-flex align-items-center gap-2" id="ws-tracked-items-header-wrap">
+<i class="bi bi-list-check text-success"></i>
+<span data-i18n="workspace.trackedItemsCardTitle" id="ws-tracked-items-header-title">Файлы и папки, находящиеся на Git-слежении</span>
+</div>
+<span class="badge bg-secondary-subtle text-secondary border font-monospace small" id="ws-tracked-items-summary-badge">0 объектов в слежении</span>
+</div>
+<div class="card-body p-0" id="ws-tracked-items-card-body">
+<div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+<table class="table table-sm table-hover table-striped align-middle mb-0 font-monospace small" id="ws-tracked-items-table">
+<thead class="table-light sticky-top">
+<tr>
+<th style="width: 40%;" data-i18n="workspace.tableColFilename">Имя файла / папки</th>
+<th style="width: 15%;" data-i18n="workspace.tableColFilesize">Размер</th>
+<th style="width: 15%;" data-i18n="workspace.tableColFiletype">Тип</th>
+<th style="width: 15%;" data-i18n="workspace.tableColGitStatus">Статус Git</th>
+<th style="width: 15%;" data-i18n="workspace.tableColModified">Дата изменения</th>
+</tr>
+</thead>
+<tbody id="ws-tracked-items-table-body">
+<tr>
+<td colspan="5" class="text-center py-3 text-muted font-sans-serif" data-i18n="workspace.trackedEmptyMsg">
+В этой рабочей области пока нет файлов и папок на слежении.
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -445,70 +498,16 @@ Updated: 2026-10-30 17:28:00
 </div>
 </div>
 <!-- Subpane 2: Шаг 2 — Документы рабочей области и извлеченные факты -->
-<div class="tab-pane fade" data-panel-id="panel-documents" id="subpane-ws-step2" role="tabpanel">
+<div class="tab-pane fade" data-panel-id="panel-documents" id="subpane-ws-documents" role="tabpanel">
 <div class="row g-3 mb-3" id="ws-step2-main-row">
-<!-- Левая колонка: Список файлов и Редактор документов с авто-коммитом в Git -->
-<div class="col-lg-5" id="ws-step2-left-col">
-<div class="card bg-body border-secondary-subtle shadow-sm h-100" data-panel-id="panel-documents" id="panel-documents">
-<div class="card-header bg-body-tertiary d-flex align-items-center justify-content-between py-2 px-3" id="panel-documents-header">
-<div class="fw-semibold small d-flex align-items-center gap-2" id="ws-step2-header-info">
-<span class="badge bg-primary rounded-pill" data-i18n="workspace.step2Badge" id="ws-step2-badge-step">Шаг 2</span>
-<span data-i18n="workspace.step2DocsTitle" id="ws-step2-docs-title">Документы рабочей области и Git-версии</span>
-<span class="badge bg-success-subtle text-success border font-monospace ms-1" id="ws-step2-active-badge"></span>
-</div>
-<button class="btn btn-sm btn-outline-secondary py-0 px-2" data-ai-tooltip="true" data-i18n-title="workspace.newDocTitle" data-term="documents" id="doc-new-clear-btn" title="Создать новый файл" type="button">
-<i class="bi bi-file-earmark-plus"></i> <span data-i18n="workspace.newDocBtn" id="doc-new-clear-btn-text">Новый файл</span>
-</button>
-</div>
-<div class="card-body p-3" id="panel-documents-body">
-<!-- Список документов -->
-<div class="list-group mb-3" id="ws-documents-list"></div>
-<!-- Редактор файла -->
-<div class="border rounded p-2 bg-body-tertiary" id="ws-doc-editor-box">
-<div class="fw-semibold small mb-2 d-flex align-items-center gap-1" id="ws-doc-editor-heading">
-<i class="bi bi-pencil-square text-primary"></i>
-<span data-i18n="workspace.docEditorTitle" id="ws-doc-editor-title">Редактор документа (сохранение создаёт коммит Git и обновляет факты)</span>
-</div>
-<div class="row g-2 mb-2" id="ws-doc-editor-inputs-row">
-<div class="col-8" id="ws-doc-filename-col">
-<input class="form-control form-control-sm" data-i18n-placeholder="workspace.docFilenamePlaceholder" id="doc-filename-input" placeholder="Имя файла (например: mama.txt)" type="text" value="mama.txt"/>
-</div>
-<div class="col-4" id="ws-doc-lang-col">
-<select class="form-select form-select-sm" id="doc-lang-input">
-<option data-i18n="workspace.docLangAuto" id="ws-doc-opt-auto" value="">Авто-язык</option>
-<option data-i18n="workspace.docLangRu" id="ws-doc-opt-ru" value="ru">Русский (ru)</option>
-<option data-i18n="workspace.docLangHe" id="ws-doc-opt-he" value="he">Иврит (he)</option>
-<option data-i18n="workspace.docLangEn" id="ws-doc-opt-en" value="en">English (en)</option>
-</select>
-</div>
-</div>
-<div class="mb-2" id="ws-doc-content-wrap">
-<textarea class="form-control form-control-sm font-monospace" data-i18n="ui.ws.txt_4e0a4174" data-i18n-placeholder="workspace.docContentPlaceholder" id="doc-content-input" placeholder="Введите текст документа..." rows="3">Мама мыла раму.</textarea>
-</div>
-<div class="input-group input-group-sm" id="ws-doc-commit-group">
-<input class="form-control" data-i18n-placeholder="workspace.docCommitPlaceholder" id="doc-commit-msg-input" placeholder="Сообщение коммита Git (опционально)" type="text"/>
-<button class="btn btn-success fw-semibold" data-ai-tooltip="true" data-term="documents" id="doc-save-btn" type="button">
-<i class="bi bi-git me-1"></i><span data-i18n="workspace.docSaveBtn" id="doc-save-btn-text">Сохранить в Git и Индексировать</span>
-</button>
-</div>
-</div>
-<!-- Краткий лог коммитов Git этой рабочей области -->
-<div class="mt-3" id="ws-git-history-wrap">
-<div class="small fw-semibold text-muted mb-1 d-flex align-items-center justify-content-between" id="ws-git-history-heading">
-<span data-i18n="workspace.gitHistoryMiniTitle" id="ws-git-history-title"><i class="bi bi-clock-history me-1"></i>История Git выбранной рабочей области:</span>
-</div>
-<div class="d-flex flex-column gap-1 small" id="ws-git-commits-mini"></div>
-</div>
-</div>
-</div>
-</div>
-<!-- Правая колонка: Структурированные факты (SQLite) и JSON схема -->
-<div class="col-lg-7" id="ws-step2-right-col">
+<!-- Структурированные факты (SQLite) и JSON схема -->
+<div class="col-12" id="ws-step2-right-col">
 <div class="card bg-body border-secondary-subtle shadow-sm h-100" data-panel-id="panel-facts" id="panel-facts">
 <div class="card-header bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between py-2 px-3" id="panel-facts-header">
 <div class="fw-semibold small d-flex align-items-center gap-2" id="ws-facts-header-wrap">
 <i class="bi bi-diagram-2-fill text-success"></i>
 <span data-i18n="workspace.factsHeaderTitle" id="ws-facts-header-title">Извлечённые канонические факты (action / possession)</span>
+<span class="badge bg-success-subtle text-success border font-monospace ms-1" id="ws-step2-active-badge"></span>
 </div>
 <div class="d-flex align-items-center gap-2" id="ws-facts-actions-wrap">
 <div class="form-check form-switch mb-0 small" id="ws-facts-stale-wrap">
@@ -554,7 +553,7 @@ Updated: 2026-10-30 17:28:00
 </div>
 </div>
 <!-- Subpane 3: Шаг 3 — Интеллектуальный вопрос-ответ -->
-<div class="tab-pane fade" data-panel-id="panel-qa" id="subpane-ws-step3" role="tabpanel">
+<div class="tab-pane fade" data-panel-id="panel-qa" id="subpane-ws-qa" role="tabpanel">
 <div class="card bg-body border-primary-subtle shadow-sm mb-3" data-panel-id="panel-qa" id="panel-qa">
 <div class="card-header bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between py-2 px-3" id="panel-qa-header">
 <div class="fw-semibold small d-flex align-items-center gap-2" id="ws-step3-header-wrap">

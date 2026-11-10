@@ -15,7 +15,7 @@
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-06 21:05:00
+ * Updated: 2026-11-07 00:00:00
  * =============================================================================
  */
 
@@ -29,7 +29,7 @@ import {
   bindTreeEvents,
   getCurrentFilesData,
   setCurrentFilesData,
-} from './ide_file_explorer.js?v=20261106_v1';
+} from './ide_file_explorer.js?v=20261106_v2';
 
 /**
  * Инициализирует окно поиска по рабочей области в стиле VS Code Command Center (Quick Open).

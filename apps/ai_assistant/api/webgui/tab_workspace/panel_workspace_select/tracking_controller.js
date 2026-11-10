@@ -12,12 +12,12 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace/panel_workspace_select
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 16:13:00
+ * Updated: 2026-11-07 00:22:00
  * =============================================================================
  */
 
 import { fetchJson, t } from '../common/ui_utils.js';
-import { mountTrackSourcesPicker } from '../../components/track_sources_picker/track_sources_picker.js';
+import { mountTrackSourcesPicker } from '../../components/track_sources_picker/track_sources_picker.js?v=20261107_v1';
 
 let stagedItems = [];
 let getWorkspaceIdFn = null;

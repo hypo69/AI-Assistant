@@ -7,17 +7,17 @@
  *   Позиционирование: строго НАД элементом (placement: top).
  *   Интерактивность: при наведении мыши появляется подсказка с контекстным пояснением.
  *   Проверка кэша ответов: если ответ уже был получен от модели или содержится в базе
- *   знаний, отображается готовое пояснение и кнопка «Узнать больше у модели».
- *   Если ответа еще нет — предлагается кнопка «Обратиться к модели за уточнением».
+ *   знаний, отображается готовое пояснение без сетевой задержки.
+ *   Кнопки вызова модели исключены, используется статический перевод.
  *   При запросе уточнения открывается стандартное модальное окно ИИ-ассистента
  *   (window.AIModalDialog.show), а результат кэшируется для мгновенного показа в будущем.
  *
  * File: global-tooltips-i18n.js
- * Project: ai-windows-admin
+ * Project: ai-assistant
  * Package: apps/common/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-25 23:57:00
+ * Updated: 2026-11-07 00:26:00
  * =============================================================================
  */
 
@@ -1437,17 +1437,12 @@
           <div class="ai-smart-tooltip-box">
             <div class="ai-smart-tooltip-header">
               <div class="ai-smart-tooltip-title" id="ai-smart-tooltip-title">
-                <span id="ai-smart-tooltip-icon">🤖</span>
-                <span id="ai-smart-tooltip-title-text">Подсказка ИИ</span>
+                <span id="ai-smart-tooltip-icon">💡</span>
+                <span id="ai-smart-tooltip-title-text">Подсказка</span>
               </div>
               <span class="ai-smart-tooltip-badge" id="ai-smart-tooltip-badge">WikiLLM</span>
             </div>
-            <div class="ai-smart-tooltip-body" id="ai-smart-tooltip-body">Загрузка пояснения...</div>
-            <div class="ai-smart-tooltip-footer">
-              <button type="button" class="ai-smart-tooltip-btn" id="ai-smart-tooltip-action-btn">
-                <i class="bi bi-robot"></i> <span id="ai-smart-tooltip-action-text">Узнать больше у модели</span>
-              </button>
-            </div>
+            <div class="ai-smart-tooltip-body" id="ai-smart-tooltip-body">Загрузка...</div>
             <div class="ai-smart-tooltip-arrow"></div>
           </div>
         `;
@@ -1524,7 +1519,17 @@
                      getAttr('data-ai-key') || 
                      '';
 
-      const rawTitle = getAttr('data-title') || 
+      const i18nTitleKey = getAttr('data-i18n-title');
+      let titleFromI18n = '';
+      if (i18nTitleKey && window.i18n && typeof window.i18n.t === 'function') {
+        const tr = window.i18n.t(i18nTitleKey);
+        if (tr && tr !== i18nTitleKey) {
+          titleFromI18n = tr;
+        }
+      }
+
+      const rawTitle = titleFromI18n ||
+                       getAttr('data-title') || 
                        getAttr('title') || 
                        getAttr('data-bs-title') || 
                        el.textContent || 
@@ -1702,6 +1707,8 @@
       return {
         key: key.toLowerCase(),
         title: cleanTitle,
+        i18nTitleKey: i18nTitleKey,
+        titleFromI18n: titleFromI18n,
         panelId: panelId,
         elementId: idStr,
         isProcess: isProcess,
@@ -1745,48 +1752,30 @@
       const actionBtn = container.querySelector('#ai-smart-tooltip-action-btn');
       const actionText = container.querySelector('#ai-smart-tooltip-action-text');
 
-      const t = (k, def) => (window.i18n && typeof window.i18n.t === 'function' ? window.i18n.t(k) : def);
+      const t = (k, def) => (window.i18n && typeof window.i18n.t === 'function' ? window.i18n.t(k, def) : def);
+      const dict = (window.i18n && window.i18n.translations && window.i18n.translations[window.i18n.lang]) || {};
+      const v = meta.key;
+      const kbTerm = (dict.kb && dict.kb[v]) || (dict.tooltips && dict.tooltips.kb && dict.tooltips.kb[v]);
+      const kbTitle = (kbTerm && kbTerm.title) || t(`tooltips.kb.${v}.title`, null);
+      const kbSummary = (kbTerm && kbTerm.summary) || t(`tooltips.kb.${v}.summary`, null);
 
-      const kbTitle = t(`tooltips.kb.${meta.key}.title`, (cached && cached.fullTitle) || (cached && cached.title) || meta.title || 'Элемент интерфейса');
-      const kbSummary = t(`tooltips.kb.${meta.key}.summary`, cached && cached.summary ? cached.summary : '');
-      const displayTitle = kbTitle || meta.title || 'Элемент интерфейса';
+      const displayTitle = kbTitle || meta.titleFromI18n || (cached && cached.fullTitle) || (cached && cached.title) || meta.title || t('tooltips.defaultTitle', 'Элемент интерфейса');
       const displayIcon = (cached && cached.icon) || '💡';
 
       if (iconEl) iconEl.textContent = displayIcon;
       if (titleEl) titleEl.textContent = displayTitle;
 
-      if (hasCachedAnswer) {
-        if (badgeEl) {
-          const badgeText = cached.source === 'wikillm' 
-            ? t('tooltips.badgeWikillm', 'WikiLLM')
-            : t('tooltips.badgeAiCache', 'Кэш ИИ');
-          badgeEl.textContent = badgeText;
-          badgeEl.style.display = 'inline-block';
-        }
-        if (bodyEl) {
-          bodyEl.textContent = kbSummary || cached.summary;
-        }
-        if (actionBtn) {
-          actionBtn.className = 'ai-smart-tooltip-btn';
-        }
-        if (actionText) {
-          actionText.textContent = t('tooltips.btnLearnMore', 'Узнать больше у модели');
-        }
-      } else {
-        if (badgeEl) {
-          badgeEl.textContent = t('tooltips.badgeNewTerm', 'Новый термин');
-          badgeEl.style.display = 'inline-block';
-        }
-        if (bodyEl) {
-          const notYetText = t('tooltips.notYetQueried', 'Контекстное назначение элемента «{title}» еще не запрашивалось у модели ИИ. Обратитесь к модели для получения экспертного объяснения.');
-          bodyEl.textContent = notYetText.replace('{title}', meta.title || displayTitle);
-        }
-        if (actionBtn) {
-          actionBtn.className = 'ai-smart-tooltip-btn btn-ask-model';
-        }
-        if (actionText) {
-          actionText.textContent = t('tooltips.btnAskModel', 'Обратиться к модели за уточнением');
-        }
+      if (badgeEl) {
+        const badgeText = (cached && cached.source === 'wikillm')
+          ? t('tooltips.badgeWikillm', 'WikiLLM')
+          : (cached && cached.category ? cached.category : t('tooltips.badgeNavigation', 'Навигация'));
+        badgeEl.textContent = badgeText;
+        badgeEl.style.display = 'inline-block';
+      }
+
+      if (bodyEl) {
+        const desc = kbSummary || (cached && cached.summary) || meta.titleFromI18n || meta.title || '';
+        bodyEl.textContent = desc;
       }
 
       // Позиционируем по горизонтали НАД или ПОД мышкой (ось X)
@@ -1897,7 +1886,7 @@
     },
 
     /**
-     * Обрабатывает клик по кнопке «Узнать больше у модели» / «Обратиться к модели за уточнением».
+     * Обрабатывает детальный просмотр элемента.
      * Открывает стандартное модальное окно ИИ-помощника (window.AIModalDialog.show) с передачей
      * глубокого контекста открываемого раздела, а не абстрактного security event.
      */
@@ -1930,7 +1919,7 @@
         targetPaneEl = document.querySelector(targetSelector);
       }
       if (!targetPaneEl) {
-        // Проверяем распространенные соглашения именования контейнеров в AI-Windows-Admin
+        // Проверяем распространенные соглашения именования контейнеров в ai-assistant
         const candidateSelectors = [
           `#slc-${meta.key}-container`,
           `#subpane-${meta.key}`,
@@ -2152,7 +2141,6 @@
         '#nav-tab-status',
         '#nav-tab-timeline',
         '#nav-tab-verification',
-        '#nav-tab-wikillm',
         '#ide-activity-bar button',
         '#ide-file-navigator button',
         '#tab-workspace button',
@@ -2252,6 +2240,14 @@
       if (window.bootstrap && window.bootstrap.Tooltip) {
         try {
           const tooltip = new window.bootstrap.Tooltip(el, {
+            title: () => {
+              if (el.hasAttribute('data-i18n-title')) {
+                const key = el.getAttribute('data-i18n-title');
+                const trans = window.i18n && typeof window.i18n.t === 'function' ? window.i18n.t(key) : '';
+                if (trans && trans !== key) return trans;
+              }
+              return el.getAttribute('data-bs-title') || el.getAttribute('data-original-title') || el.getAttribute('title') || '';
+            },
             trigger: 'hover focus',
             placement: placement,
             fallbackPlacements: ['top', 'bottom', 'right', 'left'],
@@ -2352,6 +2348,9 @@
     StandardTooltipManager.observeDOM();
 
     window.addEventListener('i18n:languageChanged', () => {
+      StandardTooltipManager.initAll();
+    });
+    window.addEventListener('i18n:ready', () => {
       StandardTooltipManager.initAll();
     });
   });

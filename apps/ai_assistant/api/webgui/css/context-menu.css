@@ -81,6 +81,16 @@ Updated: 2026-10-22 14:34:00
   color: var(--primary-color, var(--bs-primary, #89b4fa));
 }
 
+
+.custom-context-menu-shortcut {
+  font-size: 11px;
+  color: var(--text-muted, var(--bs-secondary-color));
+  margin-left: auto;
+  padding-left: 12px;
+  font-family: var(--bs-font-monospace, monospace);
+  opacity: 0.75;
+}
+
 .custom-context-menu-label {
   flex-grow: 1;
   white-space: nowrap;

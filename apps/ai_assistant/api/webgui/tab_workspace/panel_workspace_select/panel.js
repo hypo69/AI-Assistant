@@ -13,12 +13,12 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace/panel_workspace_select
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 17:09:00
+ * Updated: 2026-11-10 13:18:00
  * =============================================================================
  */
 
-import { fetchJson, t } from '../common/ui_utils.js';
-import { initTrackingController, loadTrackedItemsList } from './tracking_controller.js?v=20261030_v3';
+import { fetchJson, t, areWorkspacesEqual } from '../common/ui_utils.js?v=20261110_v1';
+import { initTrackingController, loadTrackedItemsList } from './tracking_controller.js?v=20261107_v1';
 
 function matchWorkspace(list, target) {
   if (!target || !Array.isArray(list) || list.length === 0) return null;
@@ -685,6 +685,7 @@ export async function loadWorkspaces(selectId = null, triggerCallback = false) {
  */
 export async function selectWorkspaceInTab(wsId) {
   if (!wsId) return;
+  if (areWorkspacesEqual(wsId, currentWorkspaceId)) return;
   currentWorkspaceId = wsId;
   const selector = document.getElementById('ws-selector');
   if (selector && selector.value !== wsId) {
@@ -776,8 +777,11 @@ export async function openWorkspaceFileInEditor(relPath, rowElement = null, forc
   try {
     if (!forceExternal) {
       let opened = false;
-      if (typeof window.switchTab === 'function') {
-        await window.switchTab('tab-file-editor');
+      if (typeof window.switchTab === 'function' && typeof window.isTabActive === 'function' && !window.isTabActive('tab-workspace')) {
+        await window.switchTab('tab-workspace');
+      }
+      if (typeof window.switchWorkspaceSubTab === 'function') {
+        window.switchWorkspaceSubTab('panel-file-editor', true);
       }
       if (typeof window.openFileInWasmEditor === 'function') {
         await window.openFileInWasmEditor(relPath, targetWsId, false);

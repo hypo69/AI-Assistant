@@ -12,7 +12,7 @@
 # Package: apps/ai_assistant/tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 20:07:00
+# Updated: 2026-11-07 00:57:00
 # =============================================================================
 
 from __future__ import annotations
@@ -296,6 +296,37 @@ def test_workspace_creation_initializes_readme(tmp_path: Path) -> None:
     assert "Описание для теста" in content
 
 
+def test_resolve_workspaces_dir_with_leading_slash() -> None:
+    """Проверяет, что пути со слэшем /data/workspaces разрешаются относительно __root__."""
+    from header import __root__
+    from apps.ai_assistant.core.workspace_registry import resolve_workspaces_dir
+
+    expected = (__root__ / "data" / "workspaces").resolve()
+    assert resolve_workspaces_dir("/data/workspaces") == expected
+    assert resolve_workspaces_dir("data/workspaces") == expected
+    assert resolve_workspaces_dir(r"\data\workspaces") == expected
+    assert resolve_workspaces_dir(Path("/data/workspaces")) == expected
 
 
+def test_resolve_workspaces_dir_from_config(monkeypatch, tmp_path: Path) -> None:
+    """Проверяет считывание storage.workspaces_dir из config.json."""
+    from header import __root__
+    from apps.ai_assistant.core.workspace_registry import resolve_workspaces_dir
 
+    # Проверяем через переменную окружения WORKSPACES_DIR
+    monkeypatch.setenv("WORKSPACES_DIR", "/data/workspaces")
+    assert resolve_workspaces_dir() == (__root__ / "data" / "workspaces").resolve()
+
+    # Проверяем прямой custom_path
+    assert resolve_workspaces_dir("/data/workspaces") == (__root__ / "data" / "workspaces").resolve()
+
+
+def test_workspace_manager_with_slash_path_lists_workspaces(tmp_path: Path) -> None:
+    """Проверяет, что WorkspaceManager корректно инициализирует путь со слэшем."""
+    ws_custom = tmp_path / "custom_ws"
+    ws_custom.mkdir()
+    _make_ws(ws_custom, "ws_1")
+
+    wm = WorkspaceManager(workspaces_dir=ws_custom)
+    items = wm.list_workspaces()
+    assert any(w["workspace_id"] == "ws_1" for w in items)

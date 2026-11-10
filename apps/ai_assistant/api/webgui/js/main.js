@@ -11,7 +11,7 @@
  * File: main.js
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
- * Updated: 2026-10-30 17:35:00
+ * Updated: 2026-11-10 13:35:00
  * =============================================================================
  */
 
@@ -20,7 +20,7 @@ import { initTheme } from './theme.js';
 import { initUserSettings } from './userSettings.js';
 import { initCacheUI } from './cache-ui.js';
 import { switchTab, loadTab, setupTabClicks } from './tab-core.js';
-import { initTopWorkspaceDropdown, updateTopWorkspaceDropdown } from './top_workspace_dropdown.js';
+import { initTopWorkspaceDropdown, updateTopWorkspaceDropdown, areWorkspacesEqual } from './top_workspace_dropdown.js?v=20261110_v1';
 import { initCustomContextMenu } from './context-menu.js';
 import {
   initDrawerWorkspaces,
@@ -30,7 +30,8 @@ import {
   findWorkspaceMatch,
 } from './drawer_workspaces.js';
 import { initIdeNavigation } from './ide_navigation.js';
-import { initIdeFileExplorer } from './ide_file_explorer.js?v=20261027_v1';
+import { initIdeFileExplorer } from './ide_file_explorer.js?v=20261106_v2';
+import { initModelTester, sendModelPing } from './model-tester.js';
 import './api-cache.js';
 
 // Глобальный экспорт для вызова из разметки и дочерних вкладок
@@ -39,11 +40,12 @@ window.switchToTab = switchTab;
 window.applyTranslations = applyTranslations;
 window.switchLang = switchLang;
 window.switchLocale = switchLang;
+window.sendModelPing = sendModelPing;
 
 // Карта соответствия вкладок: id -> [htmlUrl, jsUrl]
 const TABS = {
-  'workspace':        ['/html/tab_workspace/index.html',        '/html/tab_workspace/main.js'],
-  'create-workspace': ['/html/tab_create_workspace/index.html?v=20261030_v2', '/html/tab_create_workspace/main.js?v=20261030_v2'],
+  'workspace':        ['/html/tab_workspace/index.html?v=20261107_v2', '/html/tab_workspace/main.js?v=20261107_v2'],
+  'create-workspace': ['/html/tab_create_workspace/index.html?v=20261110_v1', '/html/tab_create_workspace/main.js?v=20261110_v1'],
   'timeline':         ['/html/tab_timeline/index.html',         '/html/tab_timeline/main.js'],
   'commits':          ['/html/tab_commits/index.html',          '/html/tab_commits/main.js'],
   'diff':             ['/html/tab_diff/index.html',             '/html/tab_diff/main.js'],
@@ -64,6 +66,10 @@ const TABS = {
   'obsidian':         ['/html/tab_obsidian/index.html',         '/html/tab_obsidian/main.js'],
   'doc-categorizer':  ['/html/tab_doc_categorizer/index.html',  '/html/tab_doc_categorizer/main.js'],
   'chat':             ['/html/tab_chat/index.html',             '/html/tab_chat/main.js'],
+  'tasks':            ['/html/tab_tasks/index.html',            '/html/tab_tasks/main.js'],
+  'instruments':      ['/html/tab_instruments/index.html',      '/html/tab_instruments/main.js'],
+  'wikillm':          ['/html/tab_wikillm/index.html',          '/html/tab_wikillm/main.js'],
+  'tooltips':         ['/html/tab_tooltips/index.html',         '/html/tab_tooltips/main.js'],
 };
 
 const loaded = new Set();
@@ -205,6 +211,7 @@ async function init() {
   initIdeNavigation();
   // 5.6 Инициализация стандартного навигатора по файлам и Command Center
   initIdeFileExplorer();
+  initModelTester();
 
   // Вспомогательный канонический парсер URL стандарта workspace-url-routing
   const parseWorkspaceUrlComponents = (rawHash) => {
@@ -318,14 +325,17 @@ async function init() {
     }
     if (curTab === 'tab-workspace' || curTab === 'workspace') {
       if (parsed.workspaceId) {
-        if (typeof window.selectWorkspaceInTab === 'function') {
-          await window.selectWorkspaceInTab(parsed.workspaceId);
+        const curWs = typeof window.getActiveWorkspaceId === 'function' ? window.getActiveWorkspaceId() : '';
+        if (!areWorkspacesEqual(parsed.workspaceId, curWs)) {
+          if (typeof window.selectWorkspaceInTab === 'function') {
+            await window.selectWorkspaceInTab(parsed.workspaceId);
+          }
+          await updateTopWorkspaceDropdown(parsed.workspaceId);
+          highlightActiveDrawerWorkspace(parsed.workspaceId);
         }
         if (typeof window.switchWorkspaceSubTab === 'function' && parsed.panelId) {
           window.switchWorkspaceSubTab(parsed.panelId, false);
         }
-        await updateTopWorkspaceDropdown(parsed.workspaceId);
-        highlightActiveDrawerWorkspace(parsed.workspaceId);
       }
     }
   });

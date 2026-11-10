@@ -3,8 +3,8 @@
 Это главный навигатор для AI-ассистентов в проекте **AI-Assistant** (Умный помощник хранения истории файлов, управления базами знаний и персональный ассистент пользователя). Здесь собраны все актуальные стандарты без дублирования и устаревших ссылок.
 
 **Статус:** ✅ Актуально  
-**Версия:** 3.0  
-**Updated:** 2026-11-01 17:30:00
+**Версия:** 3.1  
+**Updated:** 2026-11-10 13:35:00
 
 ---
 
@@ -14,6 +14,7 @@
 |------|--------|
 | **Понять архитектуру проекта** | → [`../../README.md`](../../README.md), [`../../apps/ai_assistant/README.md`](../../apps/ai_assistant/README.md) |
 | **Кодить правильно** | → [`standards/ENGINEERING.md`](standards/ENGINEERING.md) |
+| **Системная инженерия (против вайбкодинга)** | → [`standards/SYSTEM_ENGINEERING.md`](standards/SYSTEM_ENGINEERING.md) |
 | **Переиспользовать существующий код** | → [`standards/REUSE.md`](standards/REUSE.md) |
 | **Документировать код и шапки файлов** | → [`standards/DOCUMENTATION.md`](standards/DOCUMENTATION.md), [`standards/FILE_HEADERS.md`](standards/FILE_HEADERS.md) |
 | **Разрабатывать WebGUI и вкладки** | → [`standards/WEBGUI.md`](standards/WEBGUI.md) |
@@ -32,6 +33,10 @@
 - **`ENGINEERING.md`**  
   Как кодить: архитектурные принципы, стиль кода, языковые стандарты (Python 3.12+, Vanilla JS ES6+, HTML/CSS), разделение конфигов и секретов, версионирование фронтенд-ассетов (`?v=YYYYMMDD_vN`).  
   ⚠️ **Обязательно перед**: написанием любого кода.
+
+- **`SYSTEM_ENGINEERING.md`**  
+  За пределами вайбкодинга: фундаментальная база системной инженерии для предотвращения ловушек LLM. Неблокирующий I/O и защита Event Loop, предотвращение Lost Update в транзакциях БД, алгоритмическая сложность ($O(1)$ вместо $O(N^2)$, N+1), типобезопасность на границах (запрет `float` для денег, строгий UTC), устойчивые сетевые вызовы (таймауты, Backoff + Jitter, Circuit Breaker, Idempotency-Key, Transactional Outbox), защита от IDOR/BOLA и Slopsquatting, Property-Based тестирование и Observability (JSON-логи, метрики RED, перцентили p95/p99, W3C TraceContext).  
+  ⚠️ **Обязательно перед**: проектированием архитектуры, баз данных, сетевых интеграций и асинхронного I/O.
 
 - **`REUSE.md`**  
   Zero-divergence protocol: как искать существующий код в `apps/ai_assistant/`, `apps/common/`, `src/ai/`, `src/utils/`, 4-фазный аудит prior art и запрет на дублирование.  

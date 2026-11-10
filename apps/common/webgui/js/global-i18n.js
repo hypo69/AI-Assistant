@@ -9,11 +9,11 @@
  *   и автоматическое обновление вновь добавляемых элементов через MutationObserver.
  *
  * File: global-i18n.js
- * Project: ai-windows-admin
+ * Project: ai-assistant
  * Package: windows/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-25 22:45:00
+ * Updated: 2026-11-07 00:25:00
  * =============================================================================
  */
 
@@ -36,6 +36,7 @@
       this.loadTranslations(this.lang).then(() => {
         this.applyTranslations(document);
         this.startObserver();
+        window.dispatchEvent(new CustomEvent('i18n:ready', { detail: { lang: this.lang } }));
       });
 
       // Перехват смены языка через события
@@ -191,6 +192,19 @@
           if (translated && translated !== key) {
             el.setAttribute('title', translated);
             el.setAttribute('data-bs-title', translated);
+            el.setAttribute('data-original-title', translated);
+          }
+        }
+      });
+
+      // Метки optgroup и элементов с label (data-i18n-label)
+      container.querySelectorAll('[data-i18n-label]').forEach((el) => {
+        const key = el.getAttribute('data-i18n-label');
+        if (key) {
+          const translated = this.t(key);
+          if (translated && translated !== key) {
+            el.setAttribute('label', translated);
+            el.label = translated;
           }
         }
       });

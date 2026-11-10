@@ -26,6 +26,8 @@ Author: hypo69
 
 Copyright: © 2026 hypo69
 
+Updated: 2026-11-07 00:37:00
+
 
 
 """
@@ -60,7 +62,7 @@ def test_workspace_subtabs_html_structure() -> None:
 
     # 1. Проверяем наличие контейнера субменю под заголовком
 
-    assert '<!-- Меню суб-вкладок  -->' in html, "Комментарий меню суб-вкладок не найден"
+    assert ('<!-- Меню суб-вкладок  -->' in html or 'переключения панелей' in html), "Комментарий меню суб-вкладок не найден"
 
     assert 'id="workspace-subtabs-nav"' in html, "Контейнер #workspace-subtabs-nav не найден"
 
@@ -162,8 +164,6 @@ def test_workspace_subtabs_html_structure() -> None:
 
     sources_card = html.find(' id="panel-sources"')
 
-    docs_card = html.find(' id="panel-documents"')
-
     facts_card = html.find(' id="panel-facts"')
 
     qa_card = html.find(' id="panel-qa"')
@@ -192,9 +192,7 @@ def test_workspace_subtabs_html_structure() -> None:
 
 
 
-    # Шаг 2: документы и факты
-
-    assert docs_pos < docs_card < qa_pos, "panel-documents не внутри subpane-ws-documents"
+    # Шаг 2: факты (панель редактора документов убрана по ТЗ)
 
     assert docs_pos < facts_card < qa_pos, "panel-facts не внутри subpane-ws-documents"
 

@@ -13,7 +13,7 @@ File: index.html
 Package: apps/ai_assistant/api/webgui/tab_create_workspace
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-10-28 18:44:00
+Updated: 2026-11-10 13:35:00
 =============================================================================
 -->
 <div class="container-fluid p-3">
@@ -45,7 +45,8 @@ Updated: 2026-10-28 18:44:00
 <div class="card bg-body border-secondary-subtle shadow-sm mb-3">
 <div class="card-header bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between py-2 px-3">
 <div class="fw-semibold small d-flex align-items-center gap-2">
-<span class="badge bg-primary rounded-pill" data-i18n="ui.cws.txt_de59a272" id="cws-span-de59a272">Шаг 1</span>
+<i class="bi bi-gear-wide-connected text-primary fs-6"></i>
+<span class="d-none" data-i18n="ui.cws.txt_de59a272" id="cws-span-de59a272">Шаг 1</span>
 <span data-i18n="ui.cws.txt_3a420c17" id="cws-span-3a420c17">Параметры пространства и рабочая директория (Git Init)</span>
 </div>
 <span class="badge bg-secondary-subtle text-secondary border font-monospace small" data-i18n="ui.cws.txt_4835f679" id="create-ws-active-id-badge">
@@ -117,10 +118,11 @@ Updated: 2026-10-28 18:44:00
 </div>
 </div>
 <!-- БЛОК 2: Выбор директорий и файлов для слежения (на месте, без перемещения) -->
-<div class="card bg-body border-secondary-subtle shadow-sm mb-3 d-none" id="create-ws-tracking-card">
+<div class="card bg-body border-secondary-subtle shadow-sm mb-3" id="create-ws-tracking-card">
 <div class="card-header bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between py-2 px-3">
 <div class="fw-semibold small d-flex align-items-center gap-2">
-<span class="badge bg-success rounded-pill" data-i18n="ui.cws.txt_144fa97c" id="cws-span-144fa97c">Шаг 2</span>
+<i class="bi bi-folder-symlink text-success fs-6"></i>
+<span class="d-none" data-i18n="ui.cws.txt_144fa97c" id="cws-span-144fa97c">Шаг 2</span>
 <span data-i18n="ui.cws.txt_70ed1380" id="cws-span-70ed1380">Выбор директорий и файлов для слежения за изменениями</span>
 </div>
 <div class="d-flex align-items-center gap-2 small">
@@ -212,14 +214,20 @@ Updated: 2026-10-28 18:44:00
 </div>
 <!-- Завершающие действия -->
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 pt-2.5 border-top border-secondary-subtle">
-<div class="small text-success d-flex align-items-center gap-1.5 font-size-80" id="create-ws-sync-status-msg">
-<i class="bi bi-check-circle-fill"></i>
-<span data-i18n="ui.cws.txt_427c78fe" id="cws-span-427c78fe">Пространство настроено. Вы можете сразу перейти к работе с ним.</span>
+<div class="small text-muted d-flex align-items-center gap-1.5 font-size-80" id="create-ws-sync-status-msg">
+<i class="bi bi-info-circle text-primary"></i>
+<span data-i18n="ui.cws.txt_1a80632a" id="cws-span-1a80632a-bottom">При создании будет сформирован репозиторий Git и начальный коммит.</span>
 </div>
-<button class="btn btn-success btn-sm fw-semibold d-flex align-items-center gap-1.5 px-3 py-1.5 shadow-sm" id="btn-go-to-workspace" type="button">
+<div class="d-flex align-items-center gap-2">
+<button class="btn btn-primary btn-sm fw-semibold d-flex align-items-center gap-1.5" id="btn-create-ws-submit-bottom" type="button">
+<i class="bi bi-check2-circle"></i>
+<span data-i18n="ui.cws.txt_38b2024b" id="cws-span-38b2024b-bottom">Создать пространство и инициализировать Git</span>
+</button>
+<button class="btn btn-success btn-sm fw-semibold d-flex align-items-center gap-1.5 px-3 py-1.5 shadow-sm d-none" id="btn-go-to-workspace" type="button">
 <span data-i18n="ui.cws.txt_d26799e8" id="cws-span-d26799e8">Перейти в рабочую область</span>
 <i class="bi bi-arrow-right-circle"></i>
 </button>
+</div>
 </div>
 </div>
 </div>

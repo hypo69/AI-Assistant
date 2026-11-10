@@ -184,12 +184,15 @@
             "youtube_mp3"
         ],
         "disabled": [
-            "sqlite_db_viewer",
-            "user_storage"
+            "user_storage",
+            "sqlite_db_viewer"
         ]
     },
     "chromium": {
         "profile_dir": "data/chromium/profiles",
         "cache_dir": "data/chromium/cache"
+    },
+    "storage": {
+        "workspaces_dir": "/data/workspaces"
     }
 }

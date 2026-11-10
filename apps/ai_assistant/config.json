@@ -1,12 +1,15 @@
 {
+  "storage": {
+    "workspaces_dir": "/data/workspaces"
+  },
   "git_maintenance": {
     "auto_gc_enabled": true,
-    "gc_interval_hours": 24,
+    "gc_interval_hours": 48,
     "aggressive": false,
     "auto_prune": true,
-    "last_gc_run": "2026-11-06T22:55:17.256147",
-    "last_gc_status": "Диагностика: Наблюдение. Повторить измерение (2026-11-06T22:55:17.256147)"
+    "last_gc_run": "2026-11-10T12:54:51.337491",
+    "last_gc_status": "Диагностика: Наблюдение. Повторить измерение (2026-11-10T12:54:51.337491)"
   },
-  "active_workspace": "test_sidebar_toggle_ws",
-  "last_active_workspace": "test_sidebar_toggle_ws"
+  "active_workspace": "test_sys_toggle_ws",
+  "last_active_workspace": "test_sys_toggle_ws"
 }

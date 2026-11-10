@@ -17,13 +17,52 @@
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 13:48:00
+ * Updated: 2026-11-10 13:16:00
  * =============================================================================
  */
 
 let activeRepoPath = '';
 let activeWorkspaceId = '';
 let availableRepositories = [];
+let inFlightRepoFetch = null;
+let isSettingActiveRepo = false;
+
+/**
+ * Нормализует идентификатор рабочего пространства:
+ * декодирование URL, приведение к NFC, удаление префикса ws-, замена пробелов на _, нижний регистр.
+ * @param {string|null} id
+ * @returns {string}
+ */
+export function normalizeWorkspaceId(id) {
+  if (!id) return '';
+  let clean = String(id).trim();
+  try {
+    clean = decodeURIComponent(clean);
+  } catch (_) {}
+  return clean
+    .normalize('NFC')
+    .replace(/^ws-/, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .toLowerCase();
+}
+
+/**
+ * Проверяет эквивалентность двух идентификаторов рабочих областей независимо от пробелов, подчеркиваний и URL-кодирования.
+ * @param {string|null} id1
+ * @param {string|null} id2
+ * @returns {boolean}
+ */
+export function areWorkspacesEqual(id1, id2) {
+  if (!id1 && !id2) return true;
+  if (!id1 || !id2) return false;
+  return normalizeWorkspaceId(id1) === normalizeWorkspaceId(id2);
+}
+
+if (typeof window !== 'undefined') {
+  window.normalizeWorkspaceId = normalizeWorkspaceId;
+  window.areWorkspacesEqual = areWorkspacesEqual;
+}
 
 /**
  * Возвращает отображаемое имя активной рабочей области.
@@ -116,47 +155,56 @@ if (typeof window !== 'undefined') {
 
 /**
  * Загружает список доступных рабочих пространств, основываясь на тех, что есть в директории с Git.
+ * Выполняет дедупликацию одновременных вызовов через inFlightRepoFetch.
  * @returns {Promise<Array>}
  */
 export async function fetchAvailableRepositories() {
-  let repos = [];
+  if (inFlightRepoFetch) return inFlightRepoFetch;
 
-  // 1. Попытка получить пространства напрямую через Electron IPC
-  if (typeof window !== 'undefined' && window.aiEngineBridge?.listGitWorkspaces) {
-    try {
-      const electronWs = await window.aiEngineBridge.listGitWorkspaces();
-      if (Array.isArray(electronWs) && electronWs.length > 0) {
-        repos = electronWs.map((w) => ({
-          id: `ws-${w.workspace_id}`,
-          workspace_id: w.workspace_id,
-          name: w.name || w.workspace_id,
-          path: (w.path || '').replace(/\\/g, '/'),
-          branch: w.branch || 'master',
-          has_git: true,
-        }));
-      }
-    } catch (e) {
-      console.warn('[TopRepoSelector] Ошибка IPC listGitWorkspaces:', e);
-    }
-  }
+  inFlightRepoFetch = (async () => {
+    let repos = [];
 
-  // 2. Если список ещё пуст — запрашиваем REST API сервера (/api/v1/git/maintenance/repositories)
-  if (repos.length === 0) {
-    try {
-      const res = await fetch('/api/v1/git/maintenance/repositories');
-      if (res.ok) {
-        const serverRepos = await res.json();
-        if (Array.isArray(serverRepos)) {
-          repos = serverRepos.filter((r) => r.id && r.id.startsWith('ws-'));
+    // 1. Попытка получить пространства напрямую через Electron IPC
+    if (typeof window !== 'undefined' && window.aiEngineBridge?.listGitWorkspaces) {
+      try {
+        const electronWs = await window.aiEngineBridge.listGitWorkspaces();
+        if (Array.isArray(electronWs) && electronWs.length > 0) {
+          repos = electronWs.map((w) => ({
+            id: `ws-${w.workspace_id}`,
+            workspace_id: w.workspace_id,
+            name: w.name || w.workspace_id,
+            path: (w.path || '').replace(/\\/g, '/'),
+            branch: w.branch || 'master',
+            has_git: true,
+          }));
         }
+      } catch (e) {
+        console.warn('[TopRepoSelector] Ошибка IPC listGitWorkspaces:', e);
       }
-    } catch (err) {
-      console.warn('[TopRepoSelector] Ошибка загрузки списка репозиториев с сервера:', err);
     }
-  }
 
-  availableRepositories = Array.isArray(repos) ? repos : [];
-  return availableRepositories;
+    // 2. Если список ещё пуст — запрашиваем REST API сервера (/api/v1/git/maintenance/repositories)
+    if (repos.length === 0) {
+      try {
+        const res = await fetch('/api/v1/git/maintenance/repositories');
+        if (res.ok) {
+          const serverRepos = await res.json();
+          if (Array.isArray(serverRepos)) {
+            repos = serverRepos.filter((r) => r.id && r.id.startsWith('ws-'));
+          }
+        }
+      } catch (err) {
+        console.warn('[TopRepoSelector] Ошибка загрузки списка репозиториев с сервера:', err);
+      }
+    }
+
+    availableRepositories = Array.isArray(repos) ? repos : [];
+    return availableRepositories;
+  })().finally(() => {
+    inFlightRepoFetch = null;
+  });
+
+  return inFlightRepoFetch;
 }
 
 /**
@@ -180,125 +228,138 @@ export async function fetchGlobalActiveRepoFromServer() {
  * @param {string|null} [explicitWsId=null] - Опциональный идентификатор рабочей области
  */
 export async function setGlobalActiveRepo(chosenPath, explicitWsId = null) {
-  if (!chosenPath) return;
+  if (!chosenPath || isSettingActiveRepo) return;
+  isSettingActiveRepo = true;
 
-  const normTarget = chosenPath.replace(/\\/g, '/');
-  activeRepoPath = normTarget;
+  try {
+    const normTarget = chosenPath.replace(/\\/g, '/');
 
-  // Определение workspace_id по переданному значению, реестру или пути
-  let wsId = explicitWsId;
-  if (!wsId && availableRepositories.length > 0) {
-    const found = availableRepositories.find(
-      (r) => (r.path || '').replace(/\\/g, '/').toLowerCase() === normTarget.toLowerCase()
-    );
-    if (found) {
-      wsId = found.workspace_id || (found.id && found.id.startsWith('ws-') ? found.id.slice(3) : null);
-    }
-  }
-
-  // Если путь содержит /workspaces/, извлекаем имя рабочей области
-  if (!wsId) {
-    const match = normTarget.match(/\/(?:workspaces|data)\/([^/]+)$/i);
-    if (match && match[1]) {
-      try {
-        wsId = decodeURIComponent(match[1]);
-      } catch (_) {
-        wsId = match[1];
+    // Определение workspace_id по переданному значению, реестру или пути
+    let wsId = explicitWsId;
+    if (!wsId && availableRepositories.length > 0) {
+      const found = availableRepositories.find(
+        (r) => (r.path || '').replace(/\\/g, '/').toLowerCase() === normTarget.toLowerCase()
+      );
+      if (found) {
+        wsId = found.workspace_id || (found.id && found.id.startsWith('ws-') ? found.id.slice(3) : null);
       }
     }
-  }
 
-  activeWorkspaceId = wsId || '';
-  updateActiveWorkspaceHeaderTitle(activeWorkspaceId);
-
-  // 1. Сохраняем в localStorage для мгновенного восстановления
-  try {
-    localStorage.setItem('ai_assistant_active_repo', normTarget);
-    if (wsId) {
-      localStorage.setItem('ai_assistant_active_workspace', wsId);
-    } else {
-      localStorage.removeItem('ai_assistant_active_workspace');
+    // Если путь содержит /workspaces/, извлекаем имя рабочей области
+    if (!wsId) {
+      const match = normTarget.match(/\/(?:workspaces|data)\/([^/]+)$/i);
+      if (match && match[1]) {
+        try {
+          wsId = decodeURIComponent(match[1]);
+        } catch (_) {
+          wsId = match[1];
+        }
+      }
     }
-  } catch (_) {}
 
-  // 2. В Electron синхронизируем выбор с главным процессом и нативным меню
-  if (typeof window !== 'undefined' && window.aiEngineBridge?.setActiveWorkspace && wsId) {
+    // Защита от повторной установки идентичного репозитория и рабочего пространства
+    if (
+      areWorkspacesEqual(wsId, activeWorkspaceId) &&
+      normTarget.toLowerCase() === (activeRepoPath || '').toLowerCase()
+    ) {
+      return;
+    }
+
+    activeRepoPath = normTarget;
+    activeWorkspaceId = wsId || '';
+    updateActiveWorkspaceHeaderTitle(activeWorkspaceId);
+
+    // 1. Сохраняем в localStorage для мгновенного восстановления
     try {
-      window.aiEngineBridge.setActiveWorkspace(wsId, normTarget);
+      localStorage.setItem('ai_assistant_active_repo', normTarget);
+      if (wsId) {
+        localStorage.setItem('ai_assistant_active_workspace', wsId);
+      } else {
+        localStorage.removeItem('ai_assistant_active_workspace');
+      }
     } catch (_) {}
-  }
 
-  // 3. Отправляем API запросы на сервер для глобальной фиксации
-  try {
-    fetch('/api/v1/git/maintenance/active-repo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ repo_path: normTarget, workspace_id: wsId }),
-    });
+    // 2. В Electron синхронизируем выбор с главным процессом и нативным меню
+    if (typeof window !== 'undefined' && window.aiEngineBridge?.setActiveWorkspace && wsId) {
+      try {
+        window.aiEngineBridge.setActiveWorkspace(wsId, normTarget);
+      } catch (_) {}
+    }
 
-    if (wsId) {
-      fetch('/api/v1/workspaces/active', {
+    // 3. Отправляем API запросы на сервер для глобальной фиксации
+    try {
+      fetch('/api/v1/git/maintenance/active-repo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspace_id: wsId }),
+        body: JSON.stringify({ repo_path: normTarget, workspace_id: wsId }),
       });
-    }
-  } catch (err) {
-    console.warn('[TopRepoSelector] Ошибка сохранения активного репозитория на сервере:', err);
-  }
 
-  // 4. Синхронизируем значение в верхнем выпадающем списке
-  const topSelect = document.getElementById('top-select-git-repo');
-  if (topSelect && topSelect.value !== normTarget) {
-    for (const opt of topSelect.options) {
-      if ((opt.value || '').replace(/\\/g, '/').toLowerCase() === normTarget.toLowerCase()) {
-        topSelect.value = opt.value;
-        break;
+      if (wsId) {
+        fetch('/api/v1/workspaces/active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workspace_id: wsId }),
+        });
+      }
+    } catch (err) {
+      console.warn('[TopRepoSelector] Ошибка сохранения активного репозитория на сервере:', err);
+    }
+
+    // 4. Синхронизируем значение в верхнем выпадающем списке
+    const topSelect = document.getElementById('top-select-git-repo');
+    if (topSelect && topSelect.value !== normTarget) {
+      for (const opt of topSelect.options) {
+        if ((opt.value || '').replace(/\\/g, '/').toLowerCase() === normTarget.toLowerCase()) {
+          topSelect.value = opt.value;
+          break;
+        }
       }
     }
-  }
 
-  // 5. Синхронизируем значение в списке контекста вкладки tab_git_maintenance (#select-git-repo)
-  const maintSelect = document.getElementById('select-git-repo');
-  if (maintSelect && maintSelect.value !== normTarget) {
-    for (const opt of maintSelect.options) {
-      if ((opt.value || '').replace(/\\/g, '/').toLowerCase() === normTarget.toLowerCase()) {
-        maintSelect.value = opt.value;
-        break;
+    // 5. Синхронизируем значение в списке контекста вкладки tab_git_maintenance (#select-git-repo)
+    const maintSelect = document.getElementById('select-git-repo');
+    if (maintSelect && maintSelect.value !== normTarget) {
+      for (const opt of maintSelect.options) {
+        if ((opt.value || '').replace(/\\/g, '/').toLowerCase() === normTarget.toLowerCase()) {
+          maintSelect.value = opt.value;
+          break;
+        }
       }
     }
-  }
 
-  // 6. Синхронизируем селектор на вкладке tab_workspace (#ws-selector) и переключаем на URL рабочей области
-  if (wsId) {
-    const wsSelector = document.getElementById('ws-selector');
-    if (wsSelector && wsSelector.value !== wsId) {
-      wsSelector.value = wsId;
-    }
-    if (typeof window.selectWorkspaceInTab === 'function') {
-      window.selectWorkspaceInTab(wsId);
-    }
-    if (typeof window.switchWorkspaceSubTab === 'function') {
-      window.switchWorkspaceSubTab('step2');
+    // 6. Синхронизируем селектор на вкладке tab_workspace (#ws-selector) и переключаем на URL рабочей области
+    if (wsId) {
+      const wsSelector = document.getElementById('ws-selector');
+      if (wsSelector && wsSelector.value !== wsId) {
+        wsSelector.value = wsId;
+      }
+      if (typeof window.selectWorkspaceInTab === 'function') {
+        window.selectWorkspaceInTab(wsId);
+      }
+
+      // 6.1 Формируем канонический URL без паразитного вызова hashchange
+      const currentSub = (typeof window.getWorkspacePanelFromHash === 'function' ? window.getWorkspacePanelFromHash() : null) || 'panel-files';
+      const targetHash = `#tab-workspace#${currentSub}#workspace=${encodeURIComponent(wsId)}`;
+      if (typeof location !== 'undefined' && location.hash !== targetHash) {
+        if (typeof history !== 'undefined' && history.replaceState) {
+          history.replaceState(null, '', `${location.pathname}${location.search || ''}${targetHash}`);
+        } else {
+          location.hash = targetHash;
+        }
+      }
     }
 
-    // 6.1 Формируем канонический URL (#tab-workspace#panel-files#workspace=<wsId>)
-    const currentSub = (typeof window.getWorkspacePanelFromHash === 'function' ? window.getWorkspacePanelFromHash() : null) || 'panel-files';
-    const targetHash = `#tab-workspace#${currentSub}#workspace=${encodeURIComponent(wsId)}`;
-    if (typeof location !== 'undefined' && location.hash !== targetHash) {
-      location.hash = targetHash;
+    // 7. Оповещаем систему о смене контекста единственным событием workspace:changed
+    const eventDetail = { repoPath: normTarget, workspaceId: wsId };
+    document.dispatchEvent(new CustomEvent('workspace:changed', { detail: eventDetail }));
+    document.dispatchEvent(new CustomEvent('repo:changed', { detail: eventDetail }));
+
+    // 8. Если открыта вкладка обслуживания Git, обновляем диагностику
+    if (typeof window.loadDiagnosis === 'function') {
+      window.loadDiagnosis(normTarget);
     }
-  }
-
-  // 7. Оповещаем систему о смене контекста событиями context:changed, workspace:changed, repo:changed
-  const eventDetail = { repoPath: normTarget, workspaceId: wsId };
-  document.dispatchEvent(new CustomEvent('context:changed', { detail: eventDetail }));
-  document.dispatchEvent(new CustomEvent('workspace:changed', { detail: eventDetail }));
-  document.dispatchEvent(new CustomEvent('repo:changed', { detail: eventDetail }));
-
-  // 8. Если открыта вкладка обслуживания Git, обновляем диагностику
-  if (typeof window.loadDiagnosis === 'function') {
-    window.loadDiagnosis(normTarget);
+  } finally {
+    isSettingActiveRepo = false;
   }
 }
 window.setGlobalActiveRepo = setGlobalActiveRepo;
@@ -309,22 +370,27 @@ window.setGlobalActiveRepo = setGlobalActiveRepo;
  * @returns {Promise<void>}
  */
 export async function updateTopWorkspaceDropdown(wsId) {
+  if (!wsId) return;
   let decoded = wsId;
   try { decoded = decodeURIComponent(wsId); } catch (_) {}
   const cleanWs = (decoded || '').trim().normalize('NFC');
-  const cleanLower = cleanWs.toLowerCase();
+
+  // Если уже активно это пространство, избегаем повторных сетевых запросов и каскадов
+  if (areWorkspacesEqual(cleanWs, activeWorkspaceId)) {
+    updateActiveWorkspaceHeaderTitle(cleanWs);
+    return;
+  }
 
   const repos = await fetchAvailableRepositories();
   const found = cleanWs
     ? repos.find((r) => {
-        const rId = (r.workspace_id || (r.id || '').replace(/^ws-/, '')).normalize('NFC').toLowerCase();
-        const rName = (r.name || '').replace(/^Workspace:\s*/i, '').normalize('NFC').toLowerCase();
+        const rId = (r.workspace_id || (r.id || '').replace(/^ws-/, ''));
+        const rName = (r.name || '').replace(/^Workspace:\s*/i, '');
         const rPath = (r.path || '').replace(/\\/g, '/').toLowerCase();
         return (
-          rId === cleanLower ||
-          rName === cleanLower ||
-          rPath.endsWith(`/${cleanLower}`) ||
-          rPath.endsWith(`/${cleanLower.replace(/\s+/g, '_')}`)
+          areWorkspacesEqual(rId, cleanWs) ||
+          areWorkspacesEqual(rName, cleanWs) ||
+          rPath.endsWith(`/${normalizeWorkspaceId(cleanWs)}`)
         );
       })
     : null;
@@ -343,8 +409,8 @@ export async function updateTopWorkspaceDropdown(wsId) {
     return;
   }
   updateActiveWorkspaceHeaderTitle(cleanWs);
-  if (cleanWs.toLowerCase() === (activeWorkspaceId || '').toLowerCase() && (found.path || '').replace(/\\/g, '/').toLowerCase() === (activeRepoPath || '').toLowerCase()) return;
-  await setGlobalActiveRepo(found.path, cleanWs);
+  if (areWorkspacesEqual(cleanWs, activeWorkspaceId) && (found.path || '').replace(/\\/g, '/').toLowerCase() === (activeRepoPath || '').toLowerCase()) return;
+  await setGlobalActiveRepo(found.path, found.workspace_id || cleanWs);
 }
 window.updateTopWorkspaceDropdown = updateTopWorkspaceDropdown;
 
@@ -378,7 +444,9 @@ export function renderTopRepoSelector(repos, currentPath) {
   let html = `<optgroup label="Рабочие пространства с Git (Мои пространства)">${wsRepos.map(renderOption).join('')}</optgroup>`;
   html += '<option value="__create_new__">+ Создать / Добавить новое рабочее пространство...</option>';
 
-  select.innerHTML = html;
+  if (select.innerHTML !== html) {
+    select.innerHTML = html;
+  }
   updateActiveWorkspaceHeaderTitle(activeWorkspaceId);
 }
 

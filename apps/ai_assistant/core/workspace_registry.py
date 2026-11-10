@@ -23,6 +23,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
+# Updated: 2026-11-07 00:53:00
 # Updated: 2026-11-06 23:05:00
 # Updated: 2026-10-28 20:00:00
 # =============================================================================
@@ -211,35 +212,83 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def resolve_workspaces_dir() -> Path:
-    """Определяет каталог рабочих пространств из config.json приложения ai_assistant.
+def resolve_workspaces_dir(custom_path: Optional[Path | str] = None) -> Path:
+    """Определяет каталог рабочих пространств из config.json или явно переданного пути.
+
+    Корректно обрабатывает относительные пути репозитория со слэшами вида '/data/workspaces'
+    или '\\data\\workspaces', разрешая их строго относительно корня проекта (__root__),
+    а не относительно корня системного диска (C:\\data\\workspaces).
+
+    Args:
+        custom_path: Явно переданный каталог рабочих пространств (опционально).
 
     Returns:
-        Path: Абсолютный путь к каталогу workspaces (`storage.workspaces_dir`
-        или `git.workspaces_dir`; по умолчанию `data/workspaces` в корне проекта).
+        Path: Абсолютный путь к каталогу workspaces.
     """
-    app_dir = Path(__file__).resolve().parent.parent
-    cfg_file = app_dir / "config.json"
-    cfg_ws_dir = ""
-    if cfg_file.exists():
-        try:
-            cfg = json.loads(cfg_file.read_text(encoding="utf-8"))
-            cfg_ws_dir = cfg.get("storage", {}).get("workspaces_dir") or cfg.get("git", {}).get("workspaces_dir") or ""
-        except Exception as exc:
-            logger.warning(f"[WorkspaceRegistry] Ошибка чтения config.json: {exc}")
-    raw_str = (cfg_ws_dir or "data/workspaces").strip()
-    if raw_str.replace("\\", "/").rstrip("/") == "data":
-        raw_str = "data/workspaces"
-    ws_path = Path(raw_str)
-    if ws_path.is_absolute():
+    from header import __root__
+
+    raw_str = ""
+    if custom_path is not None:
+        raw_str = str(custom_path).strip()
+    else:
+        # 1. Проверяем переменные окружения
+        env_ws = os.environ.get("AI_ASSISTANT_WORKSPACES_DIR") or os.environ.get("WORKSPACES_DIR")
+        if env_ws:
+            raw_str = env_ws.strip()
+
+        # 2. Проверяем config.json приложения apps/ai_assistant/config.json
+        app_dir = Path(__file__).resolve().parent.parent
+        app_cfg_file = app_dir / "config.json"
+        if not raw_str and app_cfg_file.exists():
+            try:
+                cfg = json.loads(app_cfg_file.read_text(encoding="utf-8"))
+                storage_cfg = cfg.get("storage")
+                if isinstance(storage_cfg, dict):
+                    raw_str = storage_cfg.get("workspaces_dir") or storage_cfg.get("workspaces") or ""
+                elif isinstance(storage_cfg, str):
+                    raw_str = storage_cfg
+                if not raw_str:
+                    raw_str = cfg.get("workspaces_dir") or cfg.get("git", {}).get("workspaces_dir") or ""
+                if not raw_str and isinstance(cfg.get("workspaces"), str):
+                    raw_str = cfg.get("workspaces")
+            except Exception as exc:
+                logger.warning(f"[WorkspaceRegistry] Ошибка чтения {app_cfg_file}: {exc}")
+
+        # 3. Проверяем корневой config.json проекта
+        root_cfg_file = __root__ / "config.json"
+        if not raw_str and root_cfg_file.exists():
+            try:
+                root_cfg = json.loads(root_cfg_file.read_text(encoding="utf-8"))
+                storage_cfg = root_cfg.get("storage")
+                if isinstance(storage_cfg, dict):
+                    raw_str = storage_cfg.get("workspaces_dir") or storage_cfg.get("workspaces") or ""
+                elif isinstance(storage_cfg, str):
+                    raw_str = storage_cfg
+                if not raw_str:
+                    raw_str = root_cfg.get("workspaces_dir") or ""
+                if not raw_str and isinstance(root_cfg.get("workspaces"), str):
+                    raw_str = root_cfg.get("workspaces")
+            except Exception as exc:
+                logger.warning(f"[WorkspaceRegistry] Ошибка чтения {root_cfg_file}: {exc}")
+
+    raw_str = (raw_str or "data/workspaces").strip()
+
+    # Проверка на реальный абсолютный Windows диск (например, C:\ или C:/)
+    is_windows_drive = bool(re.match(r"^[a-zA-Z]:[\\/]", raw_str))
+    # UNC-путь: начинается с двух слэшей \\server\\share или //server/share
+    is_unc = (raw_str.startswith(r"\\") or raw_str.startswith("//")) and not raw_str.startswith(r"\\?")
+
+    if is_windows_drive or is_unc:
+        ws_path = Path(raw_str).resolve()
         ws_path.mkdir(parents=True, exist_ok=True)
         return ws_path
 
-    # Корневой каталог проекта
-    from header import __root__
-    root_ws = (__root__ / ws_path).resolve()
-    app_ws = (app_dir / ws_path).resolve()
+    # Очищаем ведущие слэши для путей репозитория (/data/workspaces, \data\workspaces)
+    clean = raw_str.replace("\\", "/").strip().lstrip("/")
+    if clean.rstrip("/") in ("data", ""):
+        clean = "data/workspaces"
 
+    root_ws = (__root__ / clean).resolve()
     root_ws.mkdir(parents=True, exist_ok=True)
     return root_ws
 
@@ -272,13 +321,13 @@ def _read_git_head(ws_path: Path) -> str:
 class WorkspaceRegistry:
     """Реестр рабочих пространств: сканирует каталог и управляет файлами .workspace/config.json."""
 
-    def __init__(self, workspaces_dir: Path) -> None:
+    def __init__(self, workspaces_dir: Path | str) -> None:
         """Инициализирует реестр с явно переданным каталогом рабочих пространств.
 
         Args:
             workspaces_dir: Каталог, подпапки которого являются рабочими пространствами.
         """
-        self.workspaces_dir = Path(workspaces_dir).resolve()
+        self.workspaces_dir = resolve_workspaces_dir(workspaces_dir)
         self.workspaces_dir.mkdir(parents=True, exist_ok=True)
         self._migrate_workspaces_from_legacy_data()
 

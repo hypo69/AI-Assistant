@@ -13,7 +13,7 @@
  * Package: windows/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-25 23:45:00
+ * Updated: 2026-11-07 00:25:00
  * =============================================================================
  */
 
@@ -36,6 +36,7 @@
       this.loadTranslations(this.lang).then(() => {
         this.applyTranslations(document);
         this.startObserver();
+        window.dispatchEvent(new CustomEvent('i18n:ready', { detail: { lang: this.lang } }));
       });
 
       // Перехват смены языка через события
@@ -191,6 +192,7 @@
           if (translated && translated !== key) {
             el.setAttribute('title', translated);
             el.setAttribute('data-bs-title', translated);
+            el.setAttribute('data-original-title', translated);
           }
         }
       });

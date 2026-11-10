@@ -16,7 +16,7 @@
 # Package: apps.ai_assistant
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:05:00
+# Updated: 2026-11-07 00:31:00
 # =============================================================================
 
 from __future__ import annotations
@@ -39,6 +39,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from logger import logger
+from apps.ai_assistant.api.middleware import ConsoleStatusLogMiddleware
 from apps.common.webgui import SmartMultiDirStaticFiles, COMMON_WEBGUI_DIR
 from apps.ai_assistant.api.routers.router_file_history import router as history_router
 from apps.ai_assistant.api.routers.router_git_wikillm import router as wikillm_router
@@ -56,6 +57,7 @@ from apps.ai_assistant.api.routers.router_contacts import router as contacts_rou
 from apps.ai_assistant.api.routers.router_keys import router as keys_router
 from apps.ai_assistant.api.routers.router_plugins import router as plugins_router
 from apps.common.file_editor import file_editor_router
+from apps.ai_assistant.api.routers.router_tooltips import router as tooltips_router
 
 from header import __root__
 BASE_DIR:Path = __root__  / "apps" / "ai_assistant" 
@@ -202,6 +204,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Выборочное логирование HTTP-запросов (статусы 200 и 304 выводятся только в консоль)
+app.add_middleware(ConsoleStatusLogMiddleware)
+
 # Подключение маршрутизаторов API
 app.include_router(knowledge_router)
 app.include_router(ws_obsidian_router)
@@ -218,6 +223,7 @@ app.include_router(drive_router)
 app.include_router(contacts_router)
 app.include_router(plugins_router)
 app.include_router(file_editor_router)
+app.include_router(tooltips_router)
 
 # ----------------------------------------------------------------------
 #  Основные маршруты UI
@@ -613,13 +619,13 @@ def run(
     from uvicorn import Config, Server
 
     if no_gui:
-        config = Config("apps.ai_assistant.main:app", host=target_host, port=target_port, log_level="info")
+        config = Config("apps.ai_assistant.main:app", host=target_host, port=target_port, log_level="info", access_log=False)
         server = Server(config)
         server.run()
         return
 
     def _run_server():
-        config = Config("apps.ai_assistant.main:app", host=target_host, port=target_port, log_level="info")
+        config = Config("apps.ai_assistant.main:app", host=target_host, port=target_port, log_level="info", access_log=False)
         server = Server(config)
         server.run()
 

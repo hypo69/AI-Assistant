@@ -40,7 +40,8 @@
 
  * Copyright: © 2026 hypo69
 
- * Updated: 2026-11-06 23:23:00
+ * Updated: 2026-11-07 00:00:00
+
 
  * =============================================================================
 
@@ -794,7 +795,8 @@ export function toggleFolder(folderEl, forceState = null) {
   const closedChevron = isRtl ? 'bi-chevron-left' : 'bi-chevron-right';
   const chevronIcon = folderEl.querySelector('.ide-tree-chevron i');
   if (chevronIcon) {
-    chevronIcon.className = i ;
+    chevronIcon.className = `bi ${nextExpanded ? "bi-chevron-down" : closedChevron}`;
+
   }
 
   // Обновляем иконку папки
@@ -805,7 +807,8 @@ export function toggleFolder(folderEl, forceState = null) {
     const iconName = isExternalDir
       ? (nextExpanded ? 'bi-folder2-open' : 'bi-folder-symlink-fill')
       : (nextExpanded ? 'bi-folder2-open' : 'bi-folder-fill');
-    folderIcon.className = i  ide-tree-icon ;
+    folderIcon.className = `bi ${iconName} ide-tree-icon ${folderColor}`;
+
   }
 
   // Подсвечиваем активный элемент
@@ -868,7 +871,7 @@ export async function handleFileClick(fileEl, wsId = null) {
     openEditorModal({ isDir: false, relPath, name: fileName }, targetWs);
   } else {
     try {
-      await fetch(/api/v1/workspaces//open-file, {
+      await fetch(`/api/v1/workspaces/${encodeURIComponent(targetWs)}/open-file`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rel_path: relPath }),

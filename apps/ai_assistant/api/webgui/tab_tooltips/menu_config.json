@@ -1,0 +1,99 @@
+{
+  "$schema": "webgui-menu-v1",
+  "tab_id": "tab-tooltips",
+  "draggable": true,
+  "subtabs": {
+    "nav_id": "tooltips-subtabs-nav",
+    "storage_key": "tab-tooltips_subtabs_order",
+    "items": [
+      {
+        "id": "catalog",
+        "button_id": "btn-subtab-catalog",
+        "pane_id": "subpane-tooltips-catalog",
+        "panel_id": "panel-catalog",
+        "icon": "bi bi-list-ul",
+        "label_i18n": "tooltips.subtabs.catalog",
+        "title_i18n": "tooltips.subtabs.catalogTitle",
+        "default_title": "tooltips.subtabs.catalogTitle",
+        "order": 0
+      },
+      {
+        "id": "editor",
+        "button_id": "btn-subtab-editor",
+        "pane_id": "subpane-tooltips-editor",
+        "panel_id": "panel-editor",
+        "icon": "bi bi-pencil-square",
+        "label_i18n": "tooltips.subtabs.editor",
+        "title_i18n": "tooltips.subtabs.editorTitle",
+        "default_title": "tooltips.subtabs.editorTitle",
+        "order": 1
+      },
+      {
+        "id": "kb",
+        "button_id": "btn-subtab-kb",
+        "pane_id": "subpane-tooltips-kb",
+        "panel_id": "panel-kb",
+        "icon": "bi bi-book",
+        "label_i18n": "tooltips.subtabs.kb",
+        "title_i18n": "tooltips.subtabs.kbTitle",
+        "default_title": "tooltips.subtabs.kbTitle",
+        "order": 2
+      },
+      {
+        "id": "audit",
+        "button_id": "btn-subtab-audit",
+        "pane_id": "subpane-tooltips-audit",
+        "panel_id": "panel-audit",
+        "icon": "bi bi-shield-check",
+        "label_i18n": "tooltips.subtabs.audit",
+        "title_i18n": "tooltips.subtabs.auditTitle",
+        "default_title": "tooltips.subtabs.auditTitle",
+        "order": 3
+      },
+      {
+        "id": "editor-lang-ru",
+        "button_id": "panel-editor-lang-ru",
+        "pane_id": "editor-lang-ru",
+        "panel_id": "panel-editor-lang-ru",
+        "icon": "bi-card-checklist",
+        "label_i18n": "",
+        "title_i18n": "tooltips.subtabs.panel-editor-lang-ruTitle",
+        "default_title": "Раздел: Русский (RU)",
+        "order": 4
+      },
+      {
+        "id": "editor-lang-en",
+        "button_id": "panel-editor-lang-en",
+        "pane_id": "editor-lang-en",
+        "panel_id": "panel-editor-lang-en",
+        "icon": "bi-card-checklist",
+        "label_i18n": "",
+        "title_i18n": "tooltips.subtabs.panel-editor-lang-enTitle",
+        "default_title": "Раздел: English (EN)",
+        "order": 5
+      },
+      {
+        "id": "editor-lang-he",
+        "button_id": "panel-editor-lang-he",
+        "pane_id": "editor-lang-he",
+        "panel_id": "panel-editor-lang-he",
+        "icon": "bi-card-checklist",
+        "label_i18n": "",
+        "title_i18n": "tooltips.subtabs.panel-editor-lang-heTitle",
+        "default_title": "Раздел: עברית (HE)",
+        "order": 6
+      },
+      {
+        "id": "editor-lang-uk",
+        "button_id": "panel-editor-lang-uk",
+        "pane_id": "editor-lang-uk",
+        "panel_id": "panel-editor-lang-uk",
+        "icon": "bi-card-checklist",
+        "label_i18n": "",
+        "title_i18n": "tooltips.subtabs.panel-editor-lang-ukTitle",
+        "default_title": "Раздел: Українська (UK)",
+        "order": 7
+      }
+    ]
+  }
+}

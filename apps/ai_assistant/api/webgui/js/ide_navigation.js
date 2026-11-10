@@ -17,7 +17,7 @@
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 17:28:00
+ * Updated: 2026-11-10 12:58:00
  * =============================================================================
  */
 
@@ -334,7 +334,7 @@ export function initIdeNavigation() {
   // 3. Обработка кликов по элементам инструментов Activity Bar:
   // При клике на инструмент меню НЕ выезжает, а наоборот гарантированно скрывается!
   activityBar.querySelectorAll('.ide-activity-item[data-tab]').forEach((item) => {
-    item.addEventListener('click', (e) => {
+    item.addEventListener('click', async (e) => {
       e.preventDefault();
       const tabId = item.dataset.tab;
       if (!tabId) return;
@@ -361,7 +361,10 @@ export function initIdeNavigation() {
         }
       }
 
-      switchMainTab(tabId);
+      await switchMainTab(tabId);
+      if (item.dataset.panel && typeof window.switchWorkspaceSubTab === 'function') {
+        window.switchWorkspaceSubTab(item.dataset.panel, true);
+      }
     });
   });
 

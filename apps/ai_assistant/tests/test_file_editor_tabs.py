@@ -12,7 +12,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:15:00
+# Updated: 2026-11-10 13:08:00
 # =============================================================================
 
 from __future__ import annotations
@@ -89,6 +89,11 @@ async def test_central_file_editor_orchestrator_media_support() -> None:
         assert "fe-media-video" in js
         assert "fe-media-audio" in js
         assert "file-raw" in js
+
+        # Проверка отсутствия дублирующихся export (ES-модуль)
+        assert "closeOtherDocuments" in js
+        assert "export function closeOtherDocuments" not in js
+        assert "closeOtherDocuments," in js
 
 
 @pytest.mark.asyncio

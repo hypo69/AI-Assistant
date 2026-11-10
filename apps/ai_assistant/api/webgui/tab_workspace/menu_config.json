@@ -7,10 +7,10 @@
     "storage_key": "tab-workspace_subtabs_order",
     "items": [
       {
-        "id": "editor",
-        "button_id": "panel-editor",
-        "pane_id": "subpane-ws-editor",
-        "panel_id": "panel-editor",
+        "id": "file-editor",
+        "button_id": "panel-file-editor",
+        "pane_id": "subpane-ws-file-editor",
+        "panel_id": "panel-file-editor",
         "icon": "bi bi-code-square text-primary",
         "label_i18n": "workspace.subtabs.editor",
         "title_i18n": "workspace.subtabs.editorTitle",
@@ -25,7 +25,7 @@
         "icon": "bi bi-folder2-open text-primary",
         "label_i18n": "workspace.subtabs.files",
         "title_i18n": "workspace.subtabs.panel-filesTitle",
-        "default_title": "Раздел: Файлы",
+        "default_title": "workspace.subtabs.panel-filesTitle",
         "order": 1
       },
       {
@@ -36,7 +36,7 @@
         "icon": "bi bi-file-earmark-code text-info",
         "label_i18n": "workspace.subtabs.documents",
         "title_i18n": "workspace.subtabs.panel-documentsTitle",
-        "default_title": "Раздел: Документы и факты (Git)",
+        "default_title": "workspace.subtabs.panel-documentsTitle",
         "order": 2
       },
       {
@@ -47,7 +47,7 @@
         "icon": "bi bi-chat-dots text-success",
         "label_i18n": "workspace.subtabs.qa",
         "title_i18n": "workspace.subtabs.panel-qaTitle",
-        "default_title": "Раздел: Вопрос-Ответ (QA)",
+        "default_title": "workspace.subtabs.panel-qaTitle",
         "order": 3
       },
       {
@@ -58,7 +58,7 @@
         "icon": "bi bi-git text-danger",
         "label_i18n": "workspace.subtabs.commits",
         "title_i18n": "workspace.subtabs.panel-commitsTitle",
-        "default_title": "Раздел: Коммиты",
+        "default_title": "workspace.subtabs.panel-commitsTitle",
         "order": 4
       },
       {
@@ -69,53 +69,61 @@
         "icon": "bi bi-diagram-3 text-warning",
         "label_i18n": "workspace.subtabs.tree",
         "title_i18n": "workspace.subtabs.panel-treeTitle",
-        "default_title": "Раздел: Дерево файлов",
+        "default_title": "workspace.subtabs.panel-treeTitle",
         "order": 5
-      },
-      {
-        "id": "subpane-ws-files-dir",
-        "button_id": "subtab-ws-files-dir-btn",
-        "pane_id": "subpane-ws-files-dir",
-        "panel_id": "panel-subpane-ws-files-dir",
-        "icon": "bi bi-hdd-rack text-primary",
-        "label_i18n": "workspace.filesSubtabs.repoContents",
-        "title_i18n": "workspace.subtabs.ws-files-dir-btnTitle",
-        "default_title": "Содержимое репозитория (Git)",
-        "order": 6
-      },
-      {
-        "id": "subpane-ws-files-track",
-        "button_id": "subtab-ws-files-track-btn",
-        "pane_id": "subpane-ws-files-track",
-        "panel_id": "panel-subpane-ws-files-track",
-        "icon": "bi bi-plus-square-dotted text-success",
-        "label_i18n": "workspace.filesSubtabs.addTracking",
-        "title_i18n": "workspace.subtabs.ws-files-track-btnTitle",
-        "default_title": "Добавление файлов в слежение",
-        "order": 7
-      },
-      {
-        "id": "subpane-ws-files-obsidian",
-        "button_id": "subtab-ws-files-obsidian-btn",
-        "pane_id": "subpane-ws-files-obsidian",
-        "panel_id": "panel-subpane-ws-files-obsidian",
-        "icon": "bi bi-journal-richtext text-info",
-        "label_i18n": "workspace.filesSubtabs.obsidianVault",
-        "title_i18n": "workspace.subtabs.ws-files-obsidian-btnTitle",
-        "default_title": "Раздел: Obsidian Vault",
-        "order": 8
-      },
-      {
-        "id": "subpane-ws-files-sources",
-        "button_id": "subtab-ws-files-sources-btn",
-        "pane_id": "subpane-ws-files-sources",
-        "panel_id": "panel-subpane-ws-files-sources",
-        "icon": "bi bi-folder-symlink-fill text-warning",
-        "label_i18n": "workspace.filesSubtabs.externalSources",
-        "title_i18n": "workspace.subtabs.ws-files-sources-btnTitle",
-        "default_title": "Раздел: Внешние источники",
-        "order": 9
       }
     ]
+  },
+  "blocks": {
+    "default": {
+      "nav_id": "workspace-blocks-nav",
+      "storage_key": "tab-workspace_blocks_order",
+      "items": [
+        {
+          "id": "dir",
+          "button_id": "block-dir",
+          "pane_id": "subpane-ws-files-dir",
+          "block_id": "block-dir",
+          "icon": "bi bi-hdd-rack text-primary",
+          "label_i18n": "workspace.filesSubtabs.repoContents",
+          "title_i18n": "workspace.blocks.block-dirTitle",
+          "default_title": "Содержимое репозитория (Git)",
+          "order": 0
+        },
+        {
+          "id": "track",
+          "button_id": "block-track",
+          "pane_id": "subpane-ws-files-track",
+          "block_id": "block-track",
+          "icon": "bi bi-plus-square-dotted text-success",
+          "label_i18n": "workspace.filesSubtabs.addTracking",
+          "title_i18n": "workspace.blocks.block-trackTitle",
+          "default_title": "Добавление файлов в слежение",
+          "order": 1
+        },
+        {
+          "id": "obsidian",
+          "button_id": "block-obsidian",
+          "pane_id": "subpane-ws-files-obsidian",
+          "block_id": "block-obsidian",
+          "icon": "bi bi-journal-richtext text-info",
+          "label_i18n": "workspace.filesSubtabs.obsidianVault",
+          "title_i18n": "workspace.blocks.block-obsidianTitle",
+          "default_title": "Раздел: Obsidian Vault",
+          "order": 2
+        },
+        {
+          "id": "sources",
+          "button_id": "block-sources",
+          "pane_id": "subpane-ws-files-sources",
+          "block_id": "block-sources",
+          "icon": "bi bi-folder-symlink-fill text-warning",
+          "label_i18n": "workspace.filesSubtabs.externalSources",
+          "title_i18n": "workspace.blocks.block-sourcesTitle",
+          "default_title": "Раздел: Внешние источники",
+          "order": 3
+        }
+      ]
+    }
   }
 }

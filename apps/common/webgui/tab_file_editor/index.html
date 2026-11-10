@@ -18,7 +18,7 @@ Project: ai-assistant
 Package: apps/common/webgui/tab_file_editor
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-11-06 23:15:00
+Updated: 2026-11-07 00:45:00
 =============================================================================
 -->
 
@@ -56,23 +56,35 @@ Updated: 2026-11-06 23:15:00
       <!-- Режимы: Редактор / Предпросмотр -->
       <div class="btn-group btn-group-sm d-none" id="fe-view-mode-group" role="group">
         <button type="button" class="btn btn-sm btn-outline-primary active py-0.5 px-2" id="fe-tab-mode-code">
-          <i class="bi bi-pencil me-1"></i><span data-i18n="ide.editorTabCode">Редактор</span>
+          <i class="bi bi-pencil me-1"></i><span data-i18n="ide.editorTabCode" id="fe-mode-code-text">Редактор</span>
         </button>
         <button type="button" class="btn btn-sm btn-outline-primary py-0.5 px-2" id="fe-tab-mode-preview">
-          <i class="bi bi-eye me-1"></i><span data-i18n="ide.editorTabPreview">Предпросмотр</span>
+          <i class="bi bi-eye me-1"></i><span data-i18n="ide.editorTabPreview" id="fe-mode-preview-text">Предпросмотр</span>
         </button>
       </div>
 
       <!-- Открыть в системном приложении -->
       <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 py-0.5 px-2" id="fe-btn-system-open" data-i18n-title="titles.ide.openInSystemEditor" title="Открыть в ассоциированном приложении системы" type="button">
         <i class="bi bi-box-arrow-up-right"></i>
-        <span class="d-none d-md-inline" data-i18n="ide.openInSystem">В системе</span>
+        <span class="d-none d-md-inline" data-i18n="ide.openInSystem" id="fe-open-system-text">В системе</span>
       </button>
 
       <!-- Сохранить изменения (Ctrl+S) -->
       <button class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 py-0.5 px-2.5 shadow-sm" id="fe-btn-save" data-i18n-title="fileEditor.saveTitle" title="Сохранить изменения и зафиксировать в Git (Ctrl+S)" type="button">
         <i class="bi bi-floppy-fill"></i>
-        <span data-i18n="fileEditor.saveBtn">Сохранить (Ctrl+S)</span>
+        <span data-i18n="fileEditor.saveBtn" id="fe-save-btn-text">Сохранить (Ctrl+S)</span>
+      </button>
+
+      <!-- Сохранить как... (Ctrl+Shift+S) -->
+      <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 py-0.5 px-2" id="fe-btn-save-as" data-i18n-title="fileEditor.saveAsTitle" title="Сохранить файл под другим именем (Ctrl+Shift+S)" type="button">
+        <i class="bi bi-save2"></i>
+        <span class="d-none d-lg-inline" data-i18n="fileEditor.saveAsBtn" id="fe-save-as-btn-text">Сохранить как...</span>
+      </button>
+
+      <!-- Сохранить все (Ctrl+Alt+S / Ctrl+K S) -->
+      <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1.5 py-0.5 px-2" id="fe-btn-save-all" data-i18n-title="fileEditor.saveAllTitle" title="Сохранить все открытые файлы (Ctrl+Alt+S / Ctrl+K S)" type="button">
+        <i class="bi bi-collection-fill"></i>
+        <span class="d-none d-lg-inline" data-i18n="fileEditor.saveAllBtn" id="fe-save-all-btn-text">Сохранить все</span>
       </button>
     </div>
   </div>
@@ -83,15 +95,15 @@ Updated: 2026-11-06 23:15:00
     <!-- Заглушка: Нет открытых вкладок -->
     <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 p-4 text-center text-muted" id="fe-empty-state">
       <i class="bi bi-code-square text-secondary fs-1 d-block mb-2"></i>
-      <h6 data-i18n="fileEditor.emptyTitle">Нет открытых файлов</h6>
-      <p class="small text-muted mb-0" data-i18n="fileEditor.emptyHint">Выберите файл в проводнике слева или создайте новый.</p>
+      <h6 data-i18n="fileEditor.emptyTitle" id="fe-empty-title">Нет открытых файлов</h6>
+      <p class="small text-muted mb-0" data-i18n="fileEditor.emptyHint" id="fe-empty-hint">Выберите файл в проводнике слева или создайте новый.</p>
     </div>
 
     <!-- Заглушка: Бинарный файл -->
     <div class="p-4 text-center text-muted d-none flex-column align-items-center justify-content-center flex-grow-1" id="fe-binary-notice">
       <i class="bi bi-file-earmark-binary text-secondary fs-1 d-block mb-2"></i>
-      <h6 data-i18n="ide.binaryFileTitle">Бинарный файл</h6>
-      <p class="small text-muted mb-3" data-i18n="ide.binaryFileDesc">Данный файл не является текстовым и не может редактироваться в веб-редакторе.</p>
+      <h6 data-i18n="ide.binaryFileTitle" id="fe-binary-title">Бинарный файл</h6>
+      <p class="small text-muted mb-3" data-i18n="ide.binaryFileDesc" id="fe-binary-desc">Данный файл не является текстовым и не может редактироваться в веб-редакторе.</p>
       <button class="btn btn-sm btn-primary" id="fe-btn-binary-open" type="button" data-i18n="ide.openInAssociatedApp">Открыть в ассоциированном приложении</button>
     </div>
 
@@ -107,7 +119,7 @@ Updated: 2026-11-06 23:15:00
     <div class="p-3 d-none flex-column align-items-center justify-content-center flex-grow-1 overflow-auto bg-body-tertiary" id="fe-media-stage">
       <div class="w-100 d-flex flex-column align-items-center justify-content-center" style="max-width: 960px;">
         <!-- Встроенный видеоплеер HTML5 -->
-        <video controls playsinline class="w-100 rounded shadow-sm border border-subtle d-none" id="fe-media-video" style="max-height: 72vh; background-color: var(--surface-2, #000);"></video>
+        <video controls playsinline class="w-100 rounded shadow-sm border border-subtle d-none" id="fe-media-video" style="max-height: 72vh; background-color: var(--surface-2);"></video>
         <!-- Встроенный аудиоплеер HTML5 -->
         <div class="w-100 p-4 rounded bg-body border border-subtle shadow-sm d-none" id="fe-media-audio-container">
           <div class="d-flex align-items-center gap-2 mb-3">
