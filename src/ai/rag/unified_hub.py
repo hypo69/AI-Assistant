@@ -18,12 +18,13 @@
 # Package: src.ai.rag
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 17:35:00
+# Updated: 2026-11-10 16:56:00
 # =============================================================================
 
 from __future__ import annotations
 """Единый координатор знаний: WikiLLM + Text RAG + Pixel RAG + Log RAG."""
 
+import asyncio
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -114,7 +115,7 @@ class UnifiedKnowledgeHub:
         # 1. Поиск в PixelRAG если передано изображение
         if image_bytes:
             try:
-                results["pixel_matches"] = self.pixel_rag.search_by_visual(image_bytes, top_k=top_k)
+                results["pixel_matches"] = await asyncio.to_thread(self.pixel_rag.search_by_visual, image_bytes, top_k)
             except Exception as e:
                 logger.debug(f"[UnifiedKnowledgeHub] Ошибка визуального поиска PixelRAG: {e}")
 
@@ -143,12 +144,12 @@ class UnifiedKnowledgeHub:
 
         # 3. Дополнительное обогащение контекстом из TextRAG и LogRAG
         try:
-            results["text_rag_matches"] = self.text_rag.search(query, top_k=top_k)
+            results["text_rag_matches"] = await asyncio.to_thread(self.text_rag.search, query, top_k)
         except Exception as e:
             logger.debug(f"[UnifiedKnowledgeHub] Ошибка TextRAG: {e}")
 
         try:
-            results["log_rag_matches"] = self.log_rag.search_chunks(query, top_k=top_k)
+            results["log_rag_matches"] = await asyncio.to_thread(self.log_rag.search_chunks, query, "", top_k)
         except Exception as e:
             logger.debug(f"[UnifiedKnowledgeHub] Ошибка LogRAG: {e}")
 

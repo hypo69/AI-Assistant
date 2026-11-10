@@ -19,12 +19,13 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:15:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """Маршрутизатор интеграции Git, WikiLLM и RAG."""
 
+import asyncio
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -46,8 +47,11 @@ from apps.ai_assistant.api.routers.router_knowledge import _workspace_manager
 
 router = APIRouter(prefix="/api/v1", tags=["Git WikiLLM & RAG"])
 
+_graph = _workspace_manager.graph
+_linker = WikiLLMVersionLinker(graph=_graph)
 _summarizer = AIDiffSummarizer()
 _git_engine = GitHistoryEngine()
+_orchestrator = QueryOrchestrator(temporal_graph=_graph, wiki_linker=_linker)
 
 
 def _get_target_graph(workspace_id: Optional[str] = None) -> TemporalCodeGraph:
@@ -63,13 +67,13 @@ class SupersedeRequest(BaseModel):
     source_id: str = Field(..., description="Идентификатор источника")
     target_id: str = Field(..., description="Идентификатор цели")
     invalidating_commit: str = Field(..., description="Хэш отменяющего коммита")
-    workspace_id: Optional[str] = Field(None, description="Идентификатор рабочей области")
+    workspace_id: Optional[str] = Field(default=None, description="Идентификатор рабочей области")
 
 
 class InsightsRequest(BaseModel):
     """Схема запроса ИИ-суммаризации диффа."""
     commit_hash: str = Field(..., description="Хэш коммита")
-    file_path: Optional[str] = Field(None, description="Опциональный путь к файлу")
+    file_path: Optional[str] = Field(default=None, description="Опциональный путь к файлу")
 
 
 @router.post("/annotate", response_model=AnnotationResponse, summary="Двухшаговая запись архитектурной связи")
@@ -98,8 +102,9 @@ async def create_annotation(request: AnnotationRequest) -> AnnotationResponse:
         raise HTTPException(status_code=422, detail=f"Ошибка валидации: {error_msg}")
 
     # 3. Фиксация в изолированном темпоральном графе рабочей области
-    target_graph = _get_target_graph(request.workspace_id)
-    link = target_graph.add_link(
+    target_graph = await asyncio.to_thread(_get_target_graph, request.workspace_id)
+    link = await asyncio.to_thread(
+        target_graph.add_link,
         source_id=sanitized["source_id"],
         target_id=sanitized["target_id"],
         relation_type=sanitized["relation_type"],
@@ -118,8 +123,9 @@ async def create_annotation(request: AnnotationRequest) -> AnnotationResponse:
 @router.post("/supersede", summary="Мягкая инвалидация связи (SUPERSEDED)")
 async def supersede_annotation(request: SupersedeRequest) -> Dict[str, Any]:
     """Переводит устаревшую связь в статус SUPERSEDED с фиксацией коммита инвалидации."""
-    target_graph = _get_target_graph(request.workspace_id)
-    updated = target_graph.supersede_link(
+    target_graph = await asyncio.to_thread(_get_target_graph, request.workspace_id)
+    updated = await asyncio.to_thread(
+        target_graph.supersede_link,
         source_id=request.source_id,
         target_id=request.target_id,
         invalidating_commit=request.invalidating_commit,
@@ -142,13 +148,13 @@ async def get_knowledge_links(
     workspace_id: Optional[str] = Query(None, description="Идентификатор рабочей области"),
 ) -> List[EvidenceLinkSchema]:
     """Возвращает срез темпоральных связей графа с поддержкой фильтрации."""
-    target_graph = _get_target_graph(workspace_id)
+    target_graph = await asyncio.to_thread(_get_target_graph, workspace_id)
     if status.upper() == "ALL":
-        links = target_graph.get_all_links()
+        links = await asyncio.to_thread(target_graph.get_all_links)
         if source_id:
             links = [l for l in links if l.source_id == source_id]
         return links
-    return target_graph.get_active_links(source_id=source_id)
+    return await asyncio.to_thread(target_graph.get_active_links, source_id=source_id)
 
 
 @router.post("/insights", summary="ИИ-анализ диффа и архитектурных последствий")
@@ -156,8 +162,15 @@ async def get_diff_insights(request: InsightsRequest) -> Dict[str, Any]:
     """Выполняет суммаризацию diff коммита и формирует предложения связей с WikiLLM."""
     try:
         diff_resp = await _git_engine.get_diff(commit_hash=request.commit_hash, file_path=request.file_path)
-        summary = _summarizer.summarize_diff(diff_resp.diff_text, file_path=request.file_path or "")
-        wiki_entities = _linker.find_matching_wiki_entities(f"{summary} {request.file_path or ''}")
+        summary = await asyncio.to_thread(
+            _summarizer.summarize_diff,
+            diff_resp.diff_text,
+            file_path=request.file_path or "",
+        )
+        wiki_entities = await asyncio.to_thread(
+            _linker.find_matching_wiki_entities,
+            f"{summary} {request.file_path or ''}",
+        )
 
         return {
             "commit_hash": request.commit_hash,

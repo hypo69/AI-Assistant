@@ -9,7 +9,7 @@
 # Package: src.utils
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 18:26:00
+# Updated: 2026-11-10 14:40:00
 # =============================================================================
 
 from __future__ import annotations

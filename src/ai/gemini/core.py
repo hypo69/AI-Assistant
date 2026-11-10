@@ -18,7 +18,7 @@
 # Package: src.ai.gemini
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:50:00
+# Updated: 2026-11-10 16:46:00
 # =============================================================================
 
 """Модуль реализации компонента `GoogleGenerativeAICore` системы AI-Windows-Admin."""

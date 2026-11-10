@@ -10,13 +10,13 @@
 # Package: src.utils
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 18:46:00
+# Updated: 2026-11-10 16:55:00
 # =============================================================================
 
 from __future__ import annotations
 """Модуль утилит для AI-Windows-Admin."""
 
-from . import archive, com_worker, csv, date_time, file, get_free_port, google_errors, header, image, jjson, ports, printer, smtp, url, versioning
+from . import archive, com_worker, csv, date_time, file, get_free_port, google_errors, header, image, jjson, ports, printer, smtp, system_engineering, url, versioning
 try:
     from . import pdf
 except ImportError:
@@ -51,6 +51,7 @@ __all__ = [
     'ports',
     'printer',
     'smtp',
+    'system_engineering',
     'url',
     'versioning',
 ]

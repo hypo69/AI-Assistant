@@ -16,7 +16,7 @@
 # Package: src.ai.rag
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 22:28:45
+# Updated: 2026-11-10 16:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ from .pixel_rag import PixelRAG
 
 router = APIRouter(prefix="/api/rag", tags=["Unified RAG & Knowledge Hub"])
 _hub_instance: Optional[UnifiedKnowledgeHub] = None
+_MAX_UPLOAD_IMAGE_BYTES = 25 * 1024 * 1024
 
 
 def get_hub() -> UnifiedKnowledgeHub:
@@ -70,7 +71,7 @@ class UnifiedResolveRequest(BaseModel):
 async def get_rag_status() -> Dict[str, Any]:
     """Возвращает метрики и статус глобального индекса RAG."""
     hub = get_hub()
-    metrics = hub.get_metrics()
+    metrics = await asyncio.to_thread(hub.get_metrics)
     text_count = metrics["text_rag"]["total_documents"]
     pixel_count = metrics["pixel_rag"]["total_images"]
     log_count = metrics["log_rag"]["total_chunks"]
@@ -102,7 +103,7 @@ async def search_rag(req: RagSearchRequest) -> Dict[str, Any]:
 async def get_pixel_rag_status() -> Dict[str, Any]:
     """Возвращает статус и метрики хранилища Pixel RAG."""
     hub = get_hub()
-    return hub.pixel_rag.get_status()
+    return await asyncio.to_thread(hub.pixel_rag.get_status)
 
 
 @router.post("/pixel/index")
@@ -113,11 +114,15 @@ async def index_pixel_images(files: List[UploadFile] = File(...)) -> Dict[str, A
 
     for file in files:
         try:
-            content = await file.read()
-            item = hub.pixel_rag.index_image_bytes(
-                data=content,
-                filename=file.filename or "screenshot.png",
-                title=file.filename or "UI Screenshot",
+            content = await file.read(_MAX_UPLOAD_IMAGE_BYTES + 1)
+            if len(content) > _MAX_UPLOAD_IMAGE_BYTES:
+                logger.warning(f"[Router RAG] Файл {file.filename} превышает лимит {_MAX_UPLOAD_IMAGE_BYTES} байт")
+                continue
+            item = await asyncio.to_thread(
+                hub.pixel_rag.index_image_bytes,
+                content,
+                file.filename or "screenshot.png",
+                file.filename or "UI Screenshot",
             )
             indexed_results.append(item)
         except Exception as e:
@@ -161,7 +166,7 @@ async def unified_resolve(req: UnifiedResolveRequest) -> Dict[str, Any]:
 async def get_all_metrics() -> Dict[str, Any]:
     """Возвращает подробные метрики всех слоев знаний."""
     hub = get_hub()
-    return hub.get_metrics()
+    return await asyncio.to_thread(hub.get_metrics)
 
 
 def init_router(hub: Optional[UnifiedKnowledgeHub] = None) -> APIRouter:

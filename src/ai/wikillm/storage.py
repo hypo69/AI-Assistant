@@ -16,7 +16,7 @@
 # Package: src.ai.wikillm
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 17:35:00
+# Updated: 2026-11-10 16:56:00
 # =============================================================================
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ class WikiStorage:
 
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
-        """Контекстный менеджер соединения с базой данных SQLite."""
+        """Контекстный менеджер соединения с базой данных SQLite с режимом WAL и защитой от блокировок."""
         if self._mem_conn is not None:
             try:
                 yield self._mem_conn
@@ -73,12 +73,18 @@ class WikiStorage:
                 self._mem_conn.rollback()
                 raise
         else:
-            conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+            conn = sqlite3.connect(str(self.db_path), timeout=15.0, check_same_thread=False)
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA synchronous = NORMAL")
+            conn.execute("PRAGMA busy_timeout = 15000")
             conn.execute("PRAGMA foreign_keys = ON")
             try:
                 yield conn
                 conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
             finally:
                 conn.close()
 
@@ -222,63 +228,70 @@ class WikiStorage:
                 ),
             )
 
-            # 2. Обновление claims
+            # 2. Пакетное обновление claims
             conn.execute("DELETE FROM claims WHERE canonical_key = ?", (entity.canonical_key,))
-            for claim in entity.claims:
-                cid = claim.claim_id or str(uuid.uuid4())
-                conn.execute(
+            if entity.claims:
+                conn.executemany(
                     """
                     INSERT INTO claims (claim_id, canonical_key, statement, confidence, source, verified, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        cid,
-                        entity.canonical_key,
-                        claim.statement,
-                        claim.confidence,
-                        claim.source.value,
-                        1 if claim.verified else 0,
-                        claim.created_at or now,
-                    ),
+                    [
+                        (
+                            claim.claim_id or str(uuid.uuid4()),
+                            entity.canonical_key,
+                            claim.statement,
+                            claim.confidence,
+                            claim.source.value,
+                            1 if claim.verified else 0,
+                            claim.created_at or now,
+                        )
+                        for claim in entity.claims
+                    ],
                 )
 
-            # 3. Обновление evidence
+            # 3. Пакетное обновление evidence
             conn.execute("DELETE FROM evidence WHERE canonical_key = ?", (entity.canonical_key,))
-            for ev in entity.evidence:
-                eid = ev.evidence_id or str(uuid.uuid4())
-                conn.execute(
+            if entity.evidence:
+                conn.executemany(
                     """
                     INSERT INTO evidence (evidence_id, canonical_key, description, telemetry_metric, sample_value, observed_at)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        eid,
-                        entity.canonical_key,
-                        ev.description,
-                        ev.telemetry_metric,
-                        ev.sample_value,
-                        ev.observed_at or now,
-                    ),
+                    [
+                        (
+                            ev.evidence_id or str(uuid.uuid4()),
+                            entity.canonical_key,
+                            ev.description,
+                            ev.telemetry_metric,
+                            ev.sample_value,
+                            ev.observed_at or now,
+                        )
+                        for ev in entity.evidence
+                    ],
                 )
 
-            # 4. Обновление resolutions
+            # 4. Пакетное обновление resolutions
             conn.execute("DELETE FROM resolutions WHERE canonical_key = ?", (entity.canonical_key,))
             if entity.diagnostic_info:
                 actions = entity.diagnostic_info.remediation_steps + entity.diagnostic_info.diagnostic_actions
-                for act in actions:
-                    conn.execute(
+                if actions:
+                    conn.executemany(
                         """
                         INSERT INTO resolutions (canonical_key, title, description, command, risk_level, is_automated)
                         VALUES (?, ?, ?, ?, ?, ?)
                         """,
-                        (
-                            entity.canonical_key,
-                            act.title,
-                            act.description,
-                            act.command,
-                            act.risk_level,
-                            1 if act.is_automated else 0,
-                        ),
+                        [
+                            (
+                                entity.canonical_key,
+                                act.title,
+                                act.description,
+                                act.command,
+                                act.risk_level,
+                                1 if act.is_automated else 0,
+                            )
+                            for act in actions
+                        ],
                     )
 
             # 5. Обновление FTS5 индекса

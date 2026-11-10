@@ -13,12 +13,13 @@
 # Package: apps.common.file_editor
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:02:00
+# Updated: 2026-11-10 14:31:30
 # =============================================================================
 
 from __future__ import annotations
 """FastAPI роутер модуля редактора файлов `/api/v1/file-editor`."""
 
+import asyncio
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -51,7 +52,7 @@ async def get_supported_files_catalog() -> Dict[str, Any]:
 @router.get("/wasm", summary="Бинарный модуль ядра Rust + WebAssembly")
 async def get_wasm_core_binary() -> FileResponse:
     """Отдаёт скомпилированный бинарный модуль `file_editor_core.wasm` для браузера."""
-    wasm_path = ensure_wasm_binary()
+    wasm_path = await asyncio.to_thread(ensure_wasm_binary)
     return FileResponse(
         path=str(wasm_path),
         media_type="application/wasm",
@@ -66,7 +67,7 @@ async def read_file_for_editor(
 ) -> Dict[str, Any]:
     """Считывает текстовое и бинарное представление файла вместе с дескриптором режима VS Code."""
     try:
-        return _editor_service.read_file(rel_path=rel_path, workspace_id=workspace_id)
+        return await asyncio.to_thread(_editor_service.read_file, rel_path=rel_path, workspace_id=workspace_id)
     except FileNotFoundError as fnf:
         raise HTTPException(status_code=404, detail=str(fnf))
     except ValueError as ve:
@@ -80,7 +81,7 @@ async def read_file_for_editor(
 async def save_file_from_editor(req: FileSaveRequest) -> Dict[str, Any]:
     """Записывает изменения файла на диск и при необходимости фиксирует коммит в Git."""
     try:
-        return _editor_service.save_file(req)
+        return await asyncio.to_thread(_editor_service.save_file, req)
     except FileNotFoundError as fnf:
         raise HTTPException(status_code=404, detail=str(fnf))
     except ValueError as ve:
@@ -94,7 +95,7 @@ async def save_file_from_editor(req: FileSaveRequest) -> Dict[str, Any]:
 async def format_editor_buffer(req: FileFormatRequest) -> Dict[str, Any]:
     """Форматирует буфер редактора (JSON, XML, SVG, CSV, TSV, .ipynb, код)."""
     try:
-        return _editor_service.format_buffer(req)
+        return await asyncio.to_thread(_editor_service.format_buffer, req)
     except Exception as exc:
         logger.error(f"[FileEditorRouter] Ошибка форматирования: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -104,7 +105,7 @@ async def format_editor_buffer(req: FileFormatRequest) -> Dict[str, Any]:
 async def diff_editor_buffer(req: FileDiffRequest) -> Dict[str, Any]:
     """Возвращает Unified Diff между текущим буфером редактора и файлом в рабочей области."""
     try:
-        return _editor_service.compute_diff(req)
+        return await asyncio.to_thread(_editor_service.compute_diff, req)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as exc:

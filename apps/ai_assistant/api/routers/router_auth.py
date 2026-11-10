@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 19:15:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from __future__ import annotations
 """Маршрутизатор Google OAuth 2.0 авторизации и управления профилями."""
 
 import asyncio
+import html
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -45,18 +46,26 @@ from src.ai.google_accounts_state import (
 router = APIRouter(tags=["Google OAuth & Accounts"])
 
 
+def _sanitize_next_url(raw_next: str) -> str:
+    """Проверяет параметр перенаправления next против Open Redirect и управляющих символов."""
+    cleaned = (raw_next or "/").strip()
+    if not cleaned.startswith("/") or cleaned.startswith("//") or "\\" in cleaned:
+        return "/"
+    return cleaned
+
+
 class GoogleAccountPayload(BaseModel):
     """Полезная нагрузка для создания/добавления Google аккаунта."""
-    name: Optional[str] = Field(None, description="Имя аккаунта")
-    account_name: Optional[str] = Field(None, description="Алиас имени аккаунта")
-    type: Optional[str] = Field("oauth2", description="Тип: oauth2 или service_account")
-    account_type: Optional[str] = Field(None, description="Алиас типа аккаунта")
-    email: Optional[str] = Field(None, description="Email адрес")
-    client_id: Optional[str] = Field(None, description="OAuth2 Client ID")
-    client_secret: Optional[str] = Field(None, description="OAuth2 Client Secret")
-    credentials_json: Optional[str] = Field(None, description="JSON учетных данных строкой")
-    credentials_dict: Optional[Dict[str, Any]] = Field(None, description="JSON учетных данных словарем")
-    set_as_default: Optional[bool] = Field(False, description="Установить по умолчанию")
+    name: Optional[str] = Field(default=None, description="Имя аккаунта")
+    account_name: Optional[str] = Field(default=None, description="Алиас имени аккаунта")
+    type: Optional[str] = Field(default="oauth2", description="Тип: oauth2 или service_account")
+    account_type: Optional[str] = Field(default=None, description="Алиас типа аккаунта")
+    email: Optional[str] = Field(default=None, description="Email адрес")
+    client_id: Optional[str] = Field(default=None, description="OAuth2 Client ID")
+    client_secret: Optional[str] = Field(default=None, description="OAuth2 Client Secret")
+    credentials_json: Optional[str] = Field(default=None, description="JSON учетных данных строкой")
+    credentials_dict: Optional[Dict[str, Any]] = Field(default=None, description="JSON учетных данных словарем")
+    set_as_default: Optional[bool] = Field(default=False, description="Установить по умолчанию")
 
 
 def _get_active_auth_state() -> Dict[str, Any]:
@@ -112,13 +121,13 @@ def _get_active_auth_state() -> Dict[str, Any]:
 @router.get("/auth/check", summary="Проверка текущего статуса авторизации")
 async def auth_check() -> Dict[str, Any]:
     """Возвращает информацию о текущем пользователе и состоянии Google OAuth."""
-    return _get_active_auth_state()
+    return await asyncio.to_thread(_get_active_auth_state)
 
 
 @router.post("/auth/logout", summary="Выход из сессии Google OAuth")
 async def auth_logout() -> Dict[str, Any]:
     """Сбрасывает токен текущей авторизации."""
-    try:
+    def _do_logout() -> Dict[str, Any]:
         accounts = list_google_accounts()
         for acc in accounts:
             token_rel = acc.get("token_file", "")
@@ -127,6 +136,9 @@ async def auth_logout() -> Dict[str, Any]:
                 if tp.exists():
                     tp.unlink(missing_ok=True)
         return {"status": "success", "message": "Сессия успешно завершена"}
+
+    try:
+        return await asyncio.to_thread(_do_logout)
     except Exception as exc:
         logger.warning(f"[Auth] Ошибка выхода: {exc}")
         return {"status": "error", "message": str(exc)}
@@ -138,7 +150,9 @@ async def auth_logout() -> Dict[str, Any]:
 
 @router.get("/auth/google", response_class=HTMLResponse, summary="Точка входа авторизации Google OAuth")
 async def auth_google_page(next: str = "/") -> HTMLResponse:
-    """Отображает интерактивную страницу запуска OAuth потока в браузере."""
+    """Отображает интерактивную страницу запуска OAuth потока в браузере с защитой от XSS и Open Redirect."""
+    safe_next = _sanitize_next_url(next)
+    escaped_next_attr = html.escape(safe_next, quote=True)
     html_content = f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -208,14 +222,14 @@ async def auth_google_page(next: str = "/") -> HTMLResponse:
       <button class="btn btn-primary btn-sm px-3 fw-semibold" id="btn-trigger-oauth" type="button">
         <i class="bi bi-box-arrow-up-right me-1"></i> Запустить авторизацию
       </button>
-      <a href="{next}" class="btn btn-outline-secondary btn-sm px-3">
+      <a href="{escaped_next_attr}" class="btn btn-outline-secondary btn-sm px-3">
         Назад к приложению
       </a>
     </div>
   </div>
 
   <script>
-    const nextUrl = {json.dumps(next)};
+    const nextUrl = {json.dumps(safe_next)};
     const desc = document.getElementById('auth-status-desc');
     const spinner = document.getElementById('auth-spinner');
     const errBox = document.getElementById('auth-error-box');
@@ -288,7 +302,7 @@ async def api_auth_google_login(account_name: Optional[str] = None) -> Dict[str,
 @router.get("/api/v1/auth/google-accounts", summary="Список аккаунтов Google")
 async def list_accounts_endpoint() -> Dict[str, Any]:
     """Возвращает список всех зарегистрированных Google аккаунтов в пуле."""
-    try:
+    def _do_list():
         raw_accounts = list_google_accounts()
         accounts = []
         for acc in raw_accounts:
@@ -302,6 +316,9 @@ async def list_accounts_endpoint() -> Dict[str, Any]:
                 item["has_token"] = False
             accounts.append(item)
         return {"status": "success", "accounts": accounts}
+
+    try:
+        return await asyncio.to_thread(_do_list)
     except Exception as exc:
         logger.error(f"[Auth] Ошибка получения списка аккаунтов: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -336,7 +353,8 @@ async def create_account_endpoint(payload: GoogleAccountPayload) -> Dict[str, An
     else:
         raise HTTPException(status_code=400, detail="Предоставьте файл JSON ключа или Client ID/Secret")
 
-    res = save_google_account(
+    res = await asyncio.to_thread(
+        save_google_account,
         account_name=acc_name,
         credentials_path_or_dict=creds_data,
         account_type=acc_type,
@@ -346,7 +364,8 @@ async def create_account_endpoint(payload: GoogleAccountPayload) -> Dict[str, An
     if not res:
         raise HTTPException(status_code=500, detail="Не удалось сохранить аккаунт в пуле")
 
-    return {"status": "success", "account": get_account_info(acc_name)}
+    info = await asyncio.to_thread(get_account_info, acc_name)
+    return {"status": "success", "account": info}
 
 
 @router.post("/api/v1/auth/google-accounts/upload", summary="Загрузить credentials.json")
@@ -375,7 +394,8 @@ async def upload_credentials_endpoint(
 
         is_default = str(set_as_default).lower() in ("true", "1", "yes")
 
-        res = save_google_account(
+        res = await asyncio.to_thread(
+            save_google_account,
             account_name=acc_name,
             credentials_path_or_dict=creds_dict,
             account_type=detected_type,
@@ -385,7 +405,8 @@ async def upload_credentials_endpoint(
         if not res:
             raise HTTPException(status_code=500, detail="Не удалось сохранить аккаунт из файла")
 
-        return {"status": "success", "account_name": acc_name, "account": get_account_info(acc_name)}
+        info = await asyncio.to_thread(get_account_info, acc_name)
+        return {"status": "success", "account_name": acc_name, "account": info}
     except HTTPException:
         raise
     except Exception as exc:
@@ -397,7 +418,7 @@ async def upload_credentials_endpoint(
 @router.post("/api/v1/auth/google-accounts/{name}/default", summary="Назначить аккаунт по умолчанию (алиас)")
 async def set_default_endpoint(name: str) -> Dict[str, Any]:
     """Назначает выбранный аккаунт по умолчанию."""
-    res = set_default_account(name)
+    res = await asyncio.to_thread(set_default_account, name)
     if not res:
         raise HTTPException(status_code=404, detail=f"Аккаунт '{name}' не найден")
     return {"status": "success", "default_account": name}
@@ -406,15 +427,14 @@ async def set_default_endpoint(name: str) -> Dict[str, Any]:
 @router.post("/api/v1/auth/google-accounts/{name}/reset-status", summary="Сбросить статус исчерпания")
 async def reset_status_endpoint(name: str) -> Dict[str, Any]:
     """Сбрасывает статус исчерпания квоты в активный."""
-    res = reset_account_status(name)
+    res = await asyncio.to_thread(reset_account_status, name)
     if not res:
         raise HTTPException(status_code=404, detail=f"Аккаунт '{name}' не найден")
     return {"status": "success", "name": name}
 
 
-@router.post("/api/v1/auth/google-accounts/{name}/test", summary="Тест валидности токена")
-async def test_account_endpoint(name: str) -> Dict[str, Any]:
-    """Проверяет аутентификацию и валидность токена Google аккаунта."""
+def _sync_test_google_account(name: str) -> Dict[str, Any]:
+    """Синхронно проверяет и при необходимости обновляет OAuth 2.0 токен."""
     info = get_account_info(name)
     if not info:
         return {"status": "error", "name": name, "message": f"Аккаунт '{name}' не найден"}
@@ -451,10 +471,16 @@ async def test_account_endpoint(name: str) -> Dict[str, Any]:
         return {"status": "error", "name": name, "message": f"Ошибка верификации токена: {exc}"}
 
 
+@router.post("/api/v1/auth/google-accounts/{name}/test", summary="Тест валидности токена")
+async def test_account_endpoint(name: str) -> Dict[str, Any]:
+    """Проверяет аутентификацию и валидность токена Google аккаунта в пуле потоков."""
+    return await asyncio.to_thread(_sync_test_google_account, name)
+
+
 @router.delete("/api/v1/auth/google-accounts/{name}", summary="Удалить аккаунт из пула")
 async def delete_account_endpoint(name: str) -> Dict[str, Any]:
     """Удаляет учетную запись Google из пула."""
-    res = delete_google_account(name)
+    res = await asyncio.to_thread(delete_google_account, name)
     if not res:
         raise HTTPException(status_code=404, detail=f"Аккаунт '{name}' не найден")
     return {"status": "success", "message": f"Аккаунт '{name}' удален"}
@@ -464,10 +490,10 @@ async def delete_account_endpoint(name: str) -> Dict[str, Any]:
 async def generate_telegram_link_code() -> Dict[str, Any]:
     """Генерирует одноразовый 8-значный код привязки к Telegram-боту."""
     from src.user_manager import user_manager
-    user = user_manager.get_user_by_id(1)
+    user = await asyncio.to_thread(user_manager.get_user_by_id, 1)
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
-    token = user_manager.generate_telegram_link_token(user["id"])
+    token = await asyncio.to_thread(user_manager.generate_telegram_link_token, user["id"])
     return {
         "status": "success",
         "token": token,
@@ -480,7 +506,7 @@ async def generate_telegram_link_code() -> Dict[str, Any]:
 async def get_telegram_link_status() -> Dict[str, Any]:
     """Возвращает информацию о текущей привязке Telegram."""
     from src.user_manager import user_manager
-    user = user_manager.get_user_by_id(1)
+    user = await asyncio.to_thread(user_manager.get_user_by_id, 1)
     if not user:
         return {"status": "error", "linked": False}
     return {
@@ -497,5 +523,5 @@ async def get_telegram_link_status() -> Dict[str, Any]:
 async def unlink_telegram_code() -> Dict[str, Any]:
     """Отвязывает Telegram-аккаунт от текущего профиля."""
     from src.user_manager import user_manager
-    user_manager.unlink_telegram_account(1)
+    await asyncio.to_thread(user_manager.unlink_telegram_account, 1)
     return {"status": "success", "message": "Telegram-аккаунт успешно отвязан"}

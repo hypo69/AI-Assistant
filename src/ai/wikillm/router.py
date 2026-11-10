@@ -16,15 +16,18 @@
 # Package: src.ai.wikillm
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-16 16:30:00
+# Updated: 2026-11-10 16:57:00
 # =============================================================================
 
 from __future__ import annotations
 """REST API эндпоинты для разрешения артефактов, поиска по базе знаний WikiLLM,"""
 
+import asyncio
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from header import __root__
 from logger import logger
 from .code_indexer import CodeKnowledgeIndexer
 from .engine import WikiLLMEngine
@@ -113,7 +116,7 @@ async def resolve_artifact(req: ResolveRequest) -> ResolutionResult:
 async def get_entity_by_key(canonical_key: str) -> KnowledgeEntity:
     """Возвращает подробную информацию о сущности по её каноническому ключу."""
     engine = get_engine()
-    entity = engine.storage.get_entity(canonical_key)
+    entity = await asyncio.to_thread(engine.storage.get_entity, canonical_key)
     if not entity:
         raise HTTPException(status_code=404, detail=f"Сущность не найдена: {canonical_key}")
     return entity
@@ -127,7 +130,7 @@ async def list_entities(
 ) -> List[KnowledgeEntity]:
     """Возвращает постраничный список сущностей базы знаний."""
     engine = get_engine()
-    return engine.storage.list_entities(limit=limit, offset=offset, entity_type=type)
+    return await asyncio.to_thread(engine.storage.list_entities, limit, offset, type)
 
 
 @router.get("/search", response_model=List[KnowledgeEntity])
@@ -137,14 +140,14 @@ async def search_knowledge(
 ) -> List[KnowledgeEntity]:
     """Выполняет полнотекстовый поиск FTS5 по базе знаний WikiLLM."""
     engine = get_engine()
-    return engine.storage.search_fts(q, limit=limit)
+    return await asyncio.to_thread(engine.storage.search_fts, q, limit)
 
 
 @router.get("/observations/{canonical_key:path}", response_model=ObservationRecord)
 async def get_observations(canonical_key: str) -> ObservationRecord:
     """Возвращает статистику наблюдений артефакта на локальной машине."""
     engine = get_engine()
-    obs = engine.storage.get_observation(canonical_key)
+    obs = await asyncio.to_thread(engine.storage.get_observation, canonical_key)
     if not obs:
         raise HTTPException(status_code=404, detail=f"Наблюдений для {canonical_key} не найдено")
     return obs
@@ -154,15 +157,22 @@ async def get_observations(canonical_key: str) -> ObservationRecord:
 async def record_observation_endpoint(req: ObserveRequest) -> ObservationRecord:
     """Вручную фиксирует наблюдение артефакта и совместные появления."""
     engine = get_engine()
-    return engine.storage.record_observation(req.canonical_key, req.co_occurring_keys)
+    return await asyncio.to_thread(engine.storage.record_observation, req.canonical_key, req.co_occurring_keys)
 
 
 @router.post("/code/ingest")
 async def ingest_code(req: CodeIngestRequest) -> Dict[str, Any]:
     """Запускает индексацию AST структуры исходного кода кодовой базы."""
+    root_resolved = Path(__root__).resolve()
+    target_resolved = (root_resolved / req.target_path).resolve()
+    try:
+        target_resolved.relative_to(root_resolved)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Доступ запрещен: выход за пределы корневой директории проекта")
+
     engine = get_engine()
     indexer = CodeKnowledgeIndexer(engine.storage)
-    count = indexer.index_directory(req.target_path)
+    count = await asyncio.to_thread(indexer.index_directory, target_resolved)
     return {
         "status": "success",
         "target_path": req.target_path,
@@ -174,7 +184,7 @@ async def ingest_code(req: CodeIngestRequest) -> Dict[str, Any]:
 async def get_system_stats() -> Dict[str, Any]:
     """Возвращает метрики эффективности, статистику кэш-хитов и состояние хранилища."""
     engine = get_engine()
-    return engine.get_metrics()
+    return await asyncio.to_thread(engine.get_metrics)
 
 
 class ApproveKnowledgeRequest(BaseModel):
@@ -306,8 +316,8 @@ async def approve_knowledge(req: ApproveKnowledgeRequest) -> Dict[str, Any]:
     )
 
     # Сохраняем сущность и обновляем счетчик наблюдений
-    engine.storage.save_entity(entity)
-    engine.storage.record_observation(canonical_key)
+    await asyncio.to_thread(engine.storage.save_entity, entity)
+    await asyncio.to_thread(engine.storage.record_observation, canonical_key)
 
     logger.info(f"[WikiLLM] Знание для '{canonical_key}' успешно одобрено пользователем и сохранено.")
     return {

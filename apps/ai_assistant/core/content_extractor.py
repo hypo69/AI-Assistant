@@ -21,7 +21,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-26 00:05:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
+import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -38,6 +39,8 @@ from src.utils.convertors.audio import _get_gemini_client, audio2text
 from src.utils.convertors.excel import excel2text
 from src.utils.convertors.google_sheet import extract_spreadsheet_id, read_google_sheet
 from src.utils.pdf import extract_pdf_text
+
+MAX_EXTRACT_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff", ".gif"}
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac"}
@@ -171,25 +174,36 @@ class ContentExtractor:
                 try:
                     from google.genai import types
 
-                    pdf_bytes = file_path.read_bytes()
+                    pdf_bytes = await asyncio.to_thread(file_path.read_bytes)
                     prompt = (
                         "Преобразуй содержимое этого PDF-документа в аккуратный и структурированный Markdown на русском языке. "
                         "Сохраняй структуру разделов, списки, формулы и таблицы. "
                         "Выведи только распознанный Markdown-текст без вводных фраз."
                     )
                     part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
-                    resp = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model="gemini-2.5-flash",
-                        contents=[part, prompt],
-                    )
-                    if resp and resp.text:
-                        return resp.text.strip()
+                    for attempt in range(3):
+                        try:
+                            resp = await asyncio.wait_for(
+                                asyncio.to_thread(
+                                    client.models.generate_content,
+                                    model="gemini-2.5-flash",
+                                    contents=[part, prompt],
+                                ),
+                                timeout=60.0,
+                            )
+                            if resp and resp.text:
+                                return resp.text.strip()
+                            break
+                        except Exception as call_exc:
+                            if attempt == 2:
+                                raise call_exc
+                            delay = (2 ** attempt) + random.uniform(0.1, 0.5)
+                            await asyncio.sleep(delay)
                 except Exception as exc:
                     logger.warning(f"[ContentExtractor] Сбой модели Gemini для PDF {file_path.name}, fallback на локальный: {exc}")
 
         # Штатный локальный экстрактор (pypdf -> pdfminer)
-        pdf_text = extract_pdf_text(file_path)
+        pdf_text = await asyncio.to_thread(extract_pdf_text, file_path)
         return pdf_text or f"*(Пустой или нераспознанный PDF-документ: {file_path.name})*"
 
     async def convert_image_ocr(self, file_path: Path, mode: str = "model") -> str:
@@ -205,7 +219,7 @@ class ContentExtractor:
                 try:
                     from google.genai import types
 
-                    img_bytes = file_path.read_bytes()
+                    img_bytes = await asyncio.to_thread(file_path.read_bytes)
                     mime = IMAGE_MIME_TYPES.get(file_path.suffix.lower(), "image/png")
                     prompt = (
                         "Выполни оптическое распознавание текста (OCR) этого изображения. "
@@ -213,46 +227,66 @@ class ContentExtractor:
                         "Выведи только распознанный текст без вступительных или служебных фраз."
                     )
                     part = types.Part.from_bytes(data=img_bytes, mime_type=mime)
-                    resp = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model="gemini-2.5-flash",
-                        contents=[part, prompt],
-                    )
-                    if resp and resp.text:
-                        return resp.text.strip()
+                    for attempt in range(3):
+                        try:
+                            resp = await asyncio.wait_for(
+                                asyncio.to_thread(
+                                    client.models.generate_content,
+                                    model="gemini-2.5-flash",
+                                    contents=[part, prompt],
+                                ),
+                                timeout=45.0,
+                            )
+                            if resp and resp.text:
+                                return resp.text.strip()
+                            break
+                        except Exception as call_exc:
+                            if attempt == 2:
+                                raise call_exc
+                            delay = (2 ** attempt) + random.uniform(0.1, 0.5)
+                            await asyncio.sleep(delay)
                 except Exception as exc:
                     logger.warning(f"[ContentExtractor] Сбой модели Gemini Vision для OCR {file_path.name}: {exc}")
 
         # Локальное штатное распознавание: попытка вызвать Tesseract OCR
-        try:
-            import pytesseract
-            from PIL import Image
+        def _local_ocr() -> Optional[str]:
+            try:
+                import pytesseract
+                from PIL import Image
 
-            img = Image.open(file_path)
-            ocr_res = pytesseract.image_to_string(img, lang="rus+eng").strip()
-            if ocr_res:
-                return f"# OCR (Tesseract): {file_path.name}\n\n{ocr_res}"
-        except Exception:
-            pass
+                with Image.open(file_path) as img:
+                    ocr_res = pytesseract.image_to_string(img, lang="rus+eng").strip()
+                    if ocr_res:
+                        return f"# OCR (Tesseract): {file_path.name}\n\n{ocr_res}"
+            except Exception:
+                pass
+            return None
+
+        local_ocr_res = await asyncio.to_thread(_local_ocr)
+        if local_ocr_res:
+            return local_ocr_res
 
         # Если локального Tesseract нет — формируем карточку метаданных изображения через PIL
-        try:
-            from PIL import Image
+        def _pil_metadata() -> str:
+            try:
+                from PIL import Image
 
-            with Image.open(file_path) as img:
-                w, h = img.size
-                fmt = img.format or file_path.suffix.upper().replace(".", "")
-                color_mode = img.mode
-            return (
-                f"# Изображение: {file_path.name}\n\n"
-                f"- **Формат:** {fmt}\n"
-                f"- **Разрешение:** {w}x{h} px\n"
-                f"- **Цветовая модель:** {color_mode}\n\n"
-                f"*(Локальный модуль Tesseract OCR не установлен в системе. "
-                f"Для автоматического извлечения текста выберите режим 'Расшифровка на модели (Gemini)')*"
-            )
-        except Exception as exc:
-            return f"# Изображение: {file_path.name}\n\n*(Ошибка чтения изображения: {exc})*"
+                with Image.open(file_path) as img:
+                    w, h = img.size
+                    fmt = img.format or file_path.suffix.upper().replace(".", "")
+                    color_mode = img.mode
+                return (
+                    f"# Изображение: {file_path.name}\n\n"
+                    f"- **Формат:** {fmt}\n"
+                    f"- **Разрешение:** {w}x{h} px\n"
+                    f"- **Цветовая модель:** {color_mode}\n\n"
+                    f"*(Локальный модуль Tesseract OCR не установлен в системе. "
+                    f"Для автоматического извлечения текста выберите режим 'Расшифровка на модели (Gemini)')*"
+                )
+            except Exception as exc:
+                return f"# Изображение: {file_path.name}\n\n*(Ошибка чтения изображения: {exc})*"
+
+        return await asyncio.to_thread(_pil_metadata)
 
     async def convert_audio(self, file_path: Path, mode: str = "model", language: str = "ru") -> str:
         """Выполняет транскрибацию аудиофайла строго с подключением к внешней модели Gemini (или пропуск при raw).
@@ -308,6 +342,12 @@ class ContentExtractor:
         file_path = Path(target).resolve()
         if not file_path.exists():
             raise FileNotFoundError(f"Файл не найден: {file_path}")
+
+        file_size = file_path.stat().st_size
+        if file_size > MAX_EXTRACT_FILE_SIZE_BYTES:
+            raise ValueError(
+                f"Размер файла {file_path.name} ({file_size} байт) превышает максимально допустимый лимит ({MAX_EXTRACT_FILE_SIZE_BYTES} байт)."
+            )
 
         suffix = file_path.suffix.lower()
 
@@ -392,7 +432,7 @@ class ContentExtractor:
         # 5. Excel файл (.xlsx, .xls)
         if suffix in (".xlsx", ".xls"):
             logger.info(f"[ContentExtractor] Конвертация Excel в Markdown: {file_path.name}")
-            excel_text = excel2text(file_path)
+            excel_text = await asyncio.to_thread(excel2text, file_path)
             return {
                 "text": excel_text,
                 "source_type": "excel",
@@ -405,7 +445,7 @@ class ContentExtractor:
         # 6. Microsoft Word (.docx)
         if suffix in DOC_EXTENSIONS:
             logger.info(f"[ContentExtractor] Извлечение Word DOCX: {file_path.name}")
-            docx_text = self._extract_docx(file_path)
+            docx_text = await asyncio.to_thread(self._extract_docx, file_path)
             return {
                 "text": docx_text,
                 "source_type": "docx",
@@ -417,7 +457,7 @@ class ContentExtractor:
 
         # 7. CSV / TSV
         if suffix in (".csv", ".tsv"):
-            csv_text = self._extract_csv(file_path)
+            csv_text = await asyncio.to_thread(self._extract_csv, file_path)
             return {
                 "text": csv_text,
                 "source_type": "csv",
@@ -428,7 +468,7 @@ class ContentExtractor:
             }
 
         # 8. Обычный текст / Исходный код / JSON / Markdown
-        plain_text = self._extract_plain_text(file_path)
+        plain_text = await asyncio.to_thread(self._extract_plain_text, file_path)
         return {
             "text": plain_text,
             "source_type": "text",

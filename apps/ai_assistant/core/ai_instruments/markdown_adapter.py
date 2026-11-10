@@ -5,8 +5,8 @@
 # Description:
 #   Адаптер сериализации и парсинга базы инструментов цепочек размышлений
 #   в формате локального Markdown документа (toolchain_tools.md).
-#   Обеспечивает чтение, запись, обновление счётчиков запусков и редактируемость
-#   через Obsidian Vault и текстовые редакторы.
+#   Обеспечивает атомарную запись, чтение, обновление счётчиков запусков
+#   и редактируемость через Obsidian Vault и текстовые редакторы.
 #
 # Usage Examples:
 #   Python API:
@@ -21,16 +21,17 @@
 # Package: apps.ai_assistant.core.ai_instruments
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:25:00
+# Updated: 2026-11-10 13:55:00
 # =============================================================================
 
 from __future__ import annotations
 
 """Модуль сериализации и парсинга каталога инструментов в Markdown файл."""
 
-import datetime
 import json
+import os
 import re
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -60,18 +61,18 @@ Updated: {updated_time}
 
 def serialize_instruments_to_markdown(
     instruments: List[AIInstrument],
-    updated_time: Optional[str] = None,
+    updated_time: Optional[str] = "",
 ) -> str:
     """Сериализует список инструментов в читаемый Markdown формат.
 
     Args:
         instruments: Список объектов AIInstrument.
-        updated_time: Строка времени обновления (по умолчанию текущее время).
+        updated_time: Строка времени обновления в UTC ISO 8601 (по умолчанию текущее время UTC).
 
     Returns:
         Строка с разметкой Markdown.
     """
-    now_str = updated_time or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = updated_time or get_current_iso_time()
     out = [DEFAULT_MD_HEADER.format(updated_time=now_str)]
 
     for inst in instruments:
@@ -130,7 +131,6 @@ def parse_instruments_from_markdown(content: str) -> List[AIInstrument]:
         Список распарсенных объектов AIInstrument.
     """
     instruments: List[AIInstrument] = []
-    # Разделяем по секциям заголовков второго уровня ## `id` — Name
     sections = re.split(r"\n(?=##\s+`[^`]+`)", content)
 
     for sec in sections:
@@ -145,7 +145,6 @@ def parse_instruments_from_markdown(content: str) -> List[AIInstrument]:
         tool_id = header_match.group(1).strip()
         name_from_header = (header_match.group(2) or tool_id).strip()
 
-        # Извлечение метаданных списка
         def extract_field(field_name: str, default: str = "") -> str:
             m = re.search(rf"-\s+\*\*{field_name}:\*\*\s*(?:`([^`]+)`|([^\n]+))", sec, re.IGNORECASE)
             if m:
@@ -167,28 +166,26 @@ def parse_instruments_from_markdown(content: str) -> List[AIInstrument]:
 
         last_executed_at = extract_field("Последний запуск", "")
         if last_executed_at in ("Никогда", "None", ""):
-            last_executed_at = None
+            last_executed_at = ""
 
         created_at = extract_field("Создан", get_current_iso_time())
         updated_at = extract_field("Обновлен", get_current_iso_time())
         description = extract_field("Описание", "")
 
-        # Извлечение JSON схемы параметров
         params_schema: Dict[str, Any] = {}
         schema_match = re.search(r"###\s+Схема параметров\s*```(?:json)?\s*([\s\S]*?)```", sec, re.IGNORECASE)
         if schema_match:
             try:
                 params_schema = json.loads(schema_match.group(1).strip())
-            except Exception:
+            except Exception as exc:
+                logger.warning(f"[markdown_adapter] Ошибка разбора JSON-схемы параметров {tool_id}: {exc}")
                 params_schema = {}
 
-        # Извлечение блока команды / скрипта
         command = ""
         cmd_match = re.search(r"###\s+Команда\s*/\s*Скрипт\s*```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)```", sec, re.IGNORECASE)
         if cmd_match:
             command = cmd_match.group(1).strip()
         else:
-            # Fallback: первый блок кода
             code_blocks = re.findall(r"```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)```", sec)
             if len(code_blocks) >= 2:
                 command = code_blocks[1].strip()
@@ -239,8 +236,8 @@ def load_markdown_tools(file_path: Path | str) -> List[AIInstrument]:
         return []
 
 
-def save_markdown_tools(instruments: List[AIInstrument], file_path: Path | str) -> None:
-    """Сохраняет каталог инструментов в Markdown файл.
+def save_markdown_tools(instruments: List[AIInstrument], file_path: Path | str) -> bool:
+    """Атомарно сохраняет каталог инструментов в Markdown файл через временный файл.
 
     Args:
         instruments: Список инструментов.
@@ -249,5 +246,12 @@ def save_markdown_tools(instruments: List[AIInstrument], file_path: Path | str) 
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     md_text = serialize_instruments_to_markdown(instruments)
-    path.write_text(md_text, encoding="utf-8")
+    tmp_path = path.with_suffix(f"{path.suffix}.{uuid.uuid4().hex[:8]}.tmp")
+    try:
+        tmp_path.write_text(md_text, encoding="utf-8")
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
     logger.info(f"[markdown_adapter] Сохранено {len(instruments)} инструментов в {path}")
+    return True

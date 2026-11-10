@@ -17,13 +17,14 @@
 # Package: apps.common.file_tree
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 14:15:00
+# Updated: 2026-11-10 14:31:40
 # =============================================================================
 
 from __future__ import annotations
 """Сервис обзора дерева директорий, краткой сводки и создания файлов."""
 
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -42,6 +43,14 @@ from apps.common.file_tree.models import (
     DirectoryBrowseResponse,
     FileSummaryResponse,
     FileTreeNode,
+)
+
+# Ограничения обхода дерева каталогов для защиты ОЗУ и Event Loop
+MAX_TREE_DEPTH: int = 12
+MAX_TREE_NODES: int = 5000
+MAX_SUMMARY_READ_BYTES: int = 2 * 1024 * 1024
+_IGNORED_DIR_NAMES: frozenset[str] = frozenset(
+    {".git", ".workspace", "__pycache__", ".pytest_cache", "node_modules", ".venv", "venv"}
 )
 
 
@@ -151,8 +160,9 @@ class FileTreeService:
         total_files = 0
         total_dirs = 0
         total_size = 0
+        effective_max_depth = max(1, min(max_depth, MAX_TREE_DEPTH))
 
-        # Рекурсивная функция обхода каталога
+        # Рекурсивная функция обхода каталога с защитой от переполнения узлов
         def _scan_node(
             current_path: Path,
             current_depth: int,
@@ -161,7 +171,11 @@ class FileTreeService:
         ) -> List[FileTreeNode]:
             nonlocal total_files, total_dirs, total_size
 
-            if current_depth > max_depth or not current_path.exists():
+            if (
+                current_depth > effective_max_depth
+                or (total_files + total_dirs) >= MAX_TREE_NODES
+                or not current_path.exists()
+            ):
                 return []
 
             nodes: List[FileTreeNode] = []
@@ -170,14 +184,16 @@ class FileTreeService:
                     list(current_path.iterdir()),
                     key=lambda p: (not p.is_dir(), p.name.lower()),
                 )
-            except PermissionError:
+            except (PermissionError, OSError):
                 return []
 
             root_for_rel = base_root if base_root is not None else ws_root
 
             for entry in entries:
+                if (total_files + total_dirs) >= MAX_TREE_NODES:
+                    break
                 # Игнорируем внутренние системные каталоги Git и временные файлы
-                if entry.name in {".git", ".workspace", "__pycache__", ".pytest_cache"}:
+                if entry.name in _IGNORED_DIR_NAMES:
                     continue
 
                 try:
@@ -377,8 +393,9 @@ class FileTreeService:
         mtime_str = datetime.fromtimestamp(file_stat.st_mtime, timezone.utc).isoformat()
         ext = target_file.suffix.lower()
 
-        # Проверка на бинарность
-        raw_head = target_file.read_bytes()[:8192]
+        # Проверка на бинарность (чтение только первых 8 КБ без загрузки всего файла в память)
+        with open(target_file, "rb") as bf:
+            raw_head = bf.read(8192)
         is_binary = b"\x00" in raw_head
 
         descriptor = SupportedFileCatalog.get_descriptor(target_file.name, is_binary_detected=is_binary)
@@ -394,7 +411,9 @@ class FileTreeService:
             preview_text = f"[Бинарные данные: {file_size} байт. Доступен в Hex-редакторе Wasm]"
         else:
             try:
-                full_text = target_file.read_text(encoding="utf-8", errors="replace")
+                with open(target_file, "rb") as tf:
+                    bounded_bytes = tf.read(MAX_SUMMARY_READ_BYTES)
+                full_text = bounded_bytes.decode("utf-8", errors="replace")
                 lines = full_text.splitlines()
                 lines_count = len(lines)
 
@@ -501,8 +520,18 @@ class FileTreeService:
             size = 0
         else:
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            target_path.write_text(req.content, encoding="utf-8")
-            size = len(req.content.encode("utf-8"))
+            encoded_bytes = req.content.encode("utf-8")
+            tmp_path = target_path.with_name(f".{target_path.name}.tmp")
+            try:
+                tmp_path.write_bytes(encoded_bytes)
+                os.replace(tmp_path, target_path)
+            finally:
+                if tmp_path.exists():
+                    try:
+                        tmp_path.unlink()
+                    except OSError:
+                        pass
+            size = len(encoded_bytes)
 
         return CreateItemResponse(
             status="ok",
@@ -534,8 +563,10 @@ class FileTreeService:
 
         dirs: List[Dict[str, str]] = [{"path": "", "name": "/ (Корень)"}]
         for p in sorted(ws_root.rglob("*")):
+            if len(dirs) >= MAX_TREE_NODES:
+                break
             if p.is_dir():
-                if any(part in {".git", ".workspace", "__pycache__", ".pytest_cache"} for part in p.parts):
+                if any(part in _IGNORED_DIR_NAMES for part in p.parts):
                     continue
                 rel_dir = p.relative_to(ws_root).as_posix()
                 dirs.append({"path": rel_dir, "name": f"/{rel_dir}"})

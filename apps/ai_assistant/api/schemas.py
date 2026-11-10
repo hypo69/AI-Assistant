@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.api
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-01 20:05:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def get_utc_now_iso() -> str:
@@ -31,51 +31,83 @@ def get_utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _validate_safe_commit_ref(value: Optional[str]) -> Optional[str]:
+    """Проверяет, что ссылка на коммит не начинается с дефиса (защита от инъекции флагов Git CLI).
+
+    Args:
+        value (Optional[str]): Хэш коммита или имя ветки/ревизии.
+
+    Returns:
+        Optional[str]: Проверенная строка или None.
+
+    Raises:
+        ValueError: Если значение начинается с дефиса ('-').
+    """
+    if value is not None:
+        cleaned = value.strip()
+        if cleaned.startswith("-"):
+            raise ValueError("Недопустимый формат commit_hash: ведущий дефис запрещён")
+    return value
+
+
 class CommitSummary(BaseModel):
     """Краткая информация о коммите."""
     commit_hash: str = Field(..., description="Хэш коммита SHA-1")
-    parent_hash: str = Field("", description="Хэш родительского коммита")
+    parent_hash: str = Field(default="", description="Хэш родительского коммита")
     author: str = Field(..., description="Имя и email автора")
     timestamp: str = Field(..., description="Метка времени фиксации коммита")
     message: str = Field(..., description="Сообщение коммита")
-    files_changed: int = Field(0, description="Количество измененных файлов")
+    files_changed: int = Field(default=0, ge=0, description="Количество измененных файлов")
+
+    @field_validator("commit_hash")
+    @classmethod
+    def check_commit_hash(cls, v: str) -> str:
+        """Проверяет безопасность хэша коммита."""
+        _validate_safe_commit_ref(v)
+        return v
 
 
 class FileChangeItem(BaseModel):
     """Изменение конкретного файла в коммите."""
     file_path: str = Field(..., description="Путь к файлу")
-    status: str = Field("M", description="Статус: A (добавлен), M (изменен), D (удален), R (переименован)")
-    old_path: Optional[str] = Field(None, description="Прежний путь при переименовании")
-    blob_hash: Optional[str] = Field(None, description="Хэш blob-объекта Git")
+    status: str = Field(default="M", description="Статус: A (добавлен), M (изменен), D (удален), R (переименован)")
+    old_path: Optional[str] = Field(default=None, description="Прежний путь при переименовании")
+    blob_hash: Optional[str] = Field(default=None, description="Хэш blob-объекта Git")
 
 
 class FileHistoryResponse(BaseModel):
     """Ответ со списком истории коммитов по файлу или репозиторию."""
-    file_path: Optional[str] = Field(None, description="Целевой файл")
-    total_commits: int = Field(..., description="Количество найденных коммитов")
+    file_path: Optional[str] = Field(default=None, description="Целевой файл")
+    total_commits: int = Field(default=0, ge=0, description="Количество найденных коммитов")
     commits: List[CommitSummary] = Field(default_factory=list, description="Список коммитов")
 
 
 class DiffHunkItem(BaseModel):
     """Срез измененного блока diff."""
-    old_start: int = Field(default=0, description="Начальная строка в старой ревизии")
-    old_lines: int = Field(default=0, description="Число строк в старой ревизии")
-    new_start: int = Field(default=0, description="Начальная строка в новой ревизии")
-    new_lines: int = Field(default=0, description="Число строк в новой ревизии")
+    old_start: int = Field(default=0, ge=0, description="Начальная строка в старой ревизии")
+    old_lines: int = Field(default=0, ge=0, description="Число строк в старой ревизии")
+    new_start: int = Field(default=0, ge=0, description="Начальная строка в новой ревизии")
+    new_lines: int = Field(default=0, ge=0, description="Число строк в новой ревизии")
     hunk_text: str = Field(default="", description="Текст фрагмента diff")
 
 
 class DiffResponse(BaseModel):
     """Ответ с результатами сравнения двух коммитов или снимка коммита."""
     commit_hash: str = Field(default="", description="Хэш коммита")
-    commit_a: Optional[str] = Field(None, description="Хэш исходного коммита")
-    commit_b: Optional[str] = Field(None, description="Хэш целевого коммита")
+    commit_a: Optional[str] = Field(default=None, description="Хэш исходного коммита")
+    commit_b: Optional[str] = Field(default=None, description="Хэш целевого коммита")
     parent_hash: Optional[str] = Field(default="", description="Хэш родительского коммита")
-    file_path: Optional[str] = Field(None, description="Целевой файл")
+    file_path: Optional[str] = Field(default=None, description="Целевой файл")
     diff_text: str = Field(default="", description="Текст unified diff")
     hunks: List[DiffHunkItem] = Field(default_factory=list, description="Разобранные блоки diff")
     files_changed: List[str] = Field(default_factory=list, description="Список затронутых файлов")
     truncated: bool = Field(default=False, description="Признак усечения большого diff")
+
+    @field_validator("commit_hash", "commit_a", "commit_b", "parent_hash")
+    @classmethod
+    def check_diff_hashes(cls, v: Optional[str]) -> Optional[str]:
+        """Проверяет отсутствие ведущих дефисов в хэшах коммитов."""
+        return _validate_safe_commit_ref(v)
 
     @model_validator(mode="before")
     @classmethod
@@ -93,12 +125,12 @@ class DiffResponse(BaseModel):
 
 class BlameLine(BaseModel):
     """Строка аннотации Git Blame."""
-    line_number: int = Field(..., description="Номер строки")
+    line_number: int = Field(..., ge=1, description="Номер строки")
     commit_hash: str = Field(..., description="Хэш коммита автора строки")
     author: str = Field(..., description="Автор изменения")
     timestamp: str = Field(..., description="Дата фиксации строки")
-    code: str = Field(..., description="Исходный текст строки")
-    wiki_context: Optional[str] = Field(None, description="Связанный архитектурный факт из WikiLLM (Smart Blame)")
+    code: str = Field(default="", description="Исходный текст строки")
+    wiki_context: Optional[str] = Field(default=None, description="Связанный архитектурный факт из WikiLLM (Smart Blame)")
 
 
 class BlameResponse(BaseModel):
@@ -114,8 +146,8 @@ class TimelineEvent(BaseModel):
     timestamp: str = Field(..., description="Метка времени события")
     author: str = Field(..., description="Автор")
     message: str = Field(..., description="Сообщение коммита")
-    diff_stat: str = Field("", description="Краткая статистика (+/- строк)")
-    status: str = Field("M", description="Тип изменения файла")
+    diff_stat: str = Field(default="", description="Краткая статистика (+/- строк)")
+    status: str = Field(default="M", description="Тип изменения файла")
     related_wiki_facts: List[str] = Field(default_factory=list, description="Ключи связанных фактов WikiLLM")
 
 
@@ -124,7 +156,7 @@ class TimelineResponse(BaseModel):
     file_path: str = Field(..., description="Путь к файлу")
     events: List[TimelineEvent] = Field(default_factory=list, description="События таймлайна")
     checkpoints: List[TimelineEvent] = Field(default_factory=list, description="Контрольные точки (алиас)")
-    total_checkpoints: int = Field(0, description="Общее количество точек")
+    total_checkpoints: int = Field(default=0, ge=0, description="Общее количество точек")
 
 
 class EvidenceLinkSchema(BaseModel):
@@ -133,53 +165,59 @@ class EvidenceLinkSchema(BaseModel):
     target_id: str = Field(..., description="Идентификатор цели (page_id / fact_id / error_id)")
     relation_type: str = Field(..., description="Тип связи: modifies, documents, fixes, caused_by, supersedes")
     valid_from: str = Field(..., description="Хэш коммита или метка времени начала действия")
-    valid_to: Optional[str] = Field(None, description="Хэш коммита инвалидации или None, если активен")
-    confidence: float = Field(1.0, ge=0.0, le=1.0, description="Достоверность связи")
-    provenance: str = Field("heuristic", description="Происхождение: git_tree, commit_msg, wikillm, user")
-    status: str = Field("ACTIVE", description="Статус связи: ACTIVE или SUPERSEDED")
+    valid_to: Optional[str] = Field(default=None, description="Хэш коммита инвалидации или None, если активен")
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Достоверность связи")
+    provenance: str = Field(default="heuristic", description="Происхождение: git_tree, commit_msg, wikillm, user")
+    status: str = Field(default="ACTIVE", description="Статус связи: ACTIVE или SUPERSEDED")
 
 
 class AnnotationRequest(BaseModel):
     """Запрос на добавление аннотации к коммиту или ревизии (Шаг 1: Candidate Proposal)."""
-    workspace_id: Optional[str] = Field(None, description="Идентификатор рабочей области")
-    commit_hash: Optional[str] = Field(None, description="Хэш коммита")
-    source_id: Optional[str] = Field(None, description="Идентификатор источника")
-    file_path: Optional[str] = Field(None, description="Опциональный путь к файлу")
-    target_id: Optional[str] = Field(None, description="Идентификатор целевой сущности WikiLLM")
-    fact_title: Optional[str] = Field(None, description="Заголовок архитектурного факта/решения")
-    fact_description: Optional[str] = Field(None, description="Описание причины изменения")
-    summary: Optional[str] = Field(None, description="Краткое резюме факта")
-    valid_from: Optional[str] = Field(None, description="Хэш коммита или дата начала действия")
-    relation_type: str = Field("documents", description="Тип отношения: documents, fixes, modifies, supersedes")
-    confidence: float = Field(0.9, ge=0.0, le=1.0, description="Степень уверенности")
-    provenance: str = Field("manual", description="Происхождение аннотации")
-    user_id: int = Field(1, description="Идентификатор пользователя")
+    workspace_id: Optional[str] = Field(default=None, description="Идентификатор рабочей области")
+    commit_hash: Optional[str] = Field(default=None, description="Хэш коммита")
+    source_id: Optional[str] = Field(default=None, description="Идентификатор источника")
+    file_path: Optional[str] = Field(default=None, description="Опциональный путь к файлу")
+    target_id: Optional[str] = Field(default=None, description="Идентификатор целевой сущности WikiLLM")
+    fact_title: Optional[str] = Field(default=None, description="Заголовок архитектурного факта/решения")
+    fact_description: Optional[str] = Field(default=None, description="Описание причины изменения")
+    summary: Optional[str] = Field(default=None, description="Краткое резюме факта")
+    valid_from: Optional[str] = Field(default=None, description="Хэш коммита или дата начала действия")
+    relation_type: str = Field(default="documents", description="Тип отношения: documents, fixes, modifies, supersedes")
+    confidence: float = Field(default=0.9, ge=0.0, le=1.0, description="Степень уверенности")
+    provenance: str = Field(default="manual", description="Происхождение аннотации")
+    user_id: int = Field(default=1, ge=1, description="Идентификатор пользователя")
+
+    @field_validator("commit_hash", "valid_from")
+    @classmethod
+    def check_annotation_commit(cls, v: Optional[str]) -> Optional[str]:
+        """Проверяет отсутствие ведущих дефисов в ссылках на коммиты."""
+        return _validate_safe_commit_ref(v)
 
 
 class AnnotationResponse(BaseModel):
     """Ответ валидации и сохранения аннотации (Шаг 2: Validation Pipeline)."""
-    success: bool = Field(True, description="Успешность операции")
-    status: str = Field("verified_and_saved", description="Статус операции")
-    message: str = Field("Факт успешно валидирован и зафиксирован", description="Пояснение валидации")
-    verification_passed: bool = Field(True, description="Флаг прохождения проверок безопасности")
-    sanitized_fact_id: Optional[str] = Field(None, description="Идентификатор созданного факта в базе")
-    link: Optional[EvidenceLinkSchema] = Field(None, description="Зарегистрированная темпоральная связь")
+    success: bool = Field(default=True, description="Успешность операции")
+    status: str = Field(default="verified_and_saved", description="Статус операции")
+    message: str = Field(default="Факт успешно валидирован и зафиксирован", description="Пояснение валидации")
+    verification_passed: bool = Field(default=True, description="Флаг прохождения проверок безопасности")
+    sanitized_fact_id: Optional[str] = Field(default=None, description="Идентификатор созданного факта в базе")
+    link: Optional[EvidenceLinkSchema] = Field(default=None, description="Зарегистрированная темпоральная связь")
 
 
 class QuerySearchRequest(BaseModel):
     """Запрос на интеллектуальный поиск по истории версий."""
-    query: str = Field(..., description="Вопрос на естественном языке")
-    file_path: Optional[str] = Field(None, description="Ограничение поиска по файлу")
-    top_k: int = Field(5, ge=1, le=50, description="Количество возвращаемых результатов")
-    limit: Optional[int] = Field(None, description="Алиас для top_k")
-    include_diff: bool = Field(True, description="Извлекать ли точный diff")
+    query: str = Field(..., min_length=1, description="Вопрос на естественном языке")
+    file_path: Optional[str] = Field(default=None, description="Ограничение поиска по файлу")
+    top_k: int = Field(default=5, ge=1, le=50, description="Количество возвращаемых результатов")
+    limit: Optional[int] = Field(default=None, ge=1, le=50, description="Алиас для top_k")
+    include_diff: bool = Field(default=True, description="Извлекать ли точный diff")
 
 
 class QuerySearchResponse(BaseModel):
     """Ответ координатора поиска с ИИ-анализом и быстрыми вопросами."""
     query: str = Field(..., description="Исходный запрос")
-    total_found: int = Field(0, description="Общее число совпадений")
-    explanation: str = Field("", description="Синтезированное экспертное объяснение")
+    total_found: int = Field(default=0, ge=0, description="Общее число совпадений")
+    explanation: str = Field(default="", description="Синтезированное экспертное объяснение")
     commits: List[CommitSummary] = Field(default_factory=list, description="Найденные релевантные коммиты")
     rag_chunks: List[Dict[str, Any]] = Field(default_factory=list, description="Найденные векторные чанки")
     wiki_entities: List[Dict[str, Any]] = Field(default_factory=list, description="Сущности WikiLLM")

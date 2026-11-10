@@ -2665,5 +2665,18 @@
   "theme": {
     "copyHexTitle": "Copy HEX code",
     "resetColorTitle": "Reset color to default"
-  }
+  },
+  "workspace.subtabs.chatTitle": "Section: Чат",
+  "workspace.blocks.block-dirTitle": "Section: Содержимое репозитория (Git)",
+  "workspace.blocks.block-trackTitle": "Section: Добавление файлов в слежение",
+  "workspace.blocks.block-obsidianTitle": "Section: Obsidian Vault",
+  "workspace.blocks.block-sourcesTitle": "Section: Внешние источники",
+  "tooltips.subtabs.catalogTitle": "Section: Каталог подсказок",
+  "tooltips.subtabs.editorTitle": "Section: Редактор подсказки",
+  "tooltips.subtabs.kbTitle": "Section: База знаний (WikiLLM)",
+  "tooltips.subtabs.auditTitle": "Section: Аудит и валидация",
+  "tooltips.subtabs.panel-editor-lang-ruTitle": "Section: Русский (RU)",
+  "tooltips.subtabs.panel-editor-lang-enTitle": "Section: English (EN)",
+  "tooltips.subtabs.panel-editor-lang-heTitle": "Section: עברית (HE)",
+  "tooltips.subtabs.panel-editor-lang-ukTitle": "Section: Українська (UK)"
 }

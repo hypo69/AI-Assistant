@@ -16,7 +16,7 @@
 # Package: apps.ai_assistant
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:31:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator, Dict, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -58,6 +58,10 @@ from apps.ai_assistant.api.routers.router_keys import router as keys_router
 from apps.ai_assistant.api.routers.router_plugins import router as plugins_router
 from apps.common.file_editor import file_editor_router
 from apps.ai_assistant.api.routers.router_tooltips import router as tooltips_router
+from apps.ai_assistant.api.routers.router_ai_instruments import router as ai_instruments_router
+from apps.ai_assistant.api.routers.router_connections import router as connections_router
+from apps.ai_assistant.api.routers.router_tasks import router as tasks_router
+from apps.ai_assistant.api.routers.router_menu_config import router as menu_config_router
 
 from header import __root__
 BASE_DIR:Path = __root__  / "apps" / "ai_assistant" 
@@ -85,9 +89,9 @@ def resolve_app_path(path_str: str) -> Path:
     return (BASE_DIR / p).resolve()
 
 
-def load_app_config() -> Dict[str, any]:
+def load_app_config() -> Dict[str, Any]:
     """Загружает параметры конфигурации из файла config.json приложения и корневого config.json."""
-    cfg: Dict[str, any] = {}
+    cfg: Dict[str, Any] = {}
     if CONFIG_PATH.exists():
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -107,6 +111,23 @@ def load_app_config() -> Dict[str, any]:
             logger.warning(f"[AIAssistant] Ошибка чтения корневого config.json: {exc}")
 
     return cfg
+
+
+def _get_allowed_cors_origins() -> List[str]:
+    """Извлекает безопасный список разрешённых CORS origins из конфигурации."""
+    cfg = load_app_config()
+    server_cfg = cfg.get("server", {}) if isinstance(cfg.get("server"), dict) else {}
+    configured = server_cfg.get("allowed_origins") or cfg.get("allowed_origins")
+    if isinstance(configured, list) and configured:
+        return [str(o).strip() for o in configured if str(o).strip()]
+    return [
+        "http://127.0.0.1:8002",
+        "http://localhost:8002",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8001",
+        "http://localhost:8001",
+    ]
 
 
 def _migrate_legacy_chromium_data(target_profile: Path, target_cache: Path) -> None:
@@ -196,10 +217,11 @@ app = FastAPI(
 )
 
 # Настройка CORS
+_allowed_origins = _get_allowed_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allowed_origins,
+    allow_credentials="*" not in _allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -224,6 +246,10 @@ app.include_router(contacts_router)
 app.include_router(plugins_router)
 app.include_router(file_editor_router)
 app.include_router(tooltips_router)
+app.include_router(ai_instruments_router)
+app.include_router(connections_router)
+app.include_router(tasks_router)
+app.include_router(menu_config_router)
 
 # ----------------------------------------------------------------------
 #  Основные маршруты UI

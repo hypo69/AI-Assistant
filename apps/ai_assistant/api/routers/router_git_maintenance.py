@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-27 23:33:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -41,6 +41,8 @@ from apps.ai_assistant.core.repo_resolver import resolve_repo_path
 
 router = APIRouter(prefix="/api/v1/git/maintenance", tags=["Git Maintenance & GC"])
 
+_gc_run_lock = asyncio.Lock()
+
 
 def _resolve_target_path(repo_path: Optional[str] = None, workspace_id: Optional[str] = None) -> Optional[str]:
     """Разрешает путь к целевому репозиторию с поддержкой workspace_id."""
@@ -54,23 +56,23 @@ def _resolve_target_path(repo_path: Optional[str] = None, workspace_id: Optional
 
 class ScheduleConfigRequest(BaseModel):
     """Схема настройки расписания git gc."""
-    auto_gc_enabled: bool = Field(True, description="Флаг включения периодического выполнения git gc")
-    gc_interval_hours: int = Field(24, ge=1, le=720, description="Интервал в часах между запусками (1-720)")
-    aggressive: bool = Field(False, description="Агрессивная перепаковка объектов")
-    auto_prune: bool = Field(True, description="Удаление недостижимых объектов (--prune=now)")
+    auto_gc_enabled: bool = Field(default=True, description="Флаг включения периодического выполнения git gc")
+    gc_interval_hours: int = Field(default=24, ge=1, le=720, description="Интервал в часах между запусками (1-720)")
+    aggressive: bool = Field(default=False, description="Агрессивная перепаковка объектов")
+    auto_prune: bool = Field(default=True, description="Удаление недостижимых объектов (--prune=now)")
 
 
 class ActiveRepoSetRequest(BaseModel):
     """Схема глобальной установки активного Git-репозитория."""
     repo_path: str = Field(..., description="Абсолютный путь к целевому Git-репозиторию")
-    workspace_id: Optional[str] = Field(None, description="Опциональный идентификатор рабочей области")
+    workspace_id: Optional[str] = Field(default=None, description="Опциональный идентификатор рабочей области")
 
 
 class GcRunRequest(BaseModel):
     """Схема параметров ручного запуска git gc."""
-    aggressive: bool = Field(False, description="Выполнять ли агрессивную сборку")
-    prune: bool = Field(True, description="Удалять ли недостижимые объекты немедленно")
-    repo_path: Optional[str] = Field(None, description="Опциональный путь к целевому репозиторию")
+    aggressive: bool = Field(default=False, description="Выполнять ли агрессивную сборку")
+    prune: bool = Field(default=True, description="Удалять ли недостижимые объекты немедленно")
+    repo_path: Optional[str] = Field(default=None, description="Опциональный путь к целевому репозиторию")
 
 
 @router.get("/status", summary="Получение статуса обслуживания Git и метрик объектов")
@@ -85,16 +87,15 @@ async def get_repositories() -> List[Dict[str, str]]:
     return await asyncio.to_thread(git_maintenance_analyzer.get_available_repos)
 
 
-@router.get("/active-repo", summary="Получение глобально активного Git-репозитория")
-async def get_active_repo() -> Dict[str, Any]:
-    """Возвращает информацию о текущем глобально активном репозитории и рабочей области."""
-    from apps.ai_assistant.core.workspace_manager import WorkspaceManager
+def _sync_get_active_repo() -> Dict[str, Any]:
+    """Синхронно определяет активный репозиторий и извлекает метаданные Git."""
     from apps.ai_assistant.api.routers.router_knowledge import _workspace_manager as wm
+    from apps.ai_assistant.core.workspace_registry import WorkspaceRegistry, resolve_workspaces_dir
+
     saved = wm.store.get_active_repo()
     repo_path = saved.get("repo_path")
     workspace_id = saved.get("workspace_id")
     resolved_path = resolve_repo_path(workspace_id=workspace_id, repo_path=repo_path)
-    from apps.ai_assistant.core.workspace_registry import WorkspaceRegistry, resolve_workspaces_dir
     ws_dir = resolve_workspaces_dir()
     workspaces = WorkspaceRegistry(ws_dir).list_workspaces()
     if (not repo_path or not resolved_path.exists()) and workspaces:
@@ -114,17 +115,26 @@ async def get_active_repo() -> Dict[str, Any]:
     }
 
 
+@router.get("/active-repo", summary="Получение глобально активного Git-репозитория")
+async def get_active_repo() -> Dict[str, Any]:
+    """Возвращает информацию о текущем глобально активном репозитории и рабочей области."""
+    return await asyncio.to_thread(_sync_get_active_repo)
+
+
 @router.post("/active-repo", summary="Глобальная установка активного Git-репозитория")
 async def set_active_repo(req: ActiveRepoSetRequest) -> Dict[str, Any]:
     """Глобально фиксирует активный Git-репозиторий и связанную рабочую область."""
-    from apps.ai_assistant.core.workspace_manager import WorkspaceManager
     p = Path(req.repo_path).resolve()
     if not p.exists() or not p.is_dir():
         raise HTTPException(status_code=400, detail=f"Путь репозитория не существует: {req.repo_path}")
     norm_path = str(p).replace("\\", "/")
-    from apps.ai_assistant.api.routers.router_knowledge import _workspace_manager as wm
-    wm.store.set_active_repo(norm_path, req.workspace_id)
-    meta = git_maintenance_analyzer.get_repo_meta(p)
+
+    def _do_set_active() -> Dict[str, Any]:
+        from apps.ai_assistant.api.routers.router_knowledge import _workspace_manager as wm
+        wm.store.set_active_repo(norm_path, req.workspace_id)
+        return git_maintenance_analyzer.get_repo_meta(p)
+
+    meta = await asyncio.to_thread(_do_set_active)
     return {
         "status": "ok",
         "repo_path": norm_path,
@@ -142,7 +152,7 @@ async def get_maintenance_diagnosis(
     workspace_id: Optional[str] = Query(None, description="Идентификатор рабочей области"),
 ) -> DiagnosisResult:
     """Выполняет оценку показателей активного репозитория и возвращает вердикт: Норма / Наблюдение / Обслуживание."""
-    resolved = _resolve_target_path(repo_path, workspace_id)
+    resolved = await asyncio.to_thread(_resolve_target_path, repo_path, workspace_id)
     return await asyncio.to_thread(git_maintenance_analyzer.diagnose, resolved)
 
 
@@ -158,7 +168,7 @@ async def run_gc_auto(
     workspace_id: Optional[str] = Query(None, description="Идентификатор рабочей области"),
 ) -> Dict[str, Any]:
     """Запускает git gc --auto, принимающий решение на основе встроенных порогов Git."""
-    resolved = _resolve_target_path(repo_path, workspace_id)
+    resolved = await asyncio.to_thread(_resolve_target_path, repo_path, workspace_id)
     return await asyncio.to_thread(git_maintenance_analyzer.run_gc_auto, resolved)
 
 
@@ -168,7 +178,7 @@ async def run_fsck(
     workspace_id: Optional[str] = Query(None, description="Идентификатор рабочей области"),
 ) -> Dict[str, Any]:
     """Запускает git fsck --full для проверки целостности всех объектов базы данных Git."""
-    resolved = _resolve_target_path(repo_path, workspace_id)
+    resolved = await asyncio.to_thread(_resolve_target_path, repo_path, workspace_id)
     return await asyncio.to_thread(git_maintenance_analyzer.run_fsck, resolved)
 
 
@@ -188,17 +198,21 @@ async def update_maintenance_schedule(request: ScheduleConfigRequest) -> Dict[st
 
 @router.post("/gc-now", summary="Немедленный запуск оптимизации репозитория git gc")
 async def run_git_gc_now(request: GcRunRequest) -> Dict[str, Any]:
-    """Запускает сборку мусора и оптимизацию Git в отдельном рабочем потоке."""
-    status = git_maintenance_service.get_status()
-    if status.get("is_running"):
+    """Запускает сборку мусора и оптимизацию Git в отдельном рабочем потоке под блокировкой."""
+    if _gc_run_lock.locked():
         raise HTTPException(status_code=409, detail="Оптимизация git gc уже выполняется в данный момент")
 
-    result = await asyncio.to_thread(
-        git_maintenance_service.run_gc,
-        aggressive=request.aggressive,
-        prune=request.prune,
-    )
-    if not result.get("success", False):
-        raise HTTPException(status_code=500, detail=result.get("error", "Ошибка выполнения git gc"))
+    async with _gc_run_lock:
+        status = await asyncio.to_thread(git_maintenance_service.get_status)
+        if status.get("is_running"):
+            raise HTTPException(status_code=409, detail="Оптимизация git gc уже выполняется в данный момент")
 
-    return result
+        result = await asyncio.to_thread(
+            git_maintenance_service.run_gc,
+            aggressive=request.aggressive,
+            prune=request.prune,
+        )
+        if not result.get("success", False):
+            raise HTTPException(status_code=500, detail=result.get("error", "Ошибка выполнения git gc"))
+
+        return result

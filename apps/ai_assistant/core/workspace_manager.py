@@ -22,12 +22,14 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:55:00
+# Updated: 2026-11-10 16:40:00
 # =============================================================================
 
 from __future__ import annotations
 """Управление рабочими областями, изолированными Git-репозиториями и конвейером индексации."""
 
+from collections import OrderedDict
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -50,6 +52,7 @@ from apps.ai_assistant.core.wikillm_version_linker import WikiLLMVersionLinker
 from apps.ai_assistant.core.workspace_registry import (
     WORKSPACE_META_DIR,
     WorkspaceRegistry,
+    _utc_now_iso,
     format_host_qualified_path,
     generate_workspace_readme,
     get_current_host_name,
@@ -91,16 +94,21 @@ class WorkspaceManager:
         self.registry = WorkspaceRegistry(self.workspaces_dir)
 
         self.faiss_dir = self.base_dir / "faiss_indices"
-        self._rag_instances: Dict[str, TextRAG] = {}
-        self._stores: Dict[str, KnowledgeStore] = {}
-        self._graphs: Dict[str, TemporalCodeGraph] = {}
+        self._max_cached_instances: int = 16
+        self._rag_instances: OrderedDict[str, TextRAG] = OrderedDict()
+        self._stores: OrderedDict[str, KnowledgeStore] = OrderedDict()
+        self._graphs: OrderedDict[str, TemporalCodeGraph] = OrderedDict()
         self._default_graph: Optional[TemporalCodeGraph] = temporal_graph
 
         # Директории индексов и БД создаются изолированно внутри каждого рабочего пространства (.workspace/)
         fallback_store = self.base_dir / "knowledge_store.db"
+        from apps.ai_assistant.core.paperless_sync import PaperlessTextResolver
+
+        self._text_resolver = PaperlessTextResolver()
         self.store = knowledge_store or KnowledgeStore(
             db_path=fallback_store,
             workspaces_dir=self.workspaces_dir,
+            text_resolver=self._text_resolver,
         )
         self.analyzers = analyzer_registry or AnalyzerRegistry()
         self.wiki_linker = WikiLLMVersionLinker(
@@ -124,24 +132,32 @@ class WorkspaceManager:
         return db_dir / "knowledge_store.db"
 
     def get_workspace_graph_path(self, workspace_id: str) -> Path:
-        """Возвращает путь к SQLite темпорального графа внутри рабочего пространства."""
+        """Возвращает путь к SQLite темпорального графа: единая БД рабочей области (knowledge_store.db)."""
         ws_path = self.registry.workspace_path(workspace_id)
         db_dir = ws_path / WORKSPACE_META_DIR
         db_dir.mkdir(parents=True, exist_ok=True)
-        return db_dir / "temporal_graph.db"
+        return db_dir / "knowledge_store.db"
 
     def get_workspace_store(self, workspace_id: str) -> KnowledgeStore:
-        """Возвращает изолированный экземпляр KnowledgeStore для конкретного рабочего пространства."""
-        if workspace_id not in self._stores:
-            db_path = self.get_workspace_db_path(workspace_id)
-            self._stores[workspace_id] = KnowledgeStore(db_path=db_path)
+        """Возвращает изолированный экземпляр KnowledgeStore для конкретного рабочего пространства (LRU до 16 элементов)."""
+        if workspace_id in self._stores:
+            self._stores.move_to_end(workspace_id)
+            return self._stores[workspace_id]
+        db_path = self.get_workspace_db_path(workspace_id)
+        self._stores[workspace_id] = KnowledgeStore(db_path=db_path, text_resolver=self._text_resolver)
+        while len(self._stores) > self._max_cached_instances:
+            self._stores.popitem(last=False)
         return self._stores[workspace_id]
 
     def get_workspace_graph(self, workspace_id: str) -> TemporalCodeGraph:
-        """Возвращает изолированный экземпляр TemporalCodeGraph для конкретного рабочего пространства."""
-        if workspace_id not in self._graphs:
-            graph_path = self.get_workspace_graph_path(workspace_id)
-            self._graphs[workspace_id] = TemporalCodeGraph(db_path=graph_path)
+        """Возвращает изолированный экземпляр TemporalCodeGraph для конкретного рабочего пространства (LRU до 16 элементов)."""
+        if workspace_id in self._graphs:
+            self._graphs.move_to_end(workspace_id)
+            return self._graphs[workspace_id]
+        graph_path = self.get_workspace_graph_path(workspace_id)
+        self._graphs[workspace_id] = TemporalCodeGraph(db_path=graph_path)
+        while len(self._graphs) > self._max_cached_instances:
+            self._graphs.popitem(last=False)
         return self._graphs[workspace_id]
 
     @property
@@ -176,16 +192,18 @@ class WorkspaceManager:
             ws_db = ws_meta / "knowledge_store.db"
             if not ws_db.exists() and legacy_store_path.exists():
                 try:
-                    target_store = KnowledgeStore(db_path=ws_db)
-                    src_conn = sqlite3.connect(str(legacy_store_path))
-                    src_conn.row_factory = sqlite3.Row
-                    dst_conn = sqlite3.connect(str(ws_db))
+                    KnowledgeStore(db_path=ws_db)
                     tables = [
                         "documents", "document_versions", "document_chunks", "entities",
                         "facts", "fact_relations", "fact_sources", "language_analysis",
                         "embedding_registry", "query_history", "analysis_runs", "model_usage", "app_settings"
                     ]
-                    with dst_conn:
+                    with (
+                        contextlib.closing(sqlite3.connect(str(legacy_store_path), timeout=15.0)) as src_conn,
+                        contextlib.closing(sqlite3.connect(str(ws_db), timeout=15.0)) as dst_conn,
+                        dst_conn,
+                    ):
+                        src_conn.row_factory = sqlite3.Row
                         for tbl in tables:
                             try:
                                 rows = src_conn.execute(f"SELECT * FROM {tbl} WHERE workspace_id = ?", (ws_id,)).fetchall()
@@ -193,15 +211,12 @@ class WorkspaceManager:
                                     cols = [c[0] for c in src_conn.execute(f"SELECT * FROM {tbl} LIMIT 0").description]
                                     placeholders = ", ".join(["?"] * len(cols))
                                     col_names = ", ".join(cols)
-                                    for r in rows:
-                                        dst_conn.execute(
-                                            f"INSERT OR IGNORE INTO {tbl} ({col_names}) VALUES ({placeholders})",
-                                            tuple(r)
-                                        )
+                                    dst_conn.executemany(
+                                        f"INSERT OR IGNORE INTO {tbl} ({col_names}) VALUES ({placeholders})",
+                                        [tuple(r) for r in rows],
+                                    )
                             except Exception:
                                 pass
-                    src_conn.close()
-                    dst_conn.close()
                     logger.info(f"[WorkspaceManager] Перенесена SQLite база знаний для '{ws_id}' в {ws_db}")
                 except Exception as exc:
                     logger.warning(f"[WorkspaceManager] Ошибка переноса SQLite для '{ws_id}': {exc}")
@@ -216,7 +231,10 @@ class WorkspaceManager:
         return faiss_dir
 
     def get_faiss_rag(self, workspace_id: str) -> TextRAG:
-        """Возвращает или создаёт экземпляр FAISS TextRAG для указанной рабочей области внутри её директории."""
+        """Возвращает или создаёт экземпляр FAISS TextRAG для указанной рабочей области (LRU до 16 элементов)."""
+        if workspace_id in self._rag_instances:
+            self._rag_instances.move_to_end(workspace_id)
+            return self._rag_instances[workspace_id]
         if workspace_id not in self._rag_instances:
             ws_faiss_dir = self.get_workspace_faiss_dir(workspace_id)
             idx_path = ws_faiss_dir / f"ws_{workspace_id}"
@@ -251,6 +269,8 @@ class WorkspaceManager:
                             )
 
             self._rag_instances[workspace_id] = TextRAG(db_path=idx_path, dimension=256)
+            while len(self._rag_instances) > self._max_cached_instances:
+                self._rag_instances.popitem(last=False)
         return self._rag_instances[workspace_id]
 
     def _run_git(self, repo_path: Path, args: List[str]) -> str:
@@ -312,7 +332,9 @@ class WorkspaceManager:
                 data = json.loads(cfg_path.read_text(encoding="utf-8"))
                 data["active_workspace"] = clean_id
                 data["last_active_workspace"] = clean_id
-                cfg_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+                tmp_cfg = cfg_path.with_suffix(".json.tmp")
+                tmp_cfg.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+                os.replace(tmp_cfg, cfg_path)
                 logger.info(f"[WorkspaceManager] В config.json сохранён active_workspace: '{clean_id}'")
             except Exception as exc:
                 logger.warning(f"[WorkspaceManager] Ошибка сохранения active_workspace в config.json: {exc}")
@@ -344,7 +366,9 @@ class WorkspaceManager:
             el_state_path = __root__ / "data" / "electron_state.json"
             if el_state_path.parent.exists():
                 el_state = {"active_workspace_id": workspace_id, "updated_at": _utc_now_iso()}
-                el_state_path.write_text(json.dumps(el_state, indent=2, ensure_ascii=False), encoding="utf-8")
+                tmp_el = el_state_path.with_suffix(".json.tmp")
+                tmp_el.write_text(json.dumps(el_state, indent=2, ensure_ascii=False), encoding="utf-8")
+                os.replace(tmp_el, el_state_path)
         except Exception:
             pass
         try:
@@ -654,6 +678,7 @@ class WorkspaceManager:
         host_name: Optional[str] = None,
         qualified_path: Optional[str] = None,
         relocated_from: Optional[str] = None,
+        paperless_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Единый метод сохранения проанализированного документа в SQLite, FAISS, графе и компактном Obsidian Vault."""
         from apps.ai_assistant.core.workspace_relocator import WorkspaceRelocator
@@ -675,6 +700,7 @@ class WorkspaceManager:
             host_name=resolved_host,
             qualified_path=final_qual,
             relocated_from=relocated_from,
+            paperless_id=paperless_id,
         )
         prev_doc_id = store_res.get("previous_document_id") or relocated_from
         if store_res.get("status") == "relocated_unchanged" and prev_doc_id:
@@ -941,7 +967,9 @@ class WorkspaceManager:
         if relocated_from:
             entry_payload["moved_from"] = relocated_from
         manifest_data[document_id] = entry_payload
-        manifest_file.write_text(json.dumps(manifest_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp_manifest = manifest_file.with_suffix(".json.tmp")
+        tmp_manifest.write_text(json.dumps(manifest_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp_manifest, manifest_file)
 
         if relocated_from:
             self._run_git(ws_path, ["add", "-A", ".tracked_sources.json", ".extracted_snapshots"])

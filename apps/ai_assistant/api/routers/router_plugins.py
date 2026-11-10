@@ -17,14 +17,16 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 18:29:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 
 """REST API маршрутизатор управления модульными плагинами системы."""
 
+import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -43,6 +45,7 @@ from apps.ai_assistant.api.routers.plugins_marketplace import (
 router = APIRouter(prefix="/api/v1/plugins", tags=["Plugins"])
 
 _PLUGINS_CACHE: Dict[str, BasePlugin] = {}
+_plugins_lock = asyncio.Lock()
 
 
 def get_plugins_registry() -> Dict[str, BasePlugin]:
@@ -96,7 +99,7 @@ def _get_active_config_path() -> Path:
 
 
 def _save_plugin_state_to_config(plugin_name: str, enabled: bool) -> None:
-    """Сохраняет состояние активности плагина в конфигурационный файл."""
+    """Атомарно сохраняет состояние активности плагина в конфигурационный файл."""
     cfg_path = _get_active_config_path()
     try:
         cfg: Dict[str, Any] = {}
@@ -125,8 +128,12 @@ def _save_plugin_state_to_config(plugin_name: str, enabled: bool) -> None:
                 if norm_name in plugins_sec["enabled"]:
                     plugins_sec["enabled"].remove(norm_name)
 
-        with open(cfg_path, "w", encoding="utf-8") as f:
+        tmp_path = cfg_path.with_suffix(".json.tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, cfg_path)
     except Exception as exc:
         logger.warning(f"[router_plugins] Ошибка сохранения состояния плагина в config: {exc}")
 
@@ -135,7 +142,7 @@ def _save_plugin_state_to_config(plugin_name: str, enabled: bool) -> None:
 @router.get("/", include_in_schema=False)
 async def list_plugins(lang: str = Query("ru", description="Язык интерфейса")) -> List[Dict[str, Any]]:
     """Возвращает список всех зарегистрированных плагинов с их метаданными и манифестами."""
-    registry = get_plugins_registry()
+    registry = await asyncio.to_thread(get_plugins_registry)
     manifests = []
     for name, plugin in sorted(registry.items(), key=lambda item: item[0]):
         try:
@@ -164,14 +171,15 @@ async def list_plugins(lang: str = Query("ru", description="Язык интер�
 @router.post("/reload", summary="Перезагрузка реестра плагинов")
 async def reload_plugins() -> Dict[str, Any]:
     """Пересканирует каталог plugins/ и повторно инициализирует плагины."""
-    registry = reload_plugins_registry()
+    async with _plugins_lock:
+        registry = await asyncio.to_thread(reload_plugins_registry)
     return {"status": "success", "count": len(registry), "plugins": list(registry.keys())}
 
 
 @router.get("/marketplace", summary="Каталог стандартных плагинов в стиле VS Code")
 async def list_marketplace() -> List[Dict[str, Any]]:
     """Возвращает список доступных стандартных плагинов с информацией об их установке."""
-    registry = get_plugins_registry()
+    registry = await asyncio.to_thread(get_plugins_registry)
     installed_names = list(registry.keys())
     return get_marketplace_catalog(installed_names)
 
@@ -180,10 +188,10 @@ async def list_marketplace() -> List[Dict[str, Any]]:
 async def install_plugin(payload: PluginInstallRequest) -> Dict[str, Any]:
     """Устанавливает стандартный плагин по его идентификатору и перезагружает реестр."""
     try:
-        res = install_marketplace_plugin(payload.plugin_id)
-        # Активируем плагин в конфигурации при установке
-        _save_plugin_state_to_config(payload.plugin_id, True)
-        reload_plugins_registry()
+        async with _plugins_lock:
+            res = await asyncio.to_thread(install_marketplace_plugin, payload.plugin_id)
+            await asyncio.to_thread(_save_plugin_state_to_config, payload.plugin_id, True)
+            await asyncio.to_thread(reload_plugins_registry)
         return res
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -195,7 +203,7 @@ async def install_plugin(payload: PluginInstallRequest) -> Dict[str, Any]:
 @router.get("/{name}", summary="Манифест конкретного плагина")
 async def get_plugin_details(name: str, lang: str = Query("ru")) -> Dict[str, Any]:
     """Возвращает подробный манифест выбранного плагина."""
-    registry = get_plugins_registry()
+    registry = await asyncio.to_thread(get_plugins_registry)
     plugin = registry.get(name) or registry.get(name.lower())
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Плагин '{name}' не найден")
@@ -205,13 +213,14 @@ async def get_plugin_details(name: str, lang: str = Query("ru")) -> Dict[str, An
 @router.post("/{name}/toggle", summary="Включение или отключение плагина")
 async def toggle_plugin(name: str, payload: PluginToggleRequest) -> Dict[str, Any]:
     """Переключает флаг активности плагина и сохраняет состояние в config.json."""
-    registry = get_plugins_registry()
+    registry = await asyncio.to_thread(get_plugins_registry)
     plugin = registry.get(name) or registry.get(name.lower())
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Плагин '{name}' не найден")
 
     plugin.enabled = payload.enabled
-    _save_plugin_state_to_config(plugin.name, payload.enabled)
+    async with _plugins_lock:
+        await asyncio.to_thread(_save_plugin_state_to_config, plugin.name, payload.enabled)
 
     # Запуск или остановка фоновых служб плагина
     try:
@@ -233,7 +242,7 @@ async def toggle_plugin(name: str, payload: PluginToggleRequest) -> Dict[str, An
 @router.post("/{name}/action/{action_id}", summary="Выполнение действия плагина")
 async def execute_plugin_action(name: str, action_id: str, payload: PluginActionRequest) -> Dict[str, Any]:
     """Выполняет объявленное действие плагина по его идентификатору."""
-    registry = get_plugins_registry()
+    registry = await asyncio.to_thread(get_plugins_registry)
     plugin = registry.get(name) or registry.get(name.lower())
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Плагин '{name}' не найден")
@@ -249,7 +258,7 @@ async def execute_plugin_action(name: str, action_id: str, payload: PluginAction
 @router.get("/{name}/config", summary="Получение конфигурации плагина")
 async def get_plugin_config(name: str) -> Dict[str, Any]:
     """Возвращает текущую конфигурацию и форму полей настроек плагина."""
-    registry = get_plugins_registry()
+    registry = await asyncio.to_thread(get_plugins_registry)
     plugin = registry.get(name) or registry.get(name.lower())
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Плагин '{name}' не найден")
@@ -265,13 +274,13 @@ async def get_plugin_config(name: str) -> Dict[str, Any]:
 @router.post("/{name}/config", summary="Обновление конфигурации плагина")
 async def update_plugin_config(name: str, payload: PluginConfigRequest) -> Dict[str, Any]:
     """Обновляет и сохраняет параметры конфигурации плагина."""
-    registry = get_plugins_registry()
+    registry = await asyncio.to_thread(get_plugins_registry)
     plugin = registry.get(name) or registry.get(name.lower())
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Плагин '{name}' не найден")
 
     try:
-        plugin.update_config(payload.config)
+        await asyncio.to_thread(plugin.update_config, payload.config)
         return {"status": "success", "name": plugin.name, "config": plugin.config}
     except Exception as exc:
         logger.error(f"[router_plugins] Ошибка обновления конфигурации плагина {name}: {exc}")
@@ -282,11 +291,12 @@ async def update_plugin_config(name: str, payload: PluginConfigRequest) -> Dict[
 async def uninstall_plugin(name: str) -> Dict[str, Any]:
     """Удаляет директорию пользовательского плагина и перезагружает реестр."""
     try:
-        res = uninstall_user_plugin(name)
-        _save_plugin_state_to_config(name, False)
-        reload_plugins_registry()
+        async with _plugins_lock:
+            res = await asyncio.to_thread(uninstall_user_plugin, name)
+            await asyncio.to_thread(_save_plugin_state_to_config, name, False)
+            await asyncio.to_thread(reload_plugins_registry)
         return res
-    except PermissionError as exc:
+    except (PermissionError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

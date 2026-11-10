@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:55:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -479,7 +479,10 @@ class KnowledgeQAEngine:
                     model=model_name,
                 )
 
-            response_text = await chat_instance.ask(q=user_prompt, attempts=4, temperature=0.0)
+            response_text = await asyncio.wait_for(
+                chat_instance.ask(q=user_prompt, attempts=4, temperature=0.0),
+                timeout=45.0,
+            )
             lat = (time.perf_counter() - t0) * 1000.0
 
             if not response_text or "INSUFFICIENT_DATA" in response_text:
@@ -527,7 +530,10 @@ class KnowledgeQAEngine:
                             provider=provider,
                             model=cfg_fallback_model,
                         )
-                    fb_resp = await fb_chat.ask(q=user_prompt, attempts=3, temperature=0.0)
+                    fb_resp = await asyncio.wait_for(
+                        fb_chat.ask(q=user_prompt, attempts=3, temperature=0.0),
+                        timeout=45.0,
+                    )
                     if fb_resp and "INSUFFICIENT_DATA" not in fb_resp:
                         clean_ans = fb_resp.strip()
                         self.wm.store.log_model_usage(

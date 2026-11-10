@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:56:00
+# Updated: 2026-11-10 13:59:00
 # =============================================================================
 
 from __future__ import annotations
@@ -37,6 +37,11 @@ from apps.ai_assistant.core.nlp.hebrew import (
 )
 from apps.ai_assistant.core.nlp.russian import RussianAnalyzer, RussianMorphology
 
+_RE_HEBREW_CHARS = re.compile(r"[\u0590-\u05FF]")
+_RE_RUSSIAN_CHARS = re.compile(r"[а-яА-ЯёЁ]")
+_RE_ENGLISH_CHARS = re.compile(r"[a-zA-Z]")
+_RE_SENTENCE_SPLIT = re.compile(r"[^.!?\n]+[.!?]*", re.UNICODE)
+
 
 class LanguageAnalyzer(Protocol):
     """Единый интерфейс подключаемых языковых анализаторов (ТЗ п. 3.3)."""
@@ -46,31 +51,15 @@ class LanguageAnalyzer(Protocol):
     version: str
 
     def analyze(self, text: str, document_id: str = "unknown") -> Dict[str, Any]:
-        """Выполняет морфолого-синтаксический анализ текста и извлечение фактов.
-
-        Args:
-            text: Исходный текст документа или фрагмента.
-            document_id: Идентификатор исходного документа.
-
-        Returns:
-            Dict[str, Any]: Структурированный результат анализа с фактами и токенами.
-        """
+        """Выполняет морфолого-синтаксический анализ текста и извлечение фактов."""
         ...
 
 
 def detect_language(text: str) -> str:
-    """Определяет основной язык текста по директиве lang= или символьным диапазонам Unicode.
-
-    Args:
-        text: Входная строка текста.
-
-    Returns:
-        str: Код языка ('ru', 'he', 'en' или 'unknown').
-    """
+    """Определяет основной язык текста по директиве lang= или символьным диапазонам Unicode."""
     if not text or not text.strip():
         return "unknown"
 
-    # Приоритетная проверка явной языковой директивы lang=<code > в заголовке
     for line in text[:400].splitlines():
         cl = line.strip().lower()
         if cl.startswith("lang="):
@@ -82,9 +71,10 @@ def detect_language(text: str) -> str:
             if val in ("ru", "he", "en", "ua", "uk"):
                 return "ua" if val == "uk" else val
 
-    he_count = len(re.findall(r"[\u0590-\u05FF]", text))
-    ru_count = len(re.findall(r"[а-яА-ЯёЁ]", text))
-    en_count = len(re.findall(r"[a-zA-Z]", text))
+    sample = text[:50_000]
+    he_count = len(_RE_HEBREW_CHARS.findall(sample))
+    ru_count = len(_RE_RUSSIAN_CHARS.findall(sample))
+    en_count = len(_RE_ENGLISH_CHARS.findall(sample))
 
     if he_count > 0 and he_count >= ru_count and he_count >= en_count:
         return "he"
@@ -96,21 +86,13 @@ def detect_language(text: str) -> str:
 
 
 def split_sentences(text: str) -> List[Tuple[int, str, int, int]]:
-    """Разбивает текст на предложения с сохранением индекса и символьных координат.
-
-    Args:
-        text: Исходный текст документа.
-
-    Returns:
-        List[Tuple[int, str, int, int]]: Список кортежей (sentence_index, sentence_text, char_start, char_end).
-    """
+    """Разбивает текст на предложения с сохранением индекса и символьных координат."""
     if not text:
         return []
 
     results: List[Tuple[int, str, int, int]] = []
-    pattern = re.compile(r"[^.!?\n]+[.!?]*", re.UNICODE)
     idx = 0
-    for match in pattern.finditer(text):
+    for match in _RE_SENTENCE_SPLIT.finditer(text):
         raw_sent = match.group(0)
         stripped = raw_sent.strip()
         if not stripped:
@@ -123,18 +105,7 @@ def split_sentences(text: str) -> List[Tuple[int, str, int, int]]:
 
 
 def extract_markdown_table_facts(text: str, document_id: str = "unknown") -> List[Dict[str, Any]]:
-    """Извлекает структурированные факты из таблиц Markdown (после конвертации Excel/CSV/DOCX/Google Sheets).
-
-    Первая колонка строки интерпретируется как субъект/владелец, а последующие
-    непустые ячейки с заголовками — как связанные атрибуты/объекты.
-
-    Args:
-        text: Текст документа с возможными таблицами Markdown.
-        document_id: Идентификатор документа.
-
-    Returns:
-        List[Dict[str, Any]]: Список извлечённых табличных фактов.
-    """
+    """Извлекает структурированные факты из таблиц Markdown (после конвертации Excel/CSV/DOCX/Google Sheets)."""
     if "|" not in text:
         return []
 
@@ -153,7 +124,6 @@ def extract_markdown_table_facts(text: str, document_id: str = "unknown") -> Lis
         if not cells or all(not c for c in cells):
             continue
 
-        # Пропускаем разделительную строку | --- | --- |
         if all(set(c) <= {"-", ":", " "} and "-" in c for c in cells if c):
             continue
 
@@ -231,11 +201,7 @@ class AnalyzerRegistry:
         self.register(EnglishAnalyzer())
 
     def register(self, analyzer: LanguageAnalyzer) -> None:
-        """Регистрирует новый языковой модуль без изменения ядра системы.
-
-        Args:
-            analyzer: Экземпляр анализатора, реализующий протокол LanguageAnalyzer.
-        """
+        """Регистрирует новый языковой модуль без изменения ядра системы."""
         self._analyzers[analyzer.language_code] = analyzer
 
     def get_analyzer(self, language_code: str) -> LanguageAnalyzer:
@@ -246,24 +212,14 @@ class AnalyzerRegistry:
         self,
         text: str,
         document_id: str = "unknown",
-        language: Optional[str] = None,
+        language: Optional[str] = "",
     ) -> Dict[str, Any]:
-        """Определяет язык текста (включая смешанные предложения и таблицы) и выполняет разбор.
-
-        Args:
-            text: Исходный текст.
-            document_id: Идентификатор документа.
-            language: Явно заданный код языка или None для автоопределения.
-
-        Returns:
-            Dict[str, Any]: Полный результат анализа текста.
-        """
+        """Определяет язык текста (включая смешанные предложения и таблицы) и выполняет разбор."""
         doc_lang = language if (language and language in self._analyzers) else detect_language(text)
         primary_analyzer = self.get_analyzer(doc_lang)
         res = primary_analyzer.analyze(text, document_id=document_id)
 
-        # Если язык не был жёстко зафиксирован, проверяем предложения на других языках в смешанном документе
-        if language is None:
+        if not language:
             seen_fact_quotes = {f.get("source", {}).get("quote") for f in res.get("facts", [])}
             for sent_idx, sent_text, c_start, c_end in split_sentences(text):
                 s_lang = detect_language(sent_text)
@@ -280,7 +236,6 @@ class AnalyzerRegistry:
                     for sub_ent in sub_res.get("entities", []):
                         res.setdefault("entities", []).append(sub_ent)
 
-        # Дополнительное извлечение фактов из Markdown-таблиц (Excel / CSV / DOCX / Google Sheets)
         table_facts = extract_markdown_table_facts(text, document_id=document_id)
         if table_facts:
             res.setdefault("facts", []).extend(table_facts)

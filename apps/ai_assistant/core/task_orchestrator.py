@@ -15,16 +15,17 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:38:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -49,15 +50,16 @@ class TaskOrchestratorService:
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:
-        """Возвращает соединение с SQLite с включенным WAL-режимом."""
-        conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        """Возвращает соединение с SQLite с включенным WAL-режимом и таймаутом блокировки."""
+        conn = sqlite3.connect(str(self.db_path), timeout=15.0, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=15000;")
         return conn
 
     def _init_db(self) -> None:
         """Создает таблицы задач и подзадач при первом запуске."""
-        with self._lock, self._get_connection() as conn:
+        with self._lock, contextlib.closing(self._get_connection()) as conn, conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS task_cases (
                     id TEXT PRIMARY KEY,
@@ -87,7 +89,7 @@ class TaskOrchestratorService:
                     FOREIGN KEY (case_id) REFERENCES task_cases(id) ON DELETE CASCADE
                 );
             """)
-            conn.commit()
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_task_items_case_id ON task_items(case_id);")
 
     def decompose_text(self, text: str, source_label: str = "Телефонный разговор") -> Dict[str, Any]:
         """
@@ -202,11 +204,11 @@ class TaskOrchestratorService:
     ) -> Dict[str, Any]:
         """Создает комплексное дело и связанные с ним подзадачи."""
         case_id = f"case_{uuid.uuid4().hex[:12]}"
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now(timezone.utc).isoformat()
         actors_json = json.dumps(actors or [], ensure_ascii=False)
         metadata_json = json.dumps(metadata or {}, ensure_ascii=False)
 
-        with self._lock, self._get_connection() as conn:
+        with self._lock, contextlib.closing(self._get_connection()) as conn, conn:
             conn.execute(
                 """
                 INSERT INTO task_cases (
@@ -242,14 +244,13 @@ class TaskOrchestratorService:
                         now
                     )
                 )
-            conn.commit()
 
         logger.console(f"[TaskOrchestrator] Создано дело {case_id}: {title}")
         return self.get_case(case_id) or {}
 
     def get_case(self, case_id: str) -> Optional[Dict[str, Any]]:
         """Возвращает информацию о деле и список его подзадач."""
-        with self._lock, self._get_connection() as conn:
+        with self._lock, contextlib.closing(self._get_connection()) as conn, conn:
             cur = conn.execute("SELECT * FROM task_cases WHERE id = ?", (case_id,))
             row = cur.fetchone()
             if not row:
@@ -275,8 +276,8 @@ class TaskOrchestratorService:
             return case_dict
 
     def list_cases(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Возвращает список всех зарегистрированных дел с кратким прогрессом."""
-        with self._lock, self._get_connection() as conn:
+        """Возвращает список всех зарегистрированных дел с кратким прогрессом (без N+1 запросов)."""
+        with self._lock, contextlib.closing(self._get_connection()) as conn, conn:
             if status:
                 cur = conn.execute(
                     "SELECT * FROM task_cases WHERE status = ? ORDER BY created_at DESC",
@@ -286,8 +287,18 @@ class TaskOrchestratorService:
                 cur = conn.execute("SELECT * FROM task_cases ORDER BY created_at DESC")
 
             rows = cur.fetchall()
-            results: List[Dict[str, Any]] = []
+            if not rows:
+                return []
 
+            items_by_case: Dict[str, List[sqlite3.Row]] = {}
+            cur_items = conn.execute("SELECT case_id, id, status, stage FROM task_items")
+            for item_row in cur_items.fetchall():
+                cid = item_row["case_id"]
+                if cid not in items_by_case:
+                    items_by_case[cid] = []
+                items_by_case[cid].append(item_row)
+
+            results: List[Dict[str, Any]] = []
             for row in rows:
                 c = dict(row)
                 try:
@@ -295,11 +306,7 @@ class TaskOrchestratorService:
                 except Exception:
                     c["actors"] = []
 
-                cur_items = conn.execute(
-                    "SELECT id, status, stage FROM task_items WHERE case_id = ?",
-                    (c["id"],)
-                )
-                items = cur_items.fetchall()
+                items = items_by_case.get(c["id"], [])
                 total = len(items)
                 completed = sum(1 for it in items if it["status"] == "done")
                 c["total_items"] = total
@@ -311,32 +318,29 @@ class TaskOrchestratorService:
 
     def update_case_status(self, case_id: str, new_status: str) -> bool:
         """Обновляет общий статус дела (active, pending, completed)."""
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with self._lock, self._get_connection() as conn:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock, contextlib.closing(self._get_connection()) as conn, conn:
             cur = conn.execute(
                 "UPDATE task_cases SET status = ?, updated_at = ? WHERE id = ?",
                 (new_status, now, case_id)
             )
-            conn.commit()
             return cur.rowcount > 0
 
     def update_item_status(self, item_id: str, new_status: str) -> bool:
         """Переключает статус подзадачи (todo, in_progress, done)."""
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with self._lock, self._get_connection() as conn:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock, contextlib.closing(self._get_connection()) as conn, conn:
             cur = conn.execute(
                 "UPDATE task_items SET status = ?, updated_at = ? WHERE id = ?",
                 (new_status, now, item_id)
             )
-            conn.commit()
             return cur.rowcount > 0
 
     def delete_case(self, case_id: str) -> bool:
         """Удаляет дело и связанные подзадачи."""
-        with self._lock, self._get_connection() as conn:
+        with self._lock, contextlib.closing(self._get_connection()) as conn, conn:
             conn.execute("DELETE FROM task_items WHERE case_id = ?", (case_id,))
             cur = conn.execute("DELETE FROM task_cases WHERE id = ?", (case_id,))
-            conn.commit()
             return cur.rowcount > 0
 
 

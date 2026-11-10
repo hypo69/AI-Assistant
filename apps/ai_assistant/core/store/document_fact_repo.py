@@ -5,14 +5,15 @@
 # Description:
 #   Управление таблицами documents, document_versions, document_chunks,
 #   entities, facts, fact_sources и language_analysis в SQLite.
-#   Обеспечивает автоматический перевод прежних фактов в статус 'stale'.
+#   Обеспечивает автоматический перевод прежних фактов в статус 'stale',
+#   пакетную запись (executemany) и защиту от Lost Update.
 #
 # File: core/store/document_fact_repo.py
 # Project: ai-windows-admin
 # Package: apps.ai_assistant.core.store
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-27 22:20:00
+# Updated: 2026-11-10 16:40:00
 # =============================================================================
 
 from __future__ import annotations
@@ -21,11 +22,13 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import sqlite3
 from typing import Any, Dict, List, Optional
 import uuid
 
+from logger import logger
 from apps.ai_assistant.core.store.workspace_repo import get_utc_now_iso
-from apps.ai_assistant.core.workspace_registry import get_current_host_name, parse_host_qualified_path
+from apps.ai_assistant.core.workspace_registry import parse_host_qualified_path
 
 
 def compute_sha256(text: str) -> str:
@@ -38,6 +41,61 @@ class DocumentFactRepoMixin:
 
     VALID_FACT_STATUSES = {"extracted", "validated", "ambiguous", "rejected", "stale"}
 
+    def _resolve_paperless_text(self, paperless_id: Optional[int]) -> str:
+        """Возвращает полный текст документа из Paperless; пустая строка, если резолвер не задан."""
+        resolver = getattr(self, "text_resolver", None)
+        if paperless_id is None or resolver is None:
+            return ""
+        return resolver(int(paperless_id))
+
+    def _hydrate_chunk_texts(self, rows: List[Dict[str, Any]]) -> None:
+        """Восстанавливает text чанков по смещениям из Paperless; при расхождении хэша текст не подставляется."""
+        for item in rows:
+            if item.get("text") or item.get("paperless_id") is None:
+                continue
+            full = self._resolve_paperless_text(item["paperless_id"])
+            piece = full[int(item["char_start"]):int(item["char_end"])]
+            if piece and compute_sha256(piece) == item.get("content_hash"):
+                item["text"] = piece
+            else:
+                logger.warning(f"[KnowledgeStore] Текст чанка {item.get('chunk_id')} в Paperless изменился: нужна переиндексация")
+
+    @staticmethod
+    def _fetch_facts_on_conn(
+        conn: sqlite3.Connection,
+        workspace_id: str,
+        document_id: str = "",
+        language: str = "",
+        fact_type: str = "",
+        include_stale: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Внутренний хелпер выборки фактов на уже открытом соединении без создания второго коннекта."""
+        clauses = ["workspace_id = ?"]
+        params: List[Any] = [workspace_id]
+        if not include_stale:
+            clauses.append("status NOT IN ('stale', 'rejected')")
+        if document_id:
+            clauses.append("document_id = ?")
+            params.append(document_id)
+        if language:
+            clauses.append("language = ?")
+            params.append(language)
+        if fact_type:
+            clauses.append("fact_type = ?")
+            params.append(fact_type)
+
+        sql = f"SELECT * FROM facts WHERE {' AND '.join(clauses)} ORDER BY created_at DESC"
+        cur = conn.execute(sql, params)
+        results: List[Dict[str, Any]] = []
+        for row in cur.fetchall():
+            raw = json.loads(row["raw_fact_json"])
+            raw["fact_id"] = row["fact_id"]
+            raw["status"] = row["status"]
+            raw["version_num"] = row["version_num"]
+            raw["document_id"] = row["document_id"]
+            results.append(raw)
+        return results
+
     def relocate_document(
         self,
         workspace_id: str,
@@ -45,8 +103,8 @@ class DocumentFactRepoMixin:
         new_document_id: str,
         new_file_path: str,
         commit_hash: str = "",
-        host_name: Optional[str] = None,
-        qualified_path: Optional[str] = None,
+        host_name: Optional[str] = "",
+        qualified_path: Optional[str] = "",
     ) -> Optional[Dict[str, Any]]:
         """Перепривязывает документ, его версии, чанки, сущности и факты на новый путь без потери истории."""
         if not old_document_id or old_document_id == new_document_id:
@@ -54,25 +112,25 @@ class DocumentFactRepoMixin:
 
         now = get_utc_now_iso()
         resolved_host, clean_file_path, resolved_qualified = parse_host_qualified_path(
-            new_file_path, default_host=host_name
+            new_file_path, default_host=host_name or None
         )
         final_qualified = qualified_path or resolved_qualified
         conn = self._get_conn(workspace_id=workspace_id)
         try:
-            cur = conn.execute(
-                "SELECT * FROM documents WHERE workspace_id = ? AND document_id = ?",
-                (workspace_id, old_document_id),
-            )
-            old_doc = cur.fetchone()
-            if not old_doc:
-                return None
-
-            cur_version = int(old_doc["current_version"] or 1)
-            eff_commit = commit_hash or str(old_doc["commit_hash"] or "")
-            old_chunk_prefix = f"{workspace_id}:{old_document_id}:"
-            new_chunk_prefix = f"{workspace_id}:{new_document_id}:"
-
             with conn:
+                cur = conn.execute(
+                    "SELECT * FROM documents WHERE workspace_id = ? AND document_id = ?",
+                    (workspace_id, old_document_id),
+                )
+                old_doc = cur.fetchone()
+                if not old_doc:
+                    return None
+
+                cur_version = int(old_doc["current_version"] or 1)
+                eff_commit = commit_hash or str(old_doc["commit_hash"] or "")
+                old_chunk_prefix = f"{workspace_id}:{old_document_id}:"
+                new_chunk_prefix = f"{workspace_id}:{new_document_id}:"
+
                 # 1. Удаляем случайный дубликат на целевом document_id, если он был
                 conn.execute(
                     "DELETE FROM documents WHERE workspace_id = ? AND document_id = ?",
@@ -103,56 +161,68 @@ class DocumentFactRepoMixin:
                     "UPDATE document_versions SET document_id = ? WHERE workspace_id = ? AND document_id = ?",
                     (new_document_id, workspace_id, old_document_id),
                 )
-                # 4. Переносим чанки с обновлением префикса chunk_id
+                # 4. Пакетно переносим чанки с обновлением префикса chunk_id
                 chunk_rows = conn.execute(
                     "SELECT chunk_id FROM document_chunks WHERE workspace_id = ? AND document_id = ?",
                     (workspace_id, old_document_id),
                 ).fetchall()
-                for c_row in chunk_rows:
-                    old_cid = str(c_row["chunk_id"])
-                    new_cid = (
-                        f"{new_chunk_prefix}{old_cid[len(old_chunk_prefix):]}"
-                        if old_cid.startswith(old_chunk_prefix)
-                        else old_cid
-                    )
-                    conn.execute(
+                if chunk_rows:
+                    chunk_updates = [
+                        (
+                            f"{new_chunk_prefix}{str(c_row['chunk_id'])[len(old_chunk_prefix):]}"
+                            if str(c_row["chunk_id"]).startswith(old_chunk_prefix)
+                            else str(c_row["chunk_id"]),
+                            new_document_id,
+                            str(c_row["chunk_id"]),
+                        )
+                        for c_row in chunk_rows
+                    ]
+                    conn.executemany(
                         "UPDATE document_chunks SET chunk_id = ?, document_id = ? WHERE chunk_id = ?",
-                        (new_cid, new_document_id, old_cid),
+                        chunk_updates,
                     )
-                # 5. Переносим сущности
+                # 5. Пакетно переносим сущности
                 ent_rows = conn.execute(
                     "SELECT entity_id FROM entities WHERE workspace_id = ? AND document_id = ?",
                     (workspace_id, old_document_id),
                 ).fetchall()
-                for e_row in ent_rows:
-                    old_eid = str(e_row["entity_id"])
-                    new_eid = (
-                        f"{new_chunk_prefix}{old_eid[len(old_chunk_prefix):]}"
-                        if old_eid.startswith(old_chunk_prefix)
-                        else old_eid
-                    )
-                    conn.execute(
+                if ent_rows:
+                    ent_updates = [
+                        (
+                            f"{new_chunk_prefix}{str(e_row['entity_id'])[len(old_chunk_prefix):]}"
+                            if str(e_row["entity_id"]).startswith(old_chunk_prefix)
+                            else str(e_row["entity_id"]),
+                            new_document_id,
+                            str(e_row["entity_id"]),
+                        )
+                        for e_row in ent_rows
+                    ]
+                    conn.executemany(
                         "UPDATE entities SET entity_id = ?, document_id = ? WHERE entity_id = ?",
-                        (new_eid, new_document_id, old_eid),
+                        ent_updates,
                     )
-                # 6. Переносим факты (сохраняя их статус extracted/validated!) и обновляем source в raw_fact_json
+                # 6. Пакетно переносим факты и обновляем source в raw_fact_json
                 fact_rows = conn.execute(
                     "SELECT fact_id, raw_fact_json FROM facts WHERE workspace_id = ? AND document_id = ?",
                     (workspace_id, old_document_id),
                 ).fetchall()
-                for f_row in fact_rows:
-                    fid = f_row["fact_id"]
-                    try:
-                        raw_obj = json.loads(f_row["raw_fact_json"])
-                        if isinstance(raw_obj.get("source"), dict):
-                            raw_obj["source"]["document_id"] = new_document_id
-                        raw_obj["document_id"] = new_document_id
-                        new_raw_json = json.dumps(raw_obj, ensure_ascii=False)
-                    except Exception:
-                        new_raw_json = f_row["raw_fact_json"]
-                    conn.execute(
+                if fact_rows:
+                    fact_updates = []
+                    for f_row in fact_rows:
+                        fid = f_row["fact_id"]
+                        try:
+                            raw_obj = json.loads(f_row["raw_fact_json"])
+                            if isinstance(raw_obj.get("source"), dict):
+                                raw_obj["source"]["document_id"] = new_document_id
+                            raw_obj["document_id"] = new_document_id
+                            new_raw_json = json.dumps(raw_obj, ensure_ascii=False)
+                        except Exception as exc:
+                            logger.warning(f"[DocumentFactRepo] Не удалось обновить raw_fact_json для {fid}: {exc}")
+                            new_raw_json = f_row["raw_fact_json"]
+                        fact_updates.append((new_document_id, new_raw_json, fid))
+                    conn.executemany(
                         "UPDATE facts SET document_id = ?, raw_fact_json = ? WHERE fact_id = ?",
-                        (new_document_id, new_raw_json, fid),
+                        fact_updates,
                     )
                 # 7. Переносим источники фактов и прогоны анализа
                 conn.execute(
@@ -168,7 +238,9 @@ class DocumentFactRepoMixin:
                     (new_document_id, workspace_id, old_document_id),
                 )
 
-            active_facts = self.get_facts(workspace_id=workspace_id, document_id=new_document_id, include_stale=False)
+            active_facts = self._fetch_facts_on_conn(
+                conn, workspace_id=workspace_id, document_id=new_document_id, include_stale=False
+            )
             return {
                 "status": "relocated_unchanged",
                 "previous_document_id": old_document_id,
@@ -213,20 +285,25 @@ class DocumentFactRepoMixin:
         analysis_result: Dict[str, Any],
         duration_ms: float = 0.0,
         force_reanalyze: bool = False,
-        host_name: Optional[str] = None,
-        qualified_path: Optional[str] = None,
-        relocated_from: Optional[str] = None,
+        host_name: Optional[str] = "",
+        qualified_path: Optional[str] = "",
+        relocated_from: Optional[str] = "",
+        paperless_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Сохраняет документ, версию, чанки и извлечённые факты с автораспознаванием переноса файла."""
+        """Сохраняет документ, версию, чанки и извлечённые факты с защитой от Lost Update и пакетной вставкой.
+
+        Если задан paperless_id, полный текст версии не дублируется в БД: источник текста — Paperless-ngx API.
+        """
         now = get_utc_now_iso()
         content_hash = compute_sha256(raw_content)
         language = analysis_result.get("language", "ru")
         analyzer_name = analysis_result.get("analyzer", "DefaultAnalyzer")
-        resolved_host, clean_file_path, resolved_qualified = parse_host_qualified_path(file_path, default_host=host_name)
+        resolved_host, clean_file_path, resolved_qualified = parse_host_qualified_path(
+            file_path, default_host=host_name or None
+        )
         final_qualified = qualified_path or resolved_qualified
         conn = self._get_conn(workspace_id=workspace_id)
         try:
-            # Если явно передан источник перемещения или обнаружен идентичный content_hash у перемещённого файла
             candidate_old_id = relocated_from
             if not candidate_old_id and not force_reanalyze:
                 cand_rows = conn.execute(
@@ -245,6 +322,8 @@ class DocumentFactRepoMixin:
                         break
 
             if candidate_old_id and candidate_old_id != document_id and not force_reanalyze:
+                self._close_conn(conn)
+                conn = None  # закрыли перед вызовом relocate_document
                 relocated_res = self.relocate_document(
                     workspace_id=workspace_id,
                     old_document_id=candidate_old_id,
@@ -256,26 +335,30 @@ class DocumentFactRepoMixin:
                 )
                 if relocated_res:
                     return relocated_res
+                conn = self._get_conn(workspace_id=workspace_id)
 
-            cur = conn.execute(
-                "SELECT current_version, content_hash FROM documents WHERE workspace_id = ? AND document_id = ?",
-                (workspace_id, document_id),
-            )
-            existing = cur.fetchone()
-
-            if existing and existing["content_hash"] == content_hash and not force_reanalyze:
-                active_facts = self.get_facts(workspace_id=workspace_id, document_id=document_id, include_stale=False)
-                return {
-                    "status": "unchanged_deduplicated",
-                    "document_id": document_id,
-                    "version": existing["current_version"],
-                    "facts_count": len(active_facts),
-                    "facts": active_facts,
-                }
-
-            new_version = (int(existing["current_version"]) + 1) if existing else 1
-
+            # Чтение текущей версии и запись выполняются внутри единой транзакции (защита от Lost Update)
             with conn:
+                cur = conn.execute(
+                    "SELECT current_version, content_hash FROM documents WHERE workspace_id = ? AND document_id = ?",
+                    (workspace_id, document_id),
+                )
+                existing = cur.fetchone()
+
+                if existing and existing["content_hash"] == content_hash and not force_reanalyze:
+                    active_facts = self._fetch_facts_on_conn(
+                        conn, workspace_id=workspace_id, document_id=document_id, include_stale=False
+                    )
+                    return {
+                        "status": "unchanged_deduplicated",
+                        "document_id": document_id,
+                        "version": existing["current_version"],
+                        "facts_count": len(active_facts),
+                        "facts": active_facts,
+                    }
+
+                new_version = (int(existing["current_version"]) + 1) if existing else 1
+
                 conn.execute(
                     """
                     UPDATE facts
@@ -297,8 +380,8 @@ class DocumentFactRepoMixin:
                     """
                     INSERT INTO documents (
                         document_id, workspace_id, file_path, host_name, qualified_path, title, language, encoding,
-                        current_version, content_hash, commit_hash, status, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'utf-8', ?, ?, ?, 'indexed', ?)
+                        current_version, content_hash, commit_hash, status, updated_at, paperless_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'utf-8', ?, ?, ?, 'indexed', ?, ?)
                     ON CONFLICT(workspace_id, document_id) DO UPDATE SET
                         file_path = excluded.file_path,
                         host_name = excluded.host_name,
@@ -308,7 +391,8 @@ class DocumentFactRepoMixin:
                         content_hash = excluded.content_hash,
                         commit_hash = excluded.commit_hash,
                         status = 'indexed',
-                        updated_at = excluded.updated_at
+                        updated_at = excluded.updated_at,
+                        paperless_id = COALESCE(excluded.paperless_id, documents.paperless_id)
                     """,
                     (
                         document_id,
@@ -322,64 +406,76 @@ class DocumentFactRepoMixin:
                         content_hash,
                         commit_hash,
                         now,
+                        paperless_id,
                     ),
                 )
 
+                stored_content = "" if paperless_id is not None else raw_content
                 conn.execute(
                     """
                     INSERT INTO document_versions (
                         workspace_id, document_id, version_num, commit_hash, content_hash, raw_content, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (workspace_id, document_id, new_version, commit_hash, content_hash, raw_content, now),
+                    (workspace_id, document_id, new_version, commit_hash, content_hash, stored_content, now),
                 )
 
+                chunk_params = []
                 for sent in analysis_result.get("sentences", []):
                     s_idx = int(sent.get("sentence_index", 0))
                     s_text = sent.get("text", "")
                     chunk_id = f"{workspace_id}:{document_id}:v{new_version}:s{s_idx}"
-                    conn.execute(
-                        """
-                        INSERT OR REPLACE INTO document_chunks (
-                            chunk_id, workspace_id, document_id, version_num, sentence_index,
-                            text, language, char_start, char_end, content_hash
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
+                    chunk_params.append(
                         (
                             chunk_id,
                             workspace_id,
                             document_id,
                             new_version,
                             s_idx,
-                            s_text,
+                            "" if paperless_id is not None else s_text,
                             language,
                             int(sent.get("char_start", 0)),
                             int(sent.get("char_end", len(s_text))),
                             compute_sha256(s_text),
-                        ),
+                        )
+                    )
+                if chunk_params:
+                    conn.executemany(
+                        """
+                        INSERT OR REPLACE INTO document_chunks (
+                            chunk_id, workspace_id, document_id, version_num, sentence_index,
+                            text, language, char_start, char_end, content_hash
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        chunk_params,
                     )
 
-                for idx, ent in enumerate(analysis_result.get("entities", [])):
-                    ent_id = f"{workspace_id}:{document_id}:ent:{idx}:{ent.get('normalized', '')}"
-                    conn.execute(
+                ent_params = [
+                    (
+                        f"{workspace_id}:{document_id}:ent:{idx}:{ent.get('normalized', '')}",
+                        workspace_id,
+                        document_id,
+                        ent.get("text", ""),
+                        ent.get("normalized", ""),
+                        ent.get("lemma", ""),
+                        ent.get("entity_type", "entity"),
+                        ent.get("language", language),
+                    )
+                    for idx, ent in enumerate(analysis_result.get("entities", []))
+                ]
+                if ent_params:
+                    conn.executemany(
                         """
                         INSERT OR REPLACE INTO entities (
                             entity_id, workspace_id, document_id, text, normalized, lemma, entity_type, language
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (
-                            ent_id,
-                            workspace_id,
-                            document_id,
-                            ent.get("text", ""),
-                            ent.get("normalized", ""),
-                            ent.get("lemma", ""),
-                            ent.get("entity_type", "entity"),
-                            ent.get("language", language),
-                        ),
+                        ent_params,
                     )
 
                 saved_facts: List[Dict[str, Any]] = []
+                fact_params = []
+                source_params = []
                 for idx, fact in enumerate(analysis_result.get("facts", [])):
                     fact_id = f"fact_{uuid.uuid4().hex[:12]}"
                     src = fact.get("source", {})
@@ -390,15 +486,7 @@ class DocumentFactRepoMixin:
                     fact_copy["status"] = "extracted"
                     fact_copy["commit_hash"] = commit_hash
 
-                    conn.execute(
-                        """
-                        INSERT INTO facts (
-                            fact_id, workspace_id, document_id, version_num, sentence_index,
-                            fact_type, relation, language, subject_json, predicate_json,
-                            object_json, owner_json, possessed_json, raw_fact_json,
-                            is_negated, confidence, status, created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'extracted', ?)
-                        """,
+                    fact_params.append(
                         (
                             fact_id,
                             workspace_id,
@@ -408,25 +496,18 @@ class DocumentFactRepoMixin:
                             fact.get("fact_type", "action"),
                             fact.get("relation", ""),
                             fact.get("language", language),
-                            json.dumps(fact.get("subject"), ensure_ascii=False) if fact.get("subject") else None,
-                            json.dumps(fact.get("predicate"), ensure_ascii=False) if fact.get("predicate") else None,
-                            json.dumps(fact.get("object"), ensure_ascii=False) if fact.get("object") else None,
-                            json.dumps(fact.get("owner"), ensure_ascii=False) if fact.get("owner") else None,
-                            json.dumps(fact.get("possessed_entity"), ensure_ascii=False) if fact.get("possessed_entity") else None,
+                            json.dumps(fact.get("subject"), ensure_ascii=False) if fact.get("subject") else "",
+                            json.dumps(fact.get("predicate"), ensure_ascii=False) if fact.get("predicate") else "",
+                            json.dumps(fact.get("object"), ensure_ascii=False) if fact.get("object") else "",
+                            json.dumps(fact.get("owner"), ensure_ascii=False) if fact.get("owner") else "",
+                            json.dumps(fact.get("possessed_entity"), ensure_ascii=False) if fact.get("possessed_entity") else "",
                             json.dumps(fact_copy, ensure_ascii=False),
                             1 if fact.get("is_negated") else 0,
                             float(fact.get("confidence", 0.95)),
                             now,
-                        ),
+                        )
                     )
-
-                    conn.execute(
-                        """
-                        INSERT INTO fact_sources (
-                            fact_id, workspace_id, document_id, commit_hash,
-                            sentence_index, char_start, char_end, quote_text
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
+                    source_params.append(
                         (
                             fact_id,
                             workspace_id,
@@ -436,9 +517,31 @@ class DocumentFactRepoMixin:
                             int(src.get("char_start", 0)),
                             int(src.get("char_end", 0)),
                             src.get("quote", ""),
-                        ),
+                        )
                     )
                     saved_facts.append(fact_copy)
+
+                if fact_params:
+                    conn.executemany(
+                        """
+                        INSERT INTO facts (
+                            fact_id, workspace_id, document_id, version_num, sentence_index,
+                            fact_type, relation, language, subject_json, predicate_json,
+                            object_json, owner_json, possessed_json, raw_fact_json,
+                            is_negated, confidence, status, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'extracted', ?)
+                        """,
+                        fact_params,
+                    )
+                    conn.executemany(
+                        """
+                        INSERT INTO fact_sources (
+                            fact_id, workspace_id, document_id, commit_hash,
+                            sentence_index, char_start, char_end, quote_text
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        source_params,
+                    )
 
                 conn.execute(
                     """
@@ -487,48 +590,32 @@ class DocumentFactRepoMixin:
                 "facts": saved_facts,
             }
         finally:
-            self._close_conn(conn)
+            if conn:
+                self._close_conn(conn)
 
     def get_facts(
         self,
         workspace_id: str,
-        document_id: Optional[str] = None,
-        language: Optional[str] = None,
-        fact_type: Optional[str] = None,
+        document_id: Optional[str] = "",
+        language: Optional[str] = "",
+        fact_type: Optional[str] = "",
         include_stale: bool = False,
     ) -> List[Dict[str, Any]]:
         """Возвращает структурированные факты рабочей области с фильтрацией."""
         conn = self._get_conn(workspace_id=workspace_id)
         try:
-            clauses = ["workspace_id = ?"]
-            params: List[Any] = [workspace_id]
-            if not include_stale:
-                clauses.append("status NOT IN ('stale', 'rejected')")
-            if document_id:
-                clauses.append("document_id = ?")
-                params.append(document_id)
-            if language:
-                clauses.append("language = ?")
-                params.append(language)
-            if fact_type:
-                clauses.append("fact_type = ?")
-                params.append(fact_type)
-
-            sql = f"SELECT * FROM facts WHERE {' AND '.join(clauses)} ORDER BY created_at DESC"
-            cur = conn.execute(sql, params)
-            results: List[Dict[str, Any]] = []
-            for row in cur.fetchall():
-                raw = json.loads(row["raw_fact_json"])
-                raw["fact_id"] = row["fact_id"]
-                raw["status"] = row["status"]
-                raw["version_num"] = row["version_num"]
-                raw["document_id"] = row["document_id"]
-                results.append(raw)
-            return results
+            return self._fetch_facts_on_conn(
+                conn,
+                workspace_id=workspace_id,
+                document_id=document_id or "",
+                language=language or "",
+                fact_type=fact_type or "",
+                include_stale=include_stale,
+            )
         finally:
             self._close_conn(conn)
 
-    def update_fact_status(self, fact_id: str, status: str, workspace_id: Optional[str] = None) -> bool:
+    def update_fact_status(self, fact_id: str, status: str, workspace_id: Optional[str] = "") -> bool:
         """Обновляет статус проверки факта (extracted, validated, ambiguous, rejected, stale)."""
         if status not in self.VALID_FACT_STATUSES:
             raise ValueError(f"Недопустимый статус факта: {status}")
@@ -563,11 +650,13 @@ class DocumentFactRepoMixin:
                 )
                 item["host_name"] = item.get("host_name") or h_name
                 item["qualified_path"] = item.get("qualified_path") or qual_p
+                if not item.get("content") and item.get("paperless_id") is not None:
+                    item["content"] = self._resolve_paperless_text(item["paperless_id"])
             return rows
         finally:
             self._close_conn(conn)
 
-    def list_entities(self, workspace_id: str, query: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_entities(self, workspace_id: str, query: Optional[str] = "") -> List[Dict[str, Any]]:
         """Возвращает сущности рабочей области."""
         conn = self._get_conn(workspace_id=workspace_id)
         try:
@@ -589,19 +678,10 @@ class DocumentFactRepoMixin:
     def get_document_chunks(
         self,
         workspace_id: str,
-        document_id: Optional[str] = None,
+        document_id: Optional[str] = "",
         limit: int = 200,
     ) -> List[Dict[str, Any]]:
-        """Возвращает чанки документов рабочей области для инспекции и семантического анализа RAG.
-
-        Args:
-            workspace_id: Идентификатор рабочей области.
-            document_id: Опциональный фильтр по документу.
-            limit: Максимальное количество чанков.
-
-        Returns:
-            Список словарей с метаданными и текстом чанков.
-        """
+        """Возвращает чанки документов рабочей области для инспекции и семантического анализа RAG."""
         conn = self._get_conn(workspace_id=workspace_id)
         try:
             clauses = ["c.workspace_id = ?"]
@@ -613,7 +693,7 @@ class DocumentFactRepoMixin:
             sql = f"""
                 SELECT c.chunk_id, c.workspace_id, c.document_id, c.version_num,
                        c.sentence_index, c.text, c.language, c.char_start, c.char_end,
-                       c.content_hash, d.title, d.file_path, d.host_name, d.qualified_path
+                       c.content_hash, d.title, d.file_path, d.host_name, d.qualified_path, d.paperless_id
                 FROM document_chunks c
                 LEFT JOIN documents d ON d.workspace_id = c.workspace_id AND d.document_id = c.document_id
                 WHERE {' AND '.join(clauses)}
@@ -622,6 +702,7 @@ class DocumentFactRepoMixin:
             """
             cur = conn.execute(sql, params)
             rows = [dict(r) for r in cur.fetchall()]
+            self._hydrate_chunk_texts(rows)
             for item in rows:
                 h_name, loc_p, qual_p = parse_host_qualified_path(
                     str(item.get("file_path", "")),

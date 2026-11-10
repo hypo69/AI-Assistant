@@ -12,7 +12,7 @@
 # Package: apps/ai_assistant/tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:57:00
+# Updated: 2026-11-10 16:12:00
 # =============================================================================
 
 from __future__ import annotations
@@ -160,7 +160,7 @@ def test_sqlite_databases_stored_inside_workspace(tmp_path: Path) -> None:
     expected_meta = tmp_path / "workspaces" / ws_id / ".workspace"
 
     assert db_path == expected_meta / "knowledge_store.db"
-    assert graph_path == expected_meta / "temporal_graph.db"
+    assert graph_path == expected_meta / "knowledge_store.db"
 
     # 2. Сохраняем документ через KnowledgeStore для данного пространства
     store = wm.get_workspace_store(ws_id)
@@ -185,8 +185,8 @@ def test_sqlite_databases_stored_inside_workspace(tmp_path: Path) -> None:
         valid_from="c112233",
     )
 
-    # Проверяем, что temporal_graph.db физически создан внутри .workspace
-    assert (expected_meta / "temporal_graph.db").exists()
+    # Проверяем, что knowledge_store.db физически создан внутри .workspace
+    assert (expected_meta / "knowledge_store.db").exists()
 
 
 def test_delete_workspace_success_and_protection(tmp_path: Path) -> None:

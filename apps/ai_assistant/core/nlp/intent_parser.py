@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.core.nlp
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:52:00
+# Updated: 2026-11-10 13:59:00
 # =============================================================================
 
 from __future__ import annotations
@@ -36,17 +36,37 @@ from apps.ai_assistant.core.nlp_analyzers import detect_language
 class QuestionIntentParser:
     """Анализатор типа вопроса, целевой семантической роли и грамматической формы ответа (ТЗ п. 3.5, 3.6)."""
 
+    _RE_COMMIT_HASH = re.compile(r"\b([0-9a-f]{7,40})\b", re.IGNORECASE)
+    _RE_RU_TOKENS = re.compile(r"[а-яА-ЯёЁa-zA-Z0-9-]+")
+    _RE_RU_ACTION = re.compile(r"\bчто\s+(?:не\s+)?(?:делал|делала|делало|делали|сделал|сделала)\b")
+    _RE_RU_POSSESSED = re.compile(r"^что\s+(?:не\s+)?(?:было|был|была|были|есть)\s+у\b")
+    _RE_EN_WORDS = re.compile(r"[a-z0-9']+")
+
+    _GIT_KEYWORDS = (
+        "commit", "קומיט", "קוממיט", "коммит", "коммите", "коммита", "коммиту",
+        "diff", "дифф", "ревизи", "גרסה", "git", "гит",
+    )
+    _RU_NEGATIONS = frozenset({"не", "ни"})
+    _RU_IGNORE = frozenset({
+        "кто", "что", "кем", "чем", "кого", "чего", "какой", "какую", "какое", "предмет",
+        "именно", "занимался", "занималась", "был", "была", "было", "были", "есть",
+        "ли", "у", "и", "в", "на", "не", "ни",
+    })
+    _HE_NEGATIONS = frozenset({"לא", "אין"})
+    _HE_POSSESSION_VERBS = frozenset({"היה", "הייתה", "היתה", "יש", "אין"})
+    _HE_STOP = frozenset({
+        "מה", "מי", "למי", "האם", "היה", "הייתה", "היתה", "יש", "אין", "לא",
+        "את", "הקשר", "קשר", "בין", "על", "ידי",
+    })
+    _EN_NEGATIONS = frozenset({"not", "never", "didn't", "doesn't", "wasn't", "weren't"})
+    _EN_STOP = frozenset({
+        "who", "what", "whom", "by", "did", "does", "was", "were",
+        "the", "a", "an", "is", "has", "had", "not", "never",
+    })
+
     @classmethod
-    def parse_question(cls, question: str, language: Optional[str] = None) -> Dict[str, Any]:
-        """Определяет язык, намерение вопроса, целевую роль и падеж/предлог ответа.
-
-        Args:
-            question: Текст вопроса пользователя.
-            language: Опциональный код языка ('ru', 'he', 'en').
-
-        Returns:
-            Dict[str, Any]: Описание структуры вопроса.
-        """
+    def parse_question(cls, question: str, language: Optional[str] = "") -> Dict[str, Any]:
+        """Определяет язык, намерение вопроса, целевую роль и падеж/предлог ответа."""
         lang = language if language in ("ru", "he", "en") else detect_language(question)
         q_clean = question.strip()
 
@@ -57,16 +77,11 @@ class QuestionIntentParser:
         else:
             parsed = cls._parse_russian_question(q_clean)
 
-        # Выделение запросов по Git-истории и конкретным хэшам коммитов
         q_low = q_clean.lower()
-        commit_hash_match = re.search(r"\b([0-9a-f]{7,40})\b", q_clean, re.IGNORECASE)
+        commit_hash_match = cls._RE_COMMIT_HASH.search(q_clean)
         commit_hash = commit_hash_match.group(1).lower() if commit_hash_match else ""
 
-        git_keywords = (
-            "commit", "קומיט", "קוממיט", "коммит", "коммите", "коммита", "коммиту",
-            "diff", "дифф", "ревизи", "גרסה", "git", "гит"
-        )
-        is_git_kw = any(kw in q_low for kw in git_keywords)
+        is_git_kw = any(kw in q_low for kw in cls._GIT_KEYWORDS)
 
         if commit_hash:
             parsed["intent"] = "git_commit_query"
@@ -86,8 +101,9 @@ class QuestionIntentParser:
     def _parse_russian_question(cls, q: str) -> Dict[str, Any]:
         """Разбирает русскоязычный вопрос с определением падежа ответа и ключевых лемм."""
         q_low = q.lower().strip("?!. ")
-        raw_tokens = re.findall(r"[а-яА-ЯёЁa-zA-Z0-9-]+", q_low)
-        is_negated = "не" in raw_tokens or "ни" in raw_tokens
+        raw_tokens = cls._RE_RU_TOKENS.findall(q_low)
+        token_set = set(raw_tokens)
+        is_negated = bool(token_set & cls._RU_NEGATIONS)
 
         intent = "unknown"
         target_role = "object"
@@ -101,7 +117,7 @@ class QuestionIntentParser:
             intent = "subject_query"
             target_role = "subject"
             target_case = "nomn"
-        elif re.search(r"\bчто\s+(?:не\s+)?(?:делал|делала|делало|делали|сделал|сделала)\b", q_low):
+        elif cls._RE_RU_ACTION.search(q_low):
             intent = "action_query"
             target_role = "predicate"
             target_case = "nomn"
@@ -109,7 +125,7 @@ class QuestionIntentParser:
             intent = "owner_query"
             target_role = "owner"
             target_case = "gent"
-        elif re.search(r"^что\s+(?:не\s+)?(?:было|был|была|были|есть)\s+у\b", q_low):
+        elif cls._RE_RU_POSSESSED.search(q_low):
             intent = "possessed_query"
             target_role = "possessed_entity"
             target_case = "nomn"
@@ -122,17 +138,12 @@ class QuestionIntentParser:
             target_role = "verification"
             target_case = "nomn"
 
-        ignore = {
-            "кто", "что", "кем", "чем", "кого", "чего", "какой", "какую", "какое", "предмет",
-            "именно", "занимался", "занималась", "был", "была", "было", "были", "есть",
-            "ли", "у", "и", "в", "на", "не", "ни",
-        }
         content_lemmas: List[str] = []
         noun_lemmas: List[str] = []
         predicate_lemma: Optional[str] = None
 
         for t in raw_tokens:
-            if t in ignore:
+            if t in cls._RU_IGNORE:
                 continue
             if t in ("мытьем", "мытьём", "мытье", "мытьё"):
                 predicate_lemma = "мыть"
@@ -143,7 +154,6 @@ class QuestionIntentParser:
                 predicate_lemma = v_info["lemma"]
                 content_lemmas.append(v_info["lemma"])
             elif RussianMorphology.is_adjective(t):
-                # Прилагательные сохраняем в общих леммах, но не в ядре существительных
                 content_lemmas.append(t)
             else:
                 n_info = RussianMorphology.analyze_noun(t)
@@ -167,7 +177,8 @@ class QuestionIntentParser:
         """Разбирает вопрос на иврите (включая конструкции принадлежности ל־ и действия)."""
         q_norm = normalize_hebrew(q).strip("?!. ")
         tokens = [t.strip(".,!?:;\"'()") for t in q_norm.split() if t.strip(".,!?:;\"'()")]
-        is_negated = "לא" in tokens or "אין" in tokens
+        token_set = set(tokens)
+        is_negated = bool(token_set & cls._HE_NEGATIONS)
 
         intent = "unknown"
         target_role = "object"
@@ -183,7 +194,7 @@ class QuestionIntentParser:
             intent = "owner_query"
             target_role = "owner"
             target_case = "lamed_prefix"
-        elif q_norm.startswith("מה") and any(t in ("היה", "הייתה", "היתה", "יש", "אין") for t in tokens):
+        elif q_norm.startswith("מה") and bool(token_set & cls._HE_POSSESSION_VERBS):
             intent = "possessed_query"
             target_role = "possessed_entity"
         elif "על ידי מי" in q_norm:
@@ -197,10 +208,9 @@ class QuestionIntentParser:
             intent = "object_query"
             target_role = "object"
 
-        stop = {"מה", "מי", "למי", "האם", "היה", "הייתה", "היתה", "יש", "אין", "לא", "את", "הקשר", "קשר", "בין", "על", "ידי"}
         content_terms: List[str] = []
         for t in tokens:
-            if t in stop:
+            if t in cls._HE_STOP:
                 continue
             clean_t = t
             if clean_t.startswith("ל") and len(clean_t) > 2:
@@ -214,6 +224,7 @@ class QuestionIntentParser:
             "target_role": target_role,
             "target_case": target_case,
             "is_negated": is_negated,
+            "predicate_lemma": None,
             "content_lemmas": content_terms,
             "noun_lemmas": content_terms,
             "raw_question": q,
@@ -224,8 +235,9 @@ class QuestionIntentParser:
     def _parse_english_question(cls, q: str) -> Dict[str, Any]:
         """Разбирает вопрос на английском языке."""
         q_low = q.lower().strip("?!. ")
-        words = re.findall(r"[a-z0-9']+", q_low)
-        is_negated = any(w in ("not", "never", "didn't", "doesn't", "wasn't", "weren't") for w in words)
+        words = cls._RE_EN_WORDS.findall(q_low)
+        word_set = set(words)
+        is_negated = bool(word_set & cls._EN_NEGATIONS)
         intent = "object_query"
         target_role = "object"
         if q_low.startswith("who"):
@@ -237,14 +249,14 @@ class QuestionIntentParser:
         elif q_low.startswith(("did ", "was ", "were ", "is ", "has ", "had ")):
             intent = "yes_no_query"
             target_role = "verification"
-        stop = {"who", "what", "whom", "by", "did", "does", "was", "were", "the", "a", "an", "is", "has", "had", "not", "never"}
-        lemmas = [w for w in words if w not in stop]
+        lemmas = [w for w in words if w not in cls._EN_STOP]
         return {
             "language": "en",
             "intent": intent,
             "target_role": target_role,
             "target_case": "base",
             "is_negated": is_negated,
+            "predicate_lemma": None,
             "content_lemmas": lemmas,
             "noun_lemmas": lemmas,
             "raw_question": q,

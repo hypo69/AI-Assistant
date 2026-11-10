@@ -4,31 +4,83 @@
 # =============================================================================
 # Description:
 #   Менеджер пользователей и изолированных персональных хранилищ платформы.
-#   Управляет учетными записями, квотами и каталогами данных (data/users/<id>/).
+#   Управляет учетными записями, криптографическим хешированием паролей (scrypt),
+#   квотами и каталогами данных (data/users/<id>/).
 #
 # File: user_manager.py
 # Project: ai-windows-admin
 # Package: src
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 19:15:00
+# Updated: 2026-11-10 14:21:00
 # =============================================================================
 
 from __future__ import annotations
 
 import base64
+from contextlib import contextmanager
 import datetime
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
+from pathlib import Path
+import secrets
 import shutil
 import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+import threading
+from typing import Any, Dict, Generator, List, Optional
 
 from logger import logger
 
 _DEFAULT_QUOTA_BYTES = 10 * 1024 * 1024 * 1024  # 10 ГБ по умолчанию
+_MAX_IMAGE_PREVIEW_BYTES = 20 * 1024 * 1024     # 20 МБ для превью картинок
+_MAX_TEXT_PREVIEW_BYTES = 500 * 1024            # 500 КБ для текстового превью
+
+
+def _utc_now_iso() -> str:
+    """Возвращает текущее время UTC в формате ISO 8601."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def hash_password(password: str) -> str:
+    """Хеширует пароль алгоритмом scrypt с уникальной солью (SYSTEM_ENGINEERING § 5.3)."""
+    if not password:
+        return ""
+    if password.startswith("scrypt$"):
+        return password
+    salt = secrets.token_hex(16)
+    derived = hashlib.scrypt(
+        password.encode("utf-8"),
+        salt=salt.encode("ascii"),
+        n=16384,
+        r=8,
+        p=1,
+        dklen=32,
+    )
+    return f"scrypt${salt}${derived.hex()}"
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    """Проверяет пароль против сохранённого scrypt-хеша за константное время."""
+    if not password or not stored_hash:
+        return False
+    if not stored_hash.startswith("scrypt$"):
+        return hmac.compare_digest(password, stored_hash)
+    parts = stored_hash.split("$")
+    if len(parts) != 3:
+        return False
+    _, salt, expected_hex = parts
+    derived = hashlib.scrypt(
+        password.encode("utf-8"),
+        salt=salt.encode("ascii"),
+        n=16384,
+        r=8,
+        p=1,
+        dklen=32,
+    )
+    return hmac.compare_digest(derived.hex(), expected_hex)
 
 
 def _format_bytes(size: int) -> str:
@@ -58,6 +110,7 @@ class UserManager:
         self.data_dir = self.root_dir / "data"
         self.users_dir = self.data_dir / "users"
         self.db_path = self.data_dir / "users.db"
+        self._lock = threading.RLock()
 
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.users_dir.mkdir(parents=True, exist_ok=True)
@@ -65,11 +118,23 @@ class UserManager:
         from src.user_telegram import UserTelegramService
         self._telegram_service = UserTelegramService(self.db_path)
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Возвращает соединение с базой данных SQLite."""
-        conn = sqlite3.connect(self.db_path)
+    @contextmanager
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """Открывает соединение с SQLite в режиме WAL и гарантированно закрывает дескриптор."""
+        conn = sqlite3.connect(self.db_path, timeout=15.0)
         conn.row_factory = sqlite3.Row
-        return conn
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=15000;")
+        conn.execute("PRAGMA foreign_keys=ON;")
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_db(self) -> None:
         """Инициализирует таблицы базы данных и создает администратора по умолчанию."""
@@ -102,12 +167,12 @@ class UserManager:
                 )
                 """
             )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users (telegram_id)")
 
-            # Проверяем наличие хотя бы одного пользователя
             cursor = conn.execute("SELECT COUNT(*) FROM users")
             count = cursor.fetchone()[0]
             if count == 0:
-                now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                now_str = _utc_now_iso()
                 conn.execute(
                     """
                     INSERT INTO users (
@@ -125,21 +190,12 @@ class UserManager:
                     """,
                     (now_str,),
                 )
-                conn.commit()
 
-        # Гарантируем структуру каталога для первого пользователя
         self.ensure_user_storage(1)
 
     def ensure_user_storage(self, user_id: int) -> Path:
-        """Создает и подготавливает изолированный каталог хранилища пользователя.
-
-        Args:
-            user_id: Числовой идентификатор пользователя.
-
-        Returns:
-            Path: Путь к директории пользователя.
-        """
-        user_path = self.users_dir / str(user_id)
+        """Создает и подготавливает изолированный каталог хранилища пользователя."""
+        user_path = self.users_dir / str(int(user_id))
         subdirs = ["files", "rag", "profile", "temp"]
         for sub in subdirs:
             (user_path / sub).mkdir(parents=True, exist_ok=True)
@@ -176,7 +232,7 @@ class UserManager:
     def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Возвращает данные пользователя по его идентификатору."""
         with self._get_connection() as conn:
-            row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            row = conn.execute("SELECT * FROM users WHERE id = ?", (int(user_id),)).fetchone()
             return dict(row) if row else None
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
@@ -205,11 +261,16 @@ class UserManager:
         """Отвязывает Telegram-аккаунт от профиля пользователя."""
         return self._telegram_service.unlink_account(user_id)
 
-    def get_user_directory(self, user_id: int, subfolder: Optional[str] = None, create: bool = True) -> Path:
-        """Возвращает изолированную директорию хранилища пользователя или её подпапку."""
-        base = self.ensure_user_storage(user_id)
+    def get_user_directory(self, user_id: int, subfolder: Optional[str] = "", create: bool = True) -> Path:
+        """Возвращает изолированную директорию хранилища пользователя или её подпапку с защитой от Path Traversal."""
+        base = self.ensure_user_storage(user_id).resolve()
         if subfolder:
-            target = base / subfolder
+            clean_sub = subfolder.replace("\\", "/").strip().lstrip("/")
+            target = (base / clean_sub).resolve()
+            try:
+                target.relative_to(base)
+            except ValueError as exc:
+                raise ValueError(f"Недопустимая подпапка пользователя: {subfolder}") from exc
             if create:
                 target.mkdir(parents=True, exist_ok=True)
             return target
@@ -225,9 +286,10 @@ class UserManager:
         is_active: int = 1,
         is_email_verified: int = 1,
     ) -> Optional[int]:
-        """Создает нового пользователя администратором."""
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        """Создает нового пользователя с криптографическим хешированием пароля."""
+        now_str = _utc_now_iso()
         email_clean = email.strip().lower()
+        pw_hash = hash_password(password) if password else ""
         try:
             with self._get_connection() as conn:
                 cursor = conn.execute(
@@ -236,17 +298,16 @@ class UserManager:
                         email, name, password_hash, role, is_admin, is_active, is_email_verified, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (email_clean, name.strip(), password, role, is_admin, is_active, is_email_verified, now_str, now_str),
+                    (email_clean, name.strip(), pw_hash, role, is_admin, is_active, is_email_verified, now_str, now_str),
                 )
                 user_id = cursor.lastrowid
                 conn.execute(
                     "INSERT INTO user_settings (user_id, settings_json, updated_at) VALUES (?, '{}', ?)",
                     (user_id, now_str),
                 )
-                conn.commit()
 
             if user_id:
-                self.ensure_user_storage(user_id)
+                self.ensure_user_storage(int(user_id))
             return user_id
         except Exception as exc:
             logger.error(f"[UserManager] Ошибка создания пользователя {email}: {exc}")
@@ -264,29 +325,28 @@ class UserManager:
         if not filtered:
             return True
 
-        filtered["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        filtered["updated_at"] = _utc_now_iso()
         set_clause = ", ".join(f"{k} = ?" for k in filtered.keys())
-        values = list(filtered.values()) + [user_id]
+        values = list(filtered.values()) + [int(user_id)]
 
         try:
             with self._get_connection() as conn:
                 conn.execute(f"UPDATE users SET {set_clause} WHERE id = ?", values)
-                conn.commit()
             return True
         except Exception as exc:
             logger.error(f"[UserManager] Ошибка обновления пользователя {user_id}: {exc}")
             return False
 
     def update_user_password(self, user_id: int, password: str) -> bool:
-        """Обновляет пароль пользователя."""
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        """Обновляет пароль пользователя с хешированием через scrypt."""
+        now_str = _utc_now_iso()
+        pw_hash = hash_password(password)
         try:
             with self._get_connection() as conn:
                 conn.execute(
                     "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
-                    (password, now_str, user_id),
+                    (pw_hash, now_str, int(user_id)),
                 )
-                conn.commit()
             return True
         except Exception as exc:
             logger.error(f"[UserManager] Ошибка изменения пароля пользователя {user_id}: {exc}")
@@ -296,9 +356,8 @@ class UserManager:
         """Удаляет пользователя из базы данных."""
         try:
             with self._get_connection() as conn:
-                conn.execute("DELETE FROM user_settings WHERE user_id = ?", (user_id,))
-                conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-                conn.commit()
+                conn.execute("DELETE FROM user_settings WHERE user_id = ?", (int(user_id),))
+                conn.execute("DELETE FROM users WHERE id = ?", (int(user_id),))
             return True
         except Exception as exc:
             logger.error(f"[UserManager] Ошибка удаления пользователя {user_id}: {exc}")
@@ -307,32 +366,39 @@ class UserManager:
     def get_user_settings(self, user_id: int) -> Dict[str, Any]:
         """Возвращает настройки пользователя."""
         with self._get_connection() as conn:
-            row = conn.execute("SELECT settings_json FROM user_settings WHERE user_id = ?", (user_id,)).fetchone()
+            row = conn.execute("SELECT settings_json FROM user_settings WHERE user_id = ?", (int(user_id),)).fetchone()
             if row and row[0]:
                 try:
                     return json.loads(row[0])
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning(f"[UserManager] Поврежден JSON настроек пользователя {user_id}: {exc}")
         return {}
 
     def update_user_settings(self, user_id: int, **settings: Any) -> bool:
-        """Обновляет настройки пользователя."""
-        current = self.get_user_settings(user_id)
-        current.update(settings)
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        data_str = json.dumps(current, ensure_ascii=False)
-
+        """Атомарно обновляет настройки пользователя в рамках одной транзакции (защита от Lost Update)."""
+        now_str = _utc_now_iso()
         try:
-            with self._get_connection() as conn:
+            with self._lock, self._get_connection() as conn:
+                row = conn.execute(
+                    "SELECT settings_json FROM user_settings WHERE user_id = ?",
+                    (int(user_id),),
+                ).fetchone()
+                current: Dict[str, Any] = {}
+                if row and row[0]:
+                    try:
+                        current = json.loads(row[0])
+                    except Exception:
+                        current = {}
+                current.update(settings)
+                data_str = json.dumps(current, ensure_ascii=False)
                 conn.execute(
                     """
                     INSERT INTO user_settings (user_id, settings_json, updated_at)
                     VALUES (?, ?, ?)
                     ON CONFLICT(user_id) DO UPDATE SET settings_json = excluded.settings_json, updated_at = excluded.updated_at
                     """,
-                    (user_id, data_str, now_str),
+                    (int(user_id), data_str, now_str),
                 )
-                conn.commit()
             return True
         except Exception as exc:
             logger.error(f"[UserManager] Ошибка сохранения настроек {user_id}: {exc}")
@@ -439,7 +505,7 @@ class UserManager:
 
                 try:
                     mtime = entry.stat().st_mtime
-                    mod_str = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    mod_str = datetime.datetime.fromtimestamp(mtime, tz=datetime.timezone.utc).isoformat()
                 except Exception:
                     mod_str = "-"
 
@@ -467,14 +533,18 @@ class UserManager:
         deleted_count = 0
         freed_bytes = 0
 
-        target_names = set(dir_names) if dir_names is not None else None
+        target_names = set(dir_names) if dir_names else None
 
         for item in orphaned:
             name = item["dir_name"]
             if target_names is not None and name not in target_names:
                 continue
 
-            target_path = self.users_dir / name
+            target_path = (self.users_dir / name).resolve()
+            try:
+                target_path.relative_to(self.users_dir.resolve())
+            except ValueError:
+                continue
             if target_path.exists() and target_path.is_dir():
                 try:
                     freed_bytes += item["size_bytes"]
@@ -498,8 +568,17 @@ class UserManager:
         extension: str = "",
     ) -> Dict[str, Any]:
         """Возвращает список файлов и директорий пользователя с фильтрацией."""
-        user_path = self.ensure_user_storage(user_id)
-        base_scan = user_path / subfolder if subfolder else user_path
+        user_path = self.ensure_user_storage(user_id).resolve()
+        if subfolder:
+            clean_sub = subfolder.replace("\\", "/").strip().lstrip("/")
+            base_scan = (user_path / clean_sub).resolve()
+            try:
+                base_scan.relative_to(user_path)
+            except ValueError:
+                base_scan = user_path
+        else:
+            base_scan = user_path
+
         if not base_scan.exists():
             return {
                 "status": "ok",
@@ -538,7 +617,9 @@ class UserManager:
                     pass
 
             try:
-                mod_str = datetime.datetime.fromtimestamp(entry.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                mod_str = datetime.datetime.fromtimestamp(
+                    entry.stat().st_mtime, tz=datetime.timezone.utc
+                ).isoformat()
             except Exception:
                 mod_str = "-"
 
@@ -565,7 +646,7 @@ class UserManager:
 
     def resolve_safe_user_file_path(self, user_id: int, relative_path: str) -> Optional[Path]:
         """Безопасно разрешает путь к файлу внутри хранилища пользователя без path traversal."""
-        user_path = (self.users_dir / str(user_id)).resolve()
+        user_path = (self.users_dir / str(int(user_id))).resolve()
         clean_rel = relative_path.replace("\\", "/").strip().lstrip("/")
         target = (user_path / clean_rel).resolve()
         try:
@@ -575,7 +656,7 @@ class UserManager:
             return None
 
     def get_file_preview(self, user_id: int, relative_path: str) -> Dict[str, Any]:
-        """Возвращает данные для предпросмотра файла."""
+        """Возвращает данные для предпросмотра файла с потоковым ограничением памяти."""
         target = self.resolve_safe_user_file_path(user_id, relative_path)
         if not target or not target.exists() or not target.is_file():
             return {
@@ -592,17 +673,20 @@ class UserManager:
 
         content = ""
         if is_image:
-            try:
-                data = target.read_bytes()
-                encoded = base64.b64encode(data).decode("ascii")
-                content = f"data:{mime};base64,{encoded}"
-            except Exception as exc:
-                content = f"Ошибка чтения изображения: {exc}"
+            if size > _MAX_IMAGE_PREVIEW_BYTES:
+                content = "Изображение слишком велико для предпросмотра (>20 МБ)"
+            else:
+                try:
+                    with target.open("rb") as f:
+                        data = f.read(_MAX_IMAGE_PREVIEW_BYTES)
+                    encoded = base64.b64encode(data).decode("ascii")
+                    content = f"data:{mime};base64,{encoded}"
+                except Exception as exc:
+                    content = f"Ошибка чтения изображения: {exc}"
         else:
             try:
-                # Читаем до 500 КБ текста
-                max_bytes = 500 * 1024
-                raw = target.read_bytes()[:max_bytes]
+                with target.open("rb") as f:
+                    raw = f.read(_MAX_TEXT_PREVIEW_BYTES)
                 content = raw.decode("utf-8", errors="replace")
             except Exception as exc:
                 content = f"Ошибка чтения файла: {exc}"
@@ -638,4 +722,4 @@ class UserManager:
 # Глобальный синглтон менеджера пользователей
 user_manager = UserManager()
 
-__all__ = ["UserManager", "user_manager"]
+__all__ = ["UserManager", "user_manager", "hash_password", "verify_password"]

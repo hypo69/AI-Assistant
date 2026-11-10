@@ -7,9 +7,9 @@
     "gc_interval_hours": 48,
     "aggressive": false,
     "auto_prune": true,
-    "last_gc_run": "2026-11-10T12:54:51.337491",
-    "last_gc_status": "Диагностика: Наблюдение. Повторить измерение (2026-11-10T12:54:51.337491)"
+    "last_gc_run": "2026-11-10T14:34:33.641170+00:00",
+    "last_gc_status": "Успешно завершено за 0.0 сек (2026-11-10T14:34:33.641170+00:00)"
   },
-  "active_workspace": "test_sys_toggle_ws",
-  "last_active_workspace": "test_sys_toggle_ws"
+  "active_workspace": "portable_usb_ws",
+  "last_active_workspace": "portable_usb_ws"
 }

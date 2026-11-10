@@ -21,12 +21,13 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-23 19:03:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """REST API роутер компактного Obsidian Vault и управления движками (Electron / WebView2)."""
 
+import asyncio
 from pathlib import Path
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException
@@ -48,20 +49,20 @@ def _get_wm():
 
 class ObsidianBuildRequest(BaseModel):
     """Запрос на принудительную сборку компактного хранилища Obsidian в рабочей области."""
-    commit_to_git: bool = Field(True, description="Зафиксировать обновлённые .md файлы в Git рабочей области")
+    commit_to_git: bool = Field(default=True, description="Зафиксировать обновлённые .md файлы в Git рабочей области")
 
 
 class ObsidianTopicRequest(BaseModel):
     """Запрос на целенаправленную сборку тематического конспекта в `_Topics/<Тема>.md`."""
     topic: str = Field(..., description="Название темы или досье (например: Ферма Давида)")
-    query: Optional[str] = Field(None, description="Поисковый фильтр/запрос для отбора фактов и чанков FAISS")
-    commit_to_git: bool = Field(True, description="Зафиксировать конспект в Git рабочей области")
+    query: Optional[str] = Field(default=None, description="Поисковый фильтр/запрос для отбора фактов и чанков FAISS")
+    commit_to_git: bool = Field(default=True, description="Зафиксировать конспект в Git рабочей области")
 
 
 class ObsidianOpenRequest(BaseModel):
     """Запрос на открытие хранилища или конкретной заметки в Obsidian."""
-    note_name: Optional[str] = Field("_Knowledge_Base.md", description="Имя файла заметки для открытия")
-    engine: Optional[str] = Field(None, description="Предпочтительный движок ('electron' или 'webview2')")
+    note_name: Optional[str] = Field(default="_Knowledge_Base.md", description="Имя файла заметки для открытия")
+    engine: Optional[str] = Field(default=None, description="Предпочтительный движок ('electron' или 'webview2')")
 
 
 class EngineSelectRequest(BaseModel):
@@ -74,7 +75,7 @@ async def get_obsidian_vault_status(workspace_id: str) -> Dict[str, Any]:
     """Возвращает метаданные компактного хранилища Obsidian, список `.md` файлов и URI протокола `obsidian://`."""
     try:
         wm = _get_wm()
-        return wm.obsidian.get_vault_status(workspace_id)
+        return await asyncio.to_thread(wm.obsidian.get_vault_status, workspace_id)
     except Exception as exc:
         logger.error(f"[RouterObsidian] Ошибка получения статуса Obsidian Vault для {workspace_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -86,7 +87,7 @@ async def build_obsidian_vault(workspace_id: str, req: Optional[ObsidianBuildReq
     try:
         wm = _get_wm()
         commit_flag = req.commit_to_git if req is not None else True
-        return wm.obsidian.build_workspace_vault(workspace_id=workspace_id, commit_to_git=commit_flag)
+        return await asyncio.to_thread(wm.obsidian.build_workspace_vault, workspace_id=workspace_id, commit_to_git=commit_flag)
     except Exception as exc:
         logger.error(f"[RouterObsidian] Ошибка сборки Obsidian Vault в {workspace_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -99,7 +100,8 @@ async def compile_obsidian_topic(workspace_id: str, req: ObsidianTopicRequest) -
         raise HTTPException(status_code=422, detail="Название темы не может быть пустым")
     try:
         wm = _get_wm()
-        return wm.obsidian.compile_topic_note(
+        return await asyncio.to_thread(
+            wm.obsidian.compile_topic_note,
             workspace_id=workspace_id,
             topic=req.topic,
             query=req.query,
@@ -113,7 +115,7 @@ async def compile_obsidian_topic(workspace_id: str, req: ObsidianTopicRequest) -
 @router.post("/workspaces/{workspace_id}/obsidian/open", summary="Открыть рабочую область как Vault в Obsidian")
 async def open_obsidian_vault(workspace_id: str, req: Optional[ObsidianOpenRequest] = None) -> Dict[str, Any]:
     """Открывает папку рабочей области (`workspaces/<id>/`) в приложении Obsidian через Engine Adapter."""
-    try:
+    def _do_open() -> Dict[str, Any]:
         wm = _get_wm()
         ws, ws_path = wm._get_or_create_workspace(workspace_id)
         wm.obsidian.ensure_vault_config(ws_path)
@@ -123,6 +125,9 @@ async def open_obsidian_vault(workspace_id: str, req: Optional[ObsidianOpenReque
         note_name = req.note_name if req else "_Knowledge_Base.md"
         adapter = _engine_manager.get_adapter(req.engine if req else None)
         return adapter.open_obsidian_vault(ws_path, note_name=note_name)
+
+    try:
+        return await asyncio.to_thread(_do_open)
     except Exception as exc:
         logger.error(f"[RouterObsidian] Ошибка открытия Obsidian Vault {workspace_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -131,13 +136,13 @@ async def open_obsidian_vault(workspace_id: str, req: Optional[ObsidianOpenReque
 @router.get("/engine/status", summary="Статус движков оболочки (Electron и WebView2)")
 async def get_engine_status() -> Dict[str, Any]:
     """Возвращает состояние адаптеров обоих движков (Electron + WebView2) и выбранный движок."""
-    return _engine_manager.get_status()
+    return await asyncio.to_thread(_engine_manager.get_status)
 
 
 @router.post("/engine/select", summary="Выбор активного движка оболочки (Electron или WebView2)")
 async def select_engine(req: EngineSelectRequest) -> Dict[str, Any]:
     """Переключает приоритетный движок оболочки между `electron` и `webview2`."""
     try:
-        return _engine_manager.set_preferred_engine(req.engine)
+        return await asyncio.to_thread(_engine_manager.set_preferred_engine, req.engine)
     except ValueError as ve:
         raise HTTPException(status_code=422, detail=str(ve))

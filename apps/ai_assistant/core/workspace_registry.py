@@ -23,9 +23,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:53:00
-# Updated: 2026-11-06 23:05:00
-# Updated: 2026-10-28 20:00:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -40,6 +38,7 @@ import re
 import shutil
 import socket
 import stat
+import threading
 from typing import Any, Dict, List, Optional, Tuple
 import uuid
 
@@ -327,6 +326,7 @@ class WorkspaceRegistry:
         Args:
             workspaces_dir: Каталог, подпапки которого являются рабочими пространствами.
         """
+        self._lock = threading.RLock()
         self.workspaces_dir = resolve_workspaces_dir(workspaces_dir)
         self.workspaces_dir.mkdir(parents=True, exist_ok=True)
         self._migrate_workspaces_from_legacy_data()
@@ -384,11 +384,14 @@ class WorkspaceRegistry:
             logger.warning(f"[WorkspaceRegistry] Не удалось исключить служебные каталоги из Git в {ws_path}: {exc}")
 
     def _write_config(self, ws_path: Path, cfg: Dict[str, Any]) -> None:
-        """Сохраняет настройки пространства в .workspace/config.json."""
-        cfg_file = self._config_file(ws_path)
-        cfg_file.parent.mkdir(parents=True, exist_ok=True)
-        cfg_file.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
-        self._exclude_meta_from_git(ws_path)
+        """Атомарно и потокобезопасно сохраняет настройки пространства в .workspace/config.json."""
+        with self._lock:
+            cfg_file = self._config_file(ws_path)
+            cfg_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp_file = cfg_file.with_suffix(".json.tmp")
+            tmp_file.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp_file, cfg_file)
+            self._exclude_meta_from_git(ws_path)
 
     def _load_config(self, ws_path: Path) -> Dict[str, Any]:
         """Читает настройки пространства; при отсутствии файла создаёт его со значениями по умолчанию."""
@@ -590,7 +593,11 @@ class WorkspaceRegistry:
         ws_path = (self.workspaces_dir / clean_id).resolve()
         resolved_root = self.workspaces_dir.resolve()
 
-        if not str(ws_path).startswith(str(resolved_root)) or ws_path == resolved_root:
+        try:
+            ws_path.relative_to(resolved_root)
+        except ValueError:
+            raise ValueError(f"Попытка выхода за пределы каталога рабочих пространств: {workspace_id}")
+        if ws_path == resolved_root:
             raise ValueError(f"Попытка выхода за пределы каталога рабочих пространств: {workspace_id}")
 
         if not ws_path.exists() or not ws_path.is_dir():

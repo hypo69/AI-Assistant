@@ -23,12 +23,13 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:15:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """Универсальный REST API роутер для выборки данных панелей умного версионирования."""
 
+import asyncio
 import json
 import re
 import sqlite3
@@ -343,18 +344,17 @@ def _fetch_panel_data(
         # Fallback: безопасно проверяем идентификатор таблицы перед выборкой в knowledge.db
         if re.fullmatch(r"[a-zA-Z0-9_]+", panel_key):
             try:
-                conn = sqlite3.connect(str(_wiki_adapter.db_path))
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                tbl_check = cursor.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?;",
-                    (panel_key,),
-                ).fetchone()
-                if tbl_check:
-                    cursor.execute(f"SELECT * FROM {panel_key} LIMIT :limit;", {"limit": limit})
-                    rows = cursor.fetchall()
-                    data = [dict(row) for row in rows]
-                conn.close()
+                with sqlite3.connect(str(_wiki_adapter.db_path), timeout=5.0) as conn:
+                    conn.row_factory = sqlite3.Row
+                    cursor = conn.cursor()
+                    tbl_check = cursor.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?;",
+                        (panel_key,),
+                    ).fetchone()
+                    if tbl_check:
+                        cursor.execute(f"SELECT * FROM {panel_key} LIMIT :limit;", {"limit": limit})
+                        rows = cursor.fetchall()
+                        data = [dict(row) for row in rows]
             except Exception:
                 data = []
 
@@ -385,7 +385,7 @@ async def get_panel_data(
     workspace_id: Optional[str] = Query(None, description="Идентификатор рабочей области"),
     repo_path: Optional[str] = Query(None, description="Путь к репозиторию Git"),
 ) -> PanelDataResponse:
-    """Выполняет запрос данных для указанной панели интерфейса.
+    """Выполняет запрос данных для указанной панели интерфейса в пуле потоков.
 
     Args:
         panel_id: Идентификатор панели (например, panel-timeline, panel-commits).
@@ -397,8 +397,8 @@ async def get_panel_data(
         PanelDataResponse: Набор данных панели, SQL и метаинформация.
     """
     key = _resolve_panel_key(panel_id)
-    table_name, executed_sql, data, resolved_repo = _fetch_panel_data(
-        key, limit, workspace_id=workspace_id, repo_path=repo_path
+    table_name, executed_sql, data, resolved_repo = await asyncio.to_thread(
+        _fetch_panel_data, key, limit, workspace_id, repo_path
     )
 
     return PanelDataResponse(

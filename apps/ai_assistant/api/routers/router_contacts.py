@@ -10,13 +10,14 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-27 16:30:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 
 """REST API маршрутизатор Google Contacts."""
 
+import asyncio
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -32,13 +33,13 @@ class CreateContactPayload(BaseModel):
     """Полезная нагрузка для создания контакта."""
 
     given_name: str = Field(..., description="Имя")
-    family_name: str = Field("", description="Фамилия")
-    phone: Optional[str] = Field(None, description="Номер телефона")
-    email: Optional[str] = Field(None, description="Email адрес")
-    organization: Optional[str] = Field(None, description="Компания / организация")
-    title: Optional[str] = Field(None, description="Должность")
-    notes: Optional[str] = Field(None, description="Заметки")
-    account_name: Optional[str] = Field(None, description="Имя аккаунта")
+    family_name: str = Field(default="", description="Фамилия")
+    phone: Optional[str] = Field(default=None, description="Номер телефона")
+    email: Optional[str] = Field(default=None, description="Email адрес")
+    organization: Optional[str] = Field(default=None, description="Компания / организация")
+    title: Optional[str] = Field(default=None, description="Должность")
+    notes: Optional[str] = Field(default=None, description="Заметки")
+    account_name: Optional[str] = Field(default=None, description="Имя аккаунта")
 
 
 @router.get("", summary="Список контактов телефонной книги")
@@ -53,8 +54,11 @@ async def list_contacts(
         clean_limit = limit if isinstance(limit, int) else 50
         clean_acc = account_name if isinstance(account_name, str) and account_name.strip() else None
 
-        client = get_contacts_client(account_name=clean_acc)
-        contacts = client.list_contacts(query=clean_q, max_results=clean_limit)
+        def _fetch():
+            client = get_contacts_client(account_name=clean_acc)
+            return client.list_contacts(query=clean_q, max_results=clean_limit)
+
+        contacts = await asyncio.to_thread(_fetch)
         return {"status": "success", "count": len(contacts), "contacts": contacts}
     except Exception as exc:
         logger.error(f"[RouterContacts] Ошибка получения контактов: {exc}")
@@ -65,16 +69,19 @@ async def list_contacts(
 async def create_contact(payload: CreateContactPayload) -> Dict[str, Any]:
     """Создает новый контакт в Google Contacts."""
     try:
-        client = get_contacts_client(account_name=payload.account_name)
-        res = client.create_contact(
-            given_name=payload.given_name,
-            family_name=payload.family_name,
-            phone=payload.phone,
-            email=payload.email,
-            organization=payload.organization,
-            title=payload.title,
-            notes=payload.notes,
-        )
+        def _do_create():
+            client = get_contacts_client(account_name=payload.account_name)
+            return client.create_contact(
+                given_name=payload.given_name,
+                family_name=payload.family_name,
+                phone=payload.phone,
+                email=payload.email,
+                organization=payload.organization,
+                title=payload.title,
+                notes=payload.notes,
+            )
+
+        res = await asyncio.to_thread(_do_create)
         return res
     except Exception as exc:
         logger.error(f"[RouterContacts] Ошибка создания контакта: {exc}")
@@ -88,8 +95,11 @@ async def delete_contact(
 ) -> Dict[str, Any]:
     """Удаляет контакт по resourceName."""
     try:
-        client = get_contacts_client(account_name=account_name)
-        res = client.delete_contact(resource_name=resource_name)
+        def _do_delete():
+            client = get_contacts_client(account_name=account_name)
+            return client.delete_contact(resource_name=resource_name)
+
+        res = await asyncio.to_thread(_do_delete)
         return res
     except Exception as exc:
         logger.error(f"[RouterContacts] Ошибка удаления контакта: {exc}")

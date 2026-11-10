@@ -21,7 +21,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 03:15:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -31,6 +31,8 @@ import datetime
 import json
 import os
 import subprocess
+import threading
+import time
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -109,6 +111,7 @@ class GitMaintenanceAnalyzer:
         """
         self.repo_path = Path(repo_path).resolve()
         self.history_path = Path(history_path).resolve() if history_path else DEFAULT_HISTORY_FILE
+        self._lock = threading.RLock()
 
     def _resolve_working_repo(self, custom_path: Optional[str | Path] = None) -> Path:
         """Определяет действительный абсолютный путь к целевому репозиторию."""
@@ -286,7 +289,7 @@ class GitMaintenanceAnalyzer:
         Returns:
             DiagnosisResult: Вердикт, обоснование и рекомендация.
         """
-        now_ts = datetime.datetime.now().isoformat()
+        now_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
         loose_mb = round(metrics.loose_size_kib / 1024, 2)
         pack_mb = round(metrics.pack_size_kib / 1024, 2)
         avail = self.get_available_repos()
@@ -391,34 +394,38 @@ class GitMaintenanceAnalyzer:
 
     def _record_history(self, diagnosis: DiagnosisResult, max_records: int = 50) -> None:
         """Сохраняет срез диагностики в локальный журнал истории."""
-        try:
-            self.history_path.parent.mkdir(parents=True, exist_ok=True)
-            records: List[Dict[str, Any]] = []
-            if self.history_path.exists():
-                try:
-                    with open(self.history_path, "r", encoding="utf-8") as f:
-                        records = json.load(f)
-                except Exception:
-                    records = []
+        with self._lock:
+            try:
+                self.history_path.parent.mkdir(parents=True, exist_ok=True)
+                records: List[Dict[str, Any]] = []
+                if self.history_path.exists():
+                    try:
+                        with open(self.history_path, "r", encoding="utf-8") as f:
+                            records = json.load(f)
+                    except Exception:
+                        records = []
 
-            records.insert(0, diagnosis.model_dump())
-            records = records[:max_records]
+                records.insert(0, diagnosis.model_dump())
+                records = records[:max_records]
 
-            with open(self.history_path, "w", encoding="utf-8") as f:
-                json.dump(records, f, ensure_ascii=False, indent=2)
-        except Exception as exc:
-            logger.warning(f"[GitMaintenanceAnalyzer] Ошибка записи журнала истории: {exc}")
+                tmp_path = self.history_path.with_suffix(".json.tmp")
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(records, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_path, self.history_path)
+            except Exception as exc:
+                logger.warning(f"[GitMaintenanceAnalyzer] Ошибка записи журнала истории: {exc}")
 
     def get_history(self, limit: int = 20) -> List[Dict[str, Any]]:
         """Возвращает историю предыдущих диагностических срезов."""
-        if not self.history_path.exists():
-            return []
-        try:
-            with open(self.history_path, "r", encoding="utf-8") as f:
-                records = json.load(f)
-            return records[:limit]
-        except Exception:
-            return []
+        with self._lock:
+            if not self.history_path.exists():
+                return []
+            try:
+                with open(self.history_path, "r", encoding="utf-8") as f:
+                    records = json.load(f)
+                return records[:limit]
+            except Exception:
+                return []
 
     def run_gc_auto(self, custom_path: Optional[str | Path] = None) -> Dict[str, Any]:
         """Запускает штатную команду git gc --auto, принимающую решение по встроенным порогам Git.
@@ -428,9 +435,9 @@ class GitMaintenanceAnalyzer:
         """
         target = self._resolve_working_repo(custom_path)
         logger.console(f"[GitMaintenanceAnalyzer] Запуск штатного обслуживания: git gc --auto в {target}...")
-        start_ts = datetime.datetime.now()
+        start_ts = time.perf_counter()
         output = self._run_git(["gc", "--auto"], target_path=target, timeout_sec=120, allow_stderr_fallback=True)
-        elapsed = round((datetime.datetime.now() - start_ts).total_seconds(), 2)
+        elapsed = round(time.perf_counter() - start_ts, 2)
 
         new_diagnosis = self.diagnose(target)
         return {
@@ -449,9 +456,9 @@ class GitMaintenanceAnalyzer:
         """
         target = self._resolve_working_repo(custom_path)
         logger.console(f"[GitMaintenanceAnalyzer] Запуск проверки целостности: git fsck --full в {target}...")
-        start_ts = datetime.datetime.now()
+        start_ts = time.perf_counter()
         output = self._run_git(["fsck", "--full"], target_path=target, timeout_sec=180, allow_stderr_fallback=True)
-        elapsed = round((datetime.datetime.now() - start_ts).total_seconds(), 2)
+        elapsed = round(time.perf_counter() - start_ts, 2)
 
         has_errors = "error:" in output.lower() or "fatal:" in output.lower()
         return {

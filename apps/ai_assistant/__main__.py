@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 19:37:00
+# Updated: 2026-11-10 16:32:00
 # =============================================================================
 
 from __future__ import annotations
@@ -158,6 +158,8 @@ def main() -> None:
         show_status()
     elif args.command == "serve":
         from apps.ai_assistant.main import run
+        from apps.ai_assistant.core.paperless_bootstrap import ensure_paperless_running
+        ensure_paperless_running()
         selected_action = "restart" if getattr(args, "restart", False) else ("connect" if getattr(args, "connect", False) else getattr(args, "action", None))
         run(
             port=args.port,
@@ -169,6 +171,8 @@ def main() -> None:
     else:
         # Если команда не передана, запускаем веб-сервер и предпочтительный движок (Electron)
         from apps.ai_assistant.main import run
+        from apps.ai_assistant.core.paperless_bootstrap import ensure_paperless_running
+        ensure_paperless_running()
         selected_action = "restart" if getattr(args, "restart", False) else ("connect" if getattr(args, "connect", False) else getattr(args, "action", None))
         run(
             port=getattr(args, "port", None),

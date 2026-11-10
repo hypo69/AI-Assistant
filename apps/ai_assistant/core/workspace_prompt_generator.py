@@ -19,12 +19,13 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 13:15:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """Генератор контекстных подсказок и вопросов по содержанию рабочей области."""
 
+import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from logger import logger
@@ -174,7 +175,7 @@ class WorkspacePromptGenerator:
             docs: List[Dict[str, Any]] = []
             try:
                 if hasattr(self.wm, "store") and hasattr(self.wm.store, "list_documents"):
-                    docs = self.wm.store.list_documents(workspace_id)
+                    docs = await asyncio.to_thread(self.wm.store.list_documents, workspace_id)
             except Exception as doc_exc:
                 logger.debug(f"[WorkspacePromptGenerator] Ошибка получения документов {workspace_id}: {doc_exc}")
 
@@ -196,7 +197,7 @@ class WorkspacePromptGenerator:
             entities: List[Dict[str, Any]] = []
             try:
                 if hasattr(self.wm, "store") and hasattr(self.wm.store, "list_entities"):
-                    entities = self.wm.store.list_entities(workspace_id=workspace_id)
+                    entities = await asyncio.to_thread(self.wm.store.list_entities, workspace_id=workspace_id)
             except Exception as ent_exc:
                 logger.debug(f"[WorkspacePromptGenerator] Ошибка получения сущностей {workspace_id}: {ent_exc}")
 

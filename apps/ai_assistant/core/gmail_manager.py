@@ -13,7 +13,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-23 18:25:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from __future__ import annotations
 import base64
 from concurrent.futures import ThreadPoolExecutor
 from email.message import EmailMessage
+import threading
 from typing import Any, Dict, List, Optional, Tuple
 
 from googleapiclient.discovery import build
@@ -41,6 +42,7 @@ class GmailManager:
         """
         self._default_account = default_account
         self._services: Dict[str, Any] = {}
+        self._lock = threading.RLock()
 
     def _resolve_account_name(self, account_name: Optional[str] = None) -> str:
         """Определяет имя используемого аккаунта."""
@@ -61,20 +63,21 @@ class GmailManager:
             Экземпляр клиента Google API Client Discovery или None.
         """
         acc = self._resolve_account_name(account_name)
-        if acc in self._services:
-            return self._services[acc]
+        with self._lock:
+            if acc in self._services:
+                return self._services[acc]
 
-        try:
-            creds = load_account_credentials(acc)
-            if not creds:
-                logger.warning(f"[GmailManager] Не удалось загрузить credentials для аккаунта '{acc}'")
+            try:
+                creds = load_account_credentials(acc)
+                if not creds:
+                    logger.warning(f"[GmailManager] Не удалось загрузить credentials для аккаунта '{acc}'")
+                    return None
+                service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+                self._services[acc] = service
+                return service
+            except Exception as exc:
+                logger.error(f"[GmailManager] Ошибка создания клиента Gmail для '{acc}': {exc}")
                 return None
-            service = build("gmail", "v1", credentials=creds, cache_discovery=False)
-            self._services[acc] = service
-            return service
-        except Exception as exc:
-            logger.error(f"[GmailManager] Ошибка создания клиента Gmail для '{acc}': {exc}")
-            return None
 
     def get_profile(self, account_name: Optional[str] = None) -> Dict[str, Any]:
         """Получает сводный профиль почтового ящика пользователя.
@@ -95,7 +98,7 @@ class GmailManager:
             }
 
         try:
-            profile = service.users().getProfile(userId="me").execute()
+            profile = service.users().getProfile(userId="me").execute(num_retries=3)
             return {
                 "status": "success",
                 "account": acc,
@@ -123,7 +126,7 @@ class GmailManager:
             return {"status": "error", "labels": [], "message": "Сервис недоступен"}
 
         try:
-            raw_labels = service.users().labels().list(userId="me").execute()
+            raw_labels = service.users().labels().list(userId="me").execute(num_retries=3)
             labels_list = []
             for lab in raw_labels.get("labels", []):
                 labels_list.append({
@@ -177,7 +180,7 @@ class GmailManager:
             if page_token:
                 req_params["pageToken"] = page_token
 
-            res = service.users().messages().list(**req_params).execute()
+            res = service.users().messages().list(**req_params).execute(num_retries=3)
             raw_items = res.get("messages", [])
             next_page_token = res.get("nextPageToken", "")
             result_estimate = res.get("resultSizeEstimate", 0)
@@ -245,7 +248,7 @@ class GmailManager:
                             id=item["id"],
                             format="metadata",
                             metadataHeaders=["Subject", "From", "To", "Date"],
-                        ).execute()
+                        ).execute(num_retries=3)
                         headers_map = {
                             h.get("name", "").lower(): h.get("value", "")
                             for h in meta.get("payload", {}).get("headers", [])
@@ -293,7 +296,7 @@ class GmailManager:
             return {"status": "error", "message": "Сервис недоступен"}
 
         try:
-            m = service.users().messages().get(userId="me", id=message_id, format="full").execute()
+            m = service.users().messages().get(userId="me", id=message_id, format="full").execute(num_retries=3)
             payload = m.get("payload", {})
             headers_map = {
                 h.get("name", "").lower(): h.get("value", "")
@@ -394,7 +397,7 @@ class GmailManager:
 
         try:
             # Получаем собственный email для поля From
-            profile = service.users().getProfile(userId="me").execute()
+            profile = service.users().getProfile(userId="me").execute(num_retries=3)
             user_email = profile.get("emailAddress", "me")
 
             msg = EmailMessage()
@@ -418,7 +421,7 @@ class GmailManager:
             sent_res = service.users().messages().send(
                 userId="me",
                 body={"raw": raw_b64},
-            ).execute()
+            ).execute(num_retries=3)
 
             return {
                 "status": "success",
@@ -462,7 +465,7 @@ class GmailManager:
                 userId="me",
                 id=message_id,
                 body=body,
-            ).execute()
+            ).execute(num_retries=3)
             return {"status": "success", "id": message_id, "labels": res.get("labelIds", [])}
         except Exception as exc:
             logger.error(f"[GmailManager] Ошибка изменения меток {message_id}: {exc}")
@@ -476,7 +479,7 @@ class GmailManager:
             return {"status": "error", "message": "Сервис недоступен"}
 
         try:
-            res = service.users().messages().trash(userId="me", id=message_id).execute()
+            res = service.users().messages().trash(userId="me", id=message_id).execute(num_retries=3)
             return {"status": "success", "id": message_id, "message": "Письмо перемещено в корзину", "labels": res.get("labelIds", [])}
         except Exception as exc:
             logger.error(f"[GmailManager] Ошибка перемещения в корзину {message_id}: {exc}")
@@ -490,7 +493,7 @@ class GmailManager:
             return {"status": "error", "message": "Сервис недоступен"}
 
         try:
-            res = service.users().messages().untrash(userId="me", id=message_id).execute()
+            res = service.users().messages().untrash(userId="me", id=message_id).execute(num_retries=3)
             return {"status": "success", "id": message_id, "message": "Письмо восстановлено из корзины", "labels": res.get("labelIds", [])}
         except Exception as exc:
             logger.error(f"[GmailManager] Ошибка восстановления из корзины {message_id}: {exc}")
@@ -504,7 +507,7 @@ class GmailManager:
             return {"status": "error", "message": "Сервис недоступен"}
 
         try:
-            service.users().messages().delete(userId="me", id=message_id).execute()
+            service.users().messages().delete(userId="me", id=message_id).execute(num_retries=3)
             return {"status": "success", "id": message_id, "message": "Письмо безвозвратно удалено"}
         except Exception as exc:
             logger.error(f"[GmailManager] Ошибка окончательного удаления {message_id}: {exc}")

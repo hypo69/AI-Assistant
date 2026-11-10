@@ -13,17 +13,20 @@
 # Package: apps.common.file_editor
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:01:00
+# Updated: 2026-11-10 14:31:10
 # =============================================================================
 
 from __future__ import annotations
 """Сборщик и загрузчик нативного WebAssembly-модуля редактора файлов."""
 
+import os
+import threading
 from pathlib import Path
 from logger import logger
 
 WASM_DIR: Path = Path(__file__).resolve().parent / "wasm"
 WASM_BINARY_PATH: Path = WASM_DIR / "file_editor_core.wasm"
+_WASM_BUILD_LOCK = threading.Lock()
 
 
 def _uleb128(value: int) -> bytes:
@@ -235,12 +238,19 @@ def build_file_editor_wasm_bytes() -> bytes:
 def ensure_wasm_binary() -> Path:
     """Гарантирует наличие скомпилированного файла `file_editor_core.wasm` на диске.
 
+    Использует потокобезопасную блокировку и атомарную запись через временный файл.
+
     Returns:
         Абсолютный путь к бинарному файлу `.wasm`.
     """
-    WASM_DIR.mkdir(parents=True, exist_ok=True)
-    wasm_bytes = build_file_editor_wasm_bytes()
-    if not WASM_BINARY_PATH.exists() or WASM_BINARY_PATH.read_bytes() != wasm_bytes:
-        WASM_BINARY_PATH.write_bytes(wasm_bytes)
-        logger.info(f"[FileEditorWasm] Сгенерирован бинарный модуль Wasm ({len(wasm_bytes)} байт): {WASM_BINARY_PATH}")
+    with _WASM_BUILD_LOCK:
+        WASM_DIR.mkdir(parents=True, exist_ok=True)
+        wasm_bytes = build_file_editor_wasm_bytes()
+        if not WASM_BINARY_PATH.exists() or WASM_BINARY_PATH.read_bytes() != wasm_bytes:
+            tmp_path = WASM_BINARY_PATH.with_suffix(".wasm.tmp")
+            tmp_path.write_bytes(wasm_bytes)
+            os.replace(tmp_path, WASM_BINARY_PATH)
+            logger.info(
+                f"[FileEditorWasm] Сгенерирован бинарный модуль Wasm ({len(wasm_bytes)} байт): {WASM_BINARY_PATH}"
+            )
     return WASM_BINARY_PATH

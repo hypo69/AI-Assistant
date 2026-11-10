@@ -12,13 +12,13 @@
 # Package: plugins.telegram_bot
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 20:23:00
+# Updated: 2026-11-10 16:45:00
 # =============================================================================
 
 from __future__ import annotations
 """Маршрутизация рабочих пространств и конвейер сохранения медиа в Telegram-боте."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import re
 import time
@@ -34,7 +34,8 @@ from plugins.telegram_bot import user_auth as user_manager
 if TYPE_CHECKING:
     from apps.ai_assistant.core.workspace_manager import WorkspaceManager
 
-AUDIO_EXTENSIONS = {".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac"}
+AUDIO_EXTENSIONS = frozenset({".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac"})
+_SLUG_SEP_RE = re.compile(r"[\s/\\]+")
 
 
 def _format_size(size_bytes: int) -> str:
@@ -93,7 +94,7 @@ def resolve_workspace(wm: WorkspaceManager, query: str) -> Tuple[str, str]:
                 return ws_id, ws_name or ws_id
 
     # 4. Если область не найдена — создаем новую
-    safe_slug = re.sub(r"[\s/\\]+", "_", clean_query).strip("_")
+    safe_slug = _SLUG_SEP_RE.sub("_", clean_query).strip("_")
     if not safe_slug:
         safe_slug = f"ws_{int(time.time())}"
     ws = wm.create_or_select_workspace(safe_slug, name=clean_query)
@@ -365,7 +366,7 @@ async def handle_incoming_media(
         try:
             sub = "audio" if is_audio_file else "documents"
             user_dir = user_manager.get_user_directory(user["id"], subfolder=sub, create=True)
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             backup_path = user_dir / f"{ts}_{clean_name}"
             backup_path.write_bytes(raw_bytes)
         except Exception as b_exc:

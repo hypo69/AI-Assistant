@@ -30,16 +30,17 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:15:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """Сверка перемещений файлов в Git и умной рекомендательной системе знаний."""
 
 import json
+import os
 from pathlib import Path
 import shutil
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from logger import logger
 from apps.ai_assistant.core.obsidian_vault import strip_obsidian_enrichment
@@ -75,23 +76,36 @@ class WorkspaceRelocator:
         3. Хэш содержимого (content_hash) или слепок .snapshot полностью совпадает.
         """
         host_upper = resolved_host.upper()
+        # Индексируем записи по content_hash за один проход для быстрого O(1) сопоставления
+        hash_index: Dict[str, List[Tuple[str, Dict[str, Any]]]] = {}
+        fallback_candidates: List[Tuple[str, Dict[str, Any]]] = []
+
         for old_doc_id, meta in list(manifest_data.items()):
-            if old_doc_id == new_doc_id:
+            if old_doc_id == new_doc_id or not isinstance(meta, dict):
                 continue
             entry_host = str(meta.get("host_name") or resolved_host).upper()
             if entry_host != host_upper:
                 continue
+            saved_hash = meta.get("content_hash")
+            if saved_hash:
+                hash_index.setdefault(str(saved_hash), []).append((old_doc_id, meta))
+            else:
+                fallback_candidates.append((old_doc_id, meta))
 
+        # 1. Быстрый O(1) поиск по совпадению content_hash
+        for old_doc_id, meta in hash_index.get(content_hash, []):
+            old_fp_str = str(meta.get("file_path") or "")
+            if old_fp_str and Path(old_fp_str).exists():
+                continue
+            return old_doc_id
+
+        # 2. Fallback для старых записей манифеста без поля content_hash
+        for old_doc_id, meta in fallback_candidates:
             old_fp_str = str(meta.get("file_path") or "")
             if old_fp_str and Path(old_fp_str).exists():
                 # Старый файл всё ещё на месте — значит это копия, а не перенос
                 continue
 
-            saved_hash = meta.get("content_hash")
-            if saved_hash and saved_hash == content_hash:
-                return old_doc_id
-
-            # Fallback для старых записей манифеста без поля content_hash: проверяем слепок
             snap_rel = meta.get("snapshot")
             if snap_rel:
                 snap_path = ws_path / str(snap_rel)
@@ -104,7 +118,7 @@ class WorkspaceRelocator:
                         pass
 
             # Проверка по длине контента, если слепок уже перемещён
-            if not saved_hash and int(meta.get("content_length", -1)) == content_len and content_len > 0:
+            if int(meta.get("content_length", -1)) == content_len and content_len > 0:
                 return old_doc_id
 
         return None
@@ -280,7 +294,9 @@ class WorkspaceRelocator:
                 removed_docs.append(doc_id)
 
         if removed_docs:
-            manifest_file.write_text(json.dumps(manifest_data, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp_manifest = manifest_file.with_suffix(".json.tmp")
+            tmp_manifest.write_text(json.dumps(manifest_data, indent=2, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp_manifest, manifest_file)
             wm._run_git(ws_path, ["add", ".tracked_sources.json"])
             if wm._run_git(ws_path, ["status", "--porcelain"]):
                 wm._run_git(

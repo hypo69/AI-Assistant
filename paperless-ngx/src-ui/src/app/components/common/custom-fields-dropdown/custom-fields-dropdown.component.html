@@ -1,0 +1,24 @@
+<div ngbDropdown #fieldDropdown="ngbDropdown" (openChange)="onOpenClose($event)" [popperOptions]="popperOptions">
+    <button type="button" class="btn btn-sm btn-outline-primary" id="customFieldsDropdown" [disabled]="disabled" ngbDropdownToggle aria-label="Custom Fields" i18n-aria-label>
+      <pngx-bs-icon name="ui-radios"></pngx-bs-icon><div class="d-none d-lg-inline ms-1"><ng-container i18n>Custom Fields</ng-container></div>
+    </button>
+    <div ngbDropdownMenu aria-labelledby="customFieldsDropdown" class="shadow custom-fields-dropdown">
+        <div class="list-group list-group-flush" (keydown)="listKeyDown($event)">
+            <div class="list-group-item">
+                <div class="input-group input-group-sm">
+                  <input class="form-control" type="text" [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" placeholder="Search fields" i18n-placeholder (keyup.enter)="listFilterEnter()" #listFilterTextInput>
+                </div>
+            </div>
+            @for (field of filteredFields; track field.id) {
+                <button type="button" class="list-group-item list-group-item-action bg-light" (click)="addField(field)" #button>
+                    <div class="d-flex">{{field.name}} <small class="ms-auto text-muted">{{getDataTypeLabel(field.data_type)}}</small></div>
+                </button>
+            }
+            @if (!filterText?.length || filteredFields.length === 0) {
+                <button type="button" class="list-group-item list-group-item-action bg-light" (click)="createField(filterText)" [disabled]="!canCreateFields" #button>
+                    <pngx-bs-icon width=".9em" height=".9em" name="asterisk" class="me-1"></pngx-bs-icon><ng-container i18n>Create new field</ng-container>
+                </button>
+            }
+        </div>
+    </div>
+</div>

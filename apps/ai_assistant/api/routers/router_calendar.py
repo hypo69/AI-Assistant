@@ -10,23 +10,29 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 18:48:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 
 """REST API маршрутизатор Google Календаря."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from apps.ai_assistant.core.skills_bridge import get_calendar_client
 from logger import logger
 
 router = APIRouter(prefix="/api/v1/calendar", tags=["Google Calendar"])
+
+_IDEMPOTENCY_TTL_SEC: float = 300.0
+_idempotency_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_idempotency_lock = asyncio.Lock()
 
 
 class CreateEventPayload(BaseModel):
@@ -35,11 +41,11 @@ class CreateEventPayload(BaseModel):
     summary: str = Field(..., description="Название события")
     start_time: str = Field(..., description="Время начала в ISO формате")
     end_time: str = Field(..., description="Время окончания в ISO формате")
-    description: str = Field("", description="Описание события")
-    location: str = Field("", description="Место проведения или ссылка")
+    description: str = Field(default="", description="Описание события")
+    location: str = Field(default="", description="Место проведения или ссылка")
     attendees: Optional[List[str]] = Field(default_factory=list, description="Email участников")
-    calendar_id: str = Field("primary", description="ID календаря")
-    account_name: Optional[str] = Field(None, description="Имя аккаунта")
+    calendar_id: str = Field(default="primary", description="ID календаря")
+    account_name: Optional[str] = Field(default=None, description="Имя аккаунта")
 
 
 @router.get("/events", summary="Список предстоящих событий")
@@ -58,16 +64,20 @@ async def list_events(
         clean_cal_id = calendar_id if isinstance(calendar_id, str) and calendar_id.strip() else "primary"
         clean_acc = account_name if isinstance(account_name, str) and account_name.strip() else None
 
-        client = get_calendar_client(account_name=clean_acc)
         now = datetime.now(timezone.utc)
         time_max = (now + timedelta(days=clean_days)).isoformat()
-        events = client.list_events(
-            calendar_id=clean_cal_id,
-            time_min=now.isoformat(),
-            time_max=time_max,
-            query=clean_q,
-            max_results=clean_limit,
-        )
+
+        def _fetch_events():
+            client = get_calendar_client(account_name=clean_acc)
+            return client.list_events(
+                calendar_id=clean_cal_id,
+                time_min=now.isoformat(),
+                time_max=time_max,
+                query=clean_q,
+                max_results=clean_limit,
+            )
+
+        events = await asyncio.to_thread(_fetch_events)
         return {"status": "success", "count": len(events), "events": events}
     except Exception as exc:
         parsed = logger.google_error(exc, context="RouterCalendar.list_events")
@@ -77,19 +87,38 @@ async def list_events(
 
 
 @router.post("/events", summary="Создание нового события")
-async def create_event(payload: CreateEventPayload) -> Dict[str, Any]:
-    """Создает событие в календаре пользователя."""
+async def create_event(
+    payload: CreateEventPayload,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+) -> Dict[str, Any]:
+    """Создает событие в календаре пользователя с защитой от дублей по Idempotency-Key."""
+    clean_idem = (idempotency_key or "").strip()
+    if clean_idem:
+        async with _idempotency_lock:
+            now_ts = time.monotonic()
+            expired = [k for k, (ts, _) in _idempotency_cache.items() if now_ts - ts > _IDEMPOTENCY_TTL_SEC]
+            for k in expired:
+                _idempotency_cache.pop(k, None)
+            if clean_idem in _idempotency_cache:
+                return _idempotency_cache[clean_idem][1]
+
     try:
-        client = get_calendar_client(account_name=payload.account_name)
-        res = client.create_event(
-            summary=payload.summary,
-            start_time=payload.start_time,
-            end_time=payload.end_time,
-            description=payload.description,
-            location=payload.location,
-            attendees=payload.attendees,
-            calendar_id=payload.calendar_id,
-        )
+        def _do_create():
+            client = get_calendar_client(account_name=payload.account_name)
+            return client.create_event(
+                summary=payload.summary,
+                start_time=payload.start_time,
+                end_time=payload.end_time,
+                description=payload.description,
+                location=payload.location,
+                attendees=payload.attendees,
+                calendar_id=payload.calendar_id,
+            )
+
+        res = await asyncio.to_thread(_do_create)
+        if clean_idem and isinstance(res, dict):
+            async with _idempotency_lock:
+                _idempotency_cache[clean_idem] = (time.monotonic(), res)
         return res
     except Exception as exc:
         parsed = logger.google_error(exc, context="RouterCalendar.create_event")
@@ -106,8 +135,11 @@ async def delete_event(
 ) -> Dict[str, Any]:
     """Удаляет событие из календаря."""
     try:
-        client = get_calendar_client(account_name=account_name)
-        res = client.delete_event(event_id=event_id, calendar_id=calendar_id)
+        def _do_delete():
+            client = get_calendar_client(account_name=account_name)
+            return client.delete_event(event_id=event_id, calendar_id=calendar_id)
+
+        res = await asyncio.to_thread(_do_delete)
         return res
     except Exception as exc:
         parsed = logger.google_error(exc, context="RouterCalendar.delete_event")

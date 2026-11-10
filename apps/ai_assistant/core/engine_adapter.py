@@ -24,7 +24,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:19:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -91,7 +91,12 @@ class BaseEngineAdapter:
                 os.startfile(uri)  # type: ignore[attr-defined]
                 launched = True
             else:
-                subprocess.Popen(["cmd", "/c", "start", "", uri], shell=False)
+                subprocess.Popen(
+                    ["cmd", "/c", "start", "", uri],
+                    shell=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
                 launched = True
         except Exception as exc:
             logger.warning(f"[EngineAdapter] Протокол obsidian:// недоступен ({exc}), открываем директорию Vault.")
@@ -282,6 +287,7 @@ class ElectronEngineAdapter(BaseEngineAdapter):
                         [npm_bin, "install"],
                         cwd=str(self.app_dir),
                         check=False,
+                        timeout=120,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )

@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:15:00
+# Updated: 2026-11-10 16:12:00
 # =============================================================================
 
 import pytest
@@ -60,8 +60,8 @@ async def test_workspace_isolated_graph_lifecycle(tmp_path: Path) -> None:
     assert len(links_b) == 0
 
     # 4. Проверяем физическое размещение файлов БД в .workspace/
-    db_file_a = Path(ws_a["path"]) / ".workspace" / "temporal_graph.db"
-    db_file_b = Path(ws_b["path"]) / ".workspace" / "temporal_graph.db"
+    db_file_a = Path(ws_a["path"]) / ".workspace" / "knowledge_store.db"
+    db_file_b = Path(ws_b["path"]) / ".workspace" / "knowledge_store.db"
     assert db_file_a.exists()
 
     # 5. Инвалидация в графе project_alpha

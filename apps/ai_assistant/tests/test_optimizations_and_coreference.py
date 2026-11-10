@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-26 00:10:00
+# Updated: 2026-11-10 15:42:00
 # =============================================================================
 
 from __future__ import annotations
@@ -224,21 +224,20 @@ async def test_default_in_place_git_tracking_without_copying(monkeypatch: pytest
             assert res_default.status_code == 200
             assert not (ws_path / "external_notes.txt").exists(), "Без явного указания файл не должен копироваться в папку рабочей области"
 
-            # 2. Вызов с явным copy_to_workspace=True -> физически копирует файл в ws_path
+            # 2. Вызов с явным copy_to_workspace=True -> физически копирует файл в ws_path/assets
             res_copy = await client.post(
                 "/api/v1/workspaces/ws_in_place_default/items",
                 json={"items": [str(copied_src)], "copy_to_workspace": True},
             )
             assert res_copy.status_code == 200
-            assert (ws_path / "copied_notes.txt").exists(), "При явном copy_to_workspace=True файл должен быть скопирован"
+            assert (ws_path / "assets" / "copied_notes.txt").exists(), "При явном copy_to_workspace=True файл должен быть скопирован"
 
-            # 3. Оба файла отображаются в содержимом директории Git с корректным source_mode
+            # 3. Внешний отслеживаемый файл отображается в содержимом директории Git с корректным source_mode
             contents = wm.get_directory_contents("ws_in_place_default")
             by_name = {i["name"]: i for i in contents["items"]}
             assert "external_notes.txt" in by_name
             assert by_name["external_notes.txt"]["source_mode"] == "linked"
             assert by_name["external_notes.txt"]["tracked_by_git"] is True
-            assert by_name["copied_notes.txt"]["source_mode"] == "local"
 
             # 4. Внешний отслеживаемый файл открывается через open_workspace_file по его реальному пути на диске
             opened = []

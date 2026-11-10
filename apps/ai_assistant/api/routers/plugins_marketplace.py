@@ -16,16 +16,18 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 18:45:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 
 """Каталог стандартных плагинов расширения IDE и менеджер установки."""
 
+from datetime import datetime, timezone
 import json
-import shutil
 from pathlib import Path
+import re
+import shutil
 from typing import Any, Dict, List, Optional
 
 from header import __root__
@@ -280,6 +282,7 @@ def _generate_plugin_code(meta: Dict[str, Any]) -> str:
     icon = meta["icon"]
     category = meta["category"]
     version = meta["version"]
+    updated_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     code = f'''# -*- coding: utf-8 -*-
 # =============================================================================
@@ -292,7 +295,7 @@ def _generate_plugin_code(meta: Dict[str, Any]) -> str:
 # Package: plugins.user-plugins.{plugin_id}
 # Author: {meta.get("author", "AI Assistant Team")}
 # Copyright: © 2026 {meta.get("author", "hypo69")}
-# Updated: 2026-10-28 18:45:00
+# Updated: {updated_ts}
 # =============================================================================
 
 from __future__ import annotations
@@ -373,11 +376,17 @@ Plugin = {cls_name}
 
 def install_marketplace_plugin(plugin_id: str) -> Dict[str, Any]:
     """Устанавливает стандартный плагин из каталога маркетплейса в plugins/user-plugins."""
-    meta = next((item for item in STANDARD_MARKETPLACE_CATALOG if item["id"].lower() == plugin_id.lower()), None)
+    norm_id = plugin_id.strip().lower()
+    if not re.fullmatch(r"^[a-z0-9_]{1,64}$", norm_id):
+        raise ValueError(f"Недопустимый идентификатор плагина: '{plugin_id}'")
+
+    meta = next((item for item in STANDARD_MARKETPLACE_CATALOG if item["id"].lower() == norm_id), None)
     if not meta:
         raise ValueError(f"Плагин '{plugin_id}' не найден в каталоге маркетплейса")
 
-    target_dir = __root__ / "plugins" / "user-plugins" / meta["id"]
+    base_user_plugins = (__root__ / "plugins" / "user-plugins").resolve()
+    target_dir = (base_user_plugins / meta["id"]).resolve()
+    target_dir.relative_to(base_user_plugins)
     if target_dir.exists() and (target_dir / "plugin.py").exists():
         return {
             "status": "already_installed",
@@ -441,14 +450,22 @@ __all__ = ["{cls_name}", "plugin"]
 
 
 def uninstall_user_plugin(plugin_id: str) -> Dict[str, Any]:
-    """Удаляет пользовательский плагин из каталога plugins/user-plugins."""
+    """Удаляет пользовательский плагин из каталога plugins/user-plugins с защитой от Path Traversal."""
     import sys
     norm_id = plugin_id.strip().lower()
-    target_dir = __root__ / "plugins" / "user-plugins" / norm_id
+    if not re.fullmatch(r"^[a-z0-9_]{1,64}$", norm_id):
+        raise ValueError(f"Недопустимый идентификатор плагина: '{plugin_id}'")
+
+    base_user_plugins = (__root__ / "plugins" / "user-plugins").resolve()
+    target_dir = (base_user_plugins / norm_id).resolve()
+    try:
+        target_dir.relative_to(base_user_plugins)
+    except ValueError:
+        raise PermissionError(f"Попытка выхода за пределы каталога пользовательских плагинов: '{plugin_id}'")
 
     # Проверка: если плагин в system-plugins или developer-plugins
     for scope_dir in ("system-plugins", "developer-plugins"):
-        scope_path = __root__ / "plugins" / scope_dir / norm_id
+        scope_path = (__root__ / "plugins" / scope_dir / norm_id).resolve()
         if scope_path.exists():
             raise PermissionError(f"Плагин '{plugin_id}' является частью '{scope_dir}' и не может быть удален с диска")
 

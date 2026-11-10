@@ -24,19 +24,20 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:53:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """Модуль извлечения Git-контекста и анализа изменений для QAEngine."""
 
-import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from logger import logger
 from apps.ai_assistant.core.git_history_engine import GitHistoryEngine
 
-logger = logging.getLogger("ai_assistant")
+_SAFE_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{4,40}$|^HEAD(?:[~^]\d*)*$")
 
 
 class QaGitResolver:
@@ -101,8 +102,13 @@ class QaGitResolver:
     ) -> Tuple[Optional[str], List[Dict[str, Any]], Optional[str]]:
         """Извлекает детальные данные коммита: метаданные, изменённые файлы и diff."""
         try:
+            clean_hash = (commit_hash or "").strip()
+            if not clean_hash or clean_hash.startswith("-") or not _SAFE_COMMIT_RE.match(clean_hash):
+                logger.warning(f"[QaGitResolver] Отклонен недопустимый хэш коммита: {commit_hash!r}")
+                return None, [], None
+
             meta_raw = await engine._run_git_async([
-                "show", "-s", "--format=%H||%an <%ae>||%ad||%s", commit_hash
+                "show", "-s", "--format=%H||%an <%ae>||%ad||%s", clean_hash
             ])
             if not meta_raw or "||" not in meta_raw:
                 return None, [], None

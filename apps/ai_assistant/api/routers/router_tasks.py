@@ -15,11 +15,12 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:38:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -33,24 +34,24 @@ router = APIRouter(prefix="/api/v1/tasks", tags=["Smart Tasks & Workflows"])
 class DecomposeRequest(BaseModel):
     """Схема запроса на интеллектуальную декомпозицию поручения."""
     text: str = Field(..., description="Исходный текст поручения, телефонного разговора или заметки")
-    source_label: str = Field("Телефонный разговор", description="Метка источника поручения")
+    source_label: str = Field(default="Телефонный разговор", description="Метка источника поручения")
 
 
 class TaskItemInput(BaseModel):
     """Схема подзадачи для создания дела."""
     title: str = Field(..., description="Название подзадачи")
-    description: str = Field("", description="Подробное описание")
-    stage: str = Field("general", description="Стадия процесса (documents, vet_inspection, insurance, closing)")
-    actor_role: str = Field("", description="Роль ответственного участника")
-    status: str = Field("todo", description="Статус задачи")
+    description: str = Field(default="", description="Подробное описание")
+    stage: str = Field(default="general", description="Стадия процесса (documents, vet_inspection, insurance, closing)")
+    actor_role: str = Field(default="", description="Роль ответственного участника")
+    status: str = Field(default="todo", description="Статус задачи")
 
 
 class CreateCaseRequest(BaseModel):
     """Схема создания комплексного дела."""
     title: str = Field(..., description="Название дела")
-    description: str = Field("", description="Описание дела")
-    category: str = Field("deal", description="Категория дела (deal, coordination, general)")
-    raw_transcript: str = Field("", description="Исходный транскрипт")
+    description: str = Field(default="", description="Описание дела")
+    category: str = Field(default="deal", description="Категория дела (deal, coordination, general)")
+    raw_transcript: str = Field(default="", description="Исходный транскрипт")
     actors: List[Dict[str, Any]] = Field(default_factory=list, description="Список участников")
     items: List[TaskItemInput] = Field(default_factory=list, description="Список подзадач")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Дополнительные метаданные")
@@ -73,7 +74,7 @@ class SyncCalendarRequest(BaseModel):
     summary: str = Field(..., description="Заголовок события в календаре")
     start_time: str = Field(..., description="Время начала (ISO-8601)")
     end_time: str = Field(..., description="Время окончания (ISO-8601)")
-    location: Optional[str] = Field(None, description="Место встречи")
+    location: Optional[str] = Field(default=None, description="Место встречи")
     attendees: List[str] = Field(default_factory=list, description="Email адреса участников")
 
 
@@ -81,7 +82,7 @@ class SyncCalendarRequest(BaseModel):
 async def decompose_task(req: DecomposeRequest) -> Dict[str, Any]:
     """Разбирает текст звонка или поручения и возвращает структуру сделки с этапами."""
     try:
-        plan = task_orchestrator_service.decompose_text(req.text, source_label=req.source_label)
+        plan = await asyncio.to_thread(task_orchestrator_service.decompose_text, req.text, source_label=req.source_label)
         return {"success": True, "plan": plan}
     except Exception as exc:
         logger.warning(f"[TasksRouter] Ошибка декомпозиции: {exc}")
@@ -92,7 +93,7 @@ async def decompose_task(req: DecomposeRequest) -> Dict[str, Any]:
 async def list_cases(status: Optional[str] = Query(None, description="Фильтр по статусу")) -> Dict[str, Any]:
     """Возвращает список всех зарегистрированных дел с кратким прогрессом."""
     try:
-        cases = task_orchestrator_service.list_cases(status=status)
+        cases = await asyncio.to_thread(task_orchestrator_service.list_cases, status=status)
         return {"success": True, "cases": cases, "count": len(cases)}
     except Exception as exc:
         logger.warning(f"[TasksRouter] Ошибка получения списка дел: {exc}")
@@ -104,14 +105,15 @@ async def create_case(req: CreateCaseRequest) -> Dict[str, Any]:
     """Создает новое комплексное дело со списком шагов."""
     try:
         items_dict = [it.model_dump() for it in req.items]
-        case = task_orchestrator_service.create_case(
+        case = await asyncio.to_thread(
+            task_orchestrator_service.create_case,
             title=req.title,
             description=req.description,
             category=req.category,
             raw_transcript=req.raw_transcript,
             actors=req.actors,
             items=items_dict,
-            metadata=req.metadata
+            metadata=req.metadata,
         )
         return {"success": True, "case": case}
     except Exception as exc:
@@ -122,7 +124,7 @@ async def create_case(req: CreateCaseRequest) -> Dict[str, Any]:
 @router.get("/cases/{case_id}", summary="Получение деталей дела со списком подзадач")
 async def get_case_detail(case_id: str) -> Dict[str, Any]:
     """Возвращает детальную информацию о деле и подзадачах."""
-    case = task_orchestrator_service.get_case(case_id)
+    case = await asyncio.to_thread(task_orchestrator_service.get_case, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Дело не найдено")
     return {"success": True, "case": case}
@@ -131,7 +133,7 @@ async def get_case_detail(case_id: str) -> Dict[str, Any]:
 @router.patch("/cases/{case_id}", summary="Обновление статуса дела")
 async def update_case_status(case_id: str, req: UpdateCaseStatusRequest) -> Dict[str, Any]:
     """Обновляет статус дела (active, pending, completed)."""
-    ok = task_orchestrator_service.update_case_status(case_id, req.status)
+    ok = await asyncio.to_thread(task_orchestrator_service.update_case_status, case_id, req.status)
     if not ok:
         raise HTTPException(status_code=404, detail="Дело не найдено")
     return {"success": True, "status": req.status}
@@ -140,7 +142,7 @@ async def update_case_status(case_id: str, req: UpdateCaseStatusRequest) -> Dict
 @router.patch("/items/{item_id}", summary="Обновление статуса подзадачи")
 async def update_item_status(item_id: str, req: UpdateItemStatusRequest) -> Dict[str, Any]:
     """Обновляет статус подзадачи (todo, in_progress, done)."""
-    ok = task_orchestrator_service.update_item_status(item_id, req.status)
+    ok = await asyncio.to_thread(task_orchestrator_service.update_item_status, item_id, req.status)
     if not ok:
         raise HTTPException(status_code=404, detail="Подзадача не найдена")
     return {"success": True, "status": req.status}
@@ -149,7 +151,7 @@ async def update_item_status(item_id: str, req: UpdateItemStatusRequest) -> Dict
 @router.delete("/cases/{case_id}", summary="Удаление дела")
 async def delete_case(case_id: str) -> Dict[str, Any]:
     """Удаляет дело и связанные с ним подзадачи."""
-    ok = task_orchestrator_service.delete_case(case_id)
+    ok = await asyncio.to_thread(task_orchestrator_service.delete_case, case_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Дело не найдено")
     return {"success": True, "deleted": True}

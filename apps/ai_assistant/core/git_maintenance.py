@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-22 14:38:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ class GitMaintenanceService:
         self.repo_path = Path(repo_path).resolve()
         self.config_path = Path(config_path).resolve() if config_path else DEFAULT_CONFIG_PATH
         self._is_running = False
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def _run_git(self, args: List[str], timeout_sec: int = 180) -> str:
         """Синхронно выполняет команду git в каталоге репозитория.
@@ -182,44 +182,48 @@ class GitMaintenanceService:
         Returns:
             Dict[str, Any]: Обновлённая конфигурация обслуживания.
         """
-        root_cfg: Dict[str, Any] = {}
-        if self.config_path.exists():
+        with self._lock:
+            root_cfg: Dict[str, Any] = {}
+            if self.config_path.exists():
+                try:
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        root_cfg = json.load(f)
+                except Exception as exc:
+                    logger.warning(f"[GitMaintenance] Ошибка загрузки {self.config_path}: {exc}")
+
+            current = root_cfg.get("git_maintenance", {
+                "auto_gc_enabled": True,
+                "gc_interval_hours": 24,
+                "aggressive": False,
+                "auto_prune": True,
+                "last_gc_run": None,
+                "last_gc_status": "not_run_yet",
+            })
+
+            if auto_gc_enabled is not None:
+                current["auto_gc_enabled"] = bool(auto_gc_enabled)
+            if gc_interval_hours is not None:
+                current["gc_interval_hours"] = max(1, int(gc_interval_hours))
+            if aggressive is not None:
+                current["aggressive"] = bool(aggressive)
+            if auto_prune is not None:
+                current["auto_prune"] = bool(auto_prune)
+            if last_gc_run is not None:
+                current["last_gc_run"] = last_gc_run
+            if last_gc_status is not None:
+                current["last_gc_status"] = last_gc_status
+
+            root_cfg["git_maintenance"] = current
             try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    root_cfg = json.load(f)
+                self.config_path.parent.mkdir(parents=True, exist_ok=True)
+                tmp_path = self.config_path.with_suffix(".json.tmp")
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(root_cfg, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_path, self.config_path)
             except Exception as exc:
-                logger.warning(f"[GitMaintenance] Ошибка загрузки {self.config_path}: {exc}")
+                logger.error(f"[GitMaintenance] Ошибка сохранения {self.config_path}: {exc}")
 
-        current = root_cfg.get("git_maintenance", {
-            "auto_gc_enabled": True,
-            "gc_interval_hours": 24,
-            "aggressive": False,
-            "auto_prune": True,
-            "last_gc_run": None,
-            "last_gc_status": "not_run_yet",
-        })
-
-        if auto_gc_enabled is not None:
-            current["auto_gc_enabled"] = bool(auto_gc_enabled)
-        if gc_interval_hours is not None:
-            current["gc_interval_hours"] = max(1, int(gc_interval_hours))
-        if aggressive is not None:
-            current["aggressive"] = bool(aggressive)
-        if auto_prune is not None:
-            current["auto_prune"] = bool(auto_prune)
-        if last_gc_run is not None:
-            current["last_gc_run"] = last_gc_run
-        if last_gc_status is not None:
-            current["last_gc_status"] = last_gc_status
-
-        root_cfg["git_maintenance"] = current
-        try:
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(root_cfg, f, ensure_ascii=False, indent=2)
-        except Exception as exc:
-            logger.error(f"[GitMaintenance] Ошибка сохранения {self.config_path}: {exc}")
-
-        return current
+            return current
 
     def get_status(self) -> Dict[str, Any]:
         """Возвращает агрегированный статус обслуживания Git.
@@ -260,7 +264,7 @@ class GitMaintenanceService:
             self._is_running = True
 
         try:
-            start_time = time.time()
+            start_time = time.perf_counter()
             args = ["gc"]
             if aggressive:
                 args.append("--aggressive")
@@ -271,8 +275,8 @@ class GitMaintenanceService:
 
             logger.console(f"[GitMaintenance] Запуск git gc: {' '.join(args)}...")
             output = self._run_git(args, timeout_sec=240)
-            elapsed = round(time.time() - start_time, 2)
-            timestamp = datetime.datetime.now().isoformat()
+            elapsed = round(time.perf_counter() - start_time, 2)
+            timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
             status_str = f"Успешно завершено за {elapsed} сек ({timestamp})"
             logger.console(f"[GitMaintenance] {status_str}")
@@ -319,7 +323,9 @@ class GitMaintenanceService:
         else:
             try:
                 last_dt = datetime.datetime.fromisoformat(last_run_str)
-                delta = datetime.datetime.now() - last_dt
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=datetime.timezone.utc)
+                delta = datetime.datetime.now(datetime.timezone.utc) - last_dt
                 if delta.total_seconds() >= interval_hours * 3600:
                     should_check = True
             except Exception:
@@ -330,7 +336,7 @@ class GitMaintenanceService:
             from apps.ai_assistant.core.git_maintenance_analyzer import git_maintenance_analyzer, MaintenanceVerdict
 
             diagnosis = git_maintenance_analyzer.diagnose()
-            now_iso = datetime.datetime.now().isoformat()
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
             # Если показатели требуют обслуживания - запускаем штатный git gc --auto
             if diagnosis.verdict == MaintenanceVerdict.MAINTENANCE_REQUIRED:

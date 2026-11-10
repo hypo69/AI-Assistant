@@ -24,7 +24,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 16:55:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -210,6 +210,7 @@ class GmailRagService:
         expanded = set(intent.get("expanded_keywords", []))
 
         text_to_check = f"{subject or ''} {snippet or ''} {sender or ''}".lower()
+        words_in_text = set(re.findall(r"\w+", text_to_check))
         matched_concepts: List[str] = []
 
         # 1. Проверка точного вхождения фразы или ключевых понятий
@@ -217,7 +218,7 @@ class GmailRagService:
 
         matched_count = 0
         for kw in expanded:
-            if kw and (kw in text_to_check or any(self._terms_similarity(kw, w) >= 0.75 for w in re.findall(r"\w+", text_to_check))):
+            if kw and (kw in words_in_text or kw in text_to_check or any(self._terms_similarity(kw, w) >= 0.75 for w in words_in_text)):
                 if kw not in matched_concepts:
                     matched_concepts.append(kw)
                 matched_count += 1

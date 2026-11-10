@@ -25,7 +25,7 @@
 # Package: apps.ai_assistant.core.ai_instruments
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:08:00
+# Updated: 2026-11-10 13:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ class AIInstrument(BaseModel):
         description="Счётчик успешных запусков инструмента в цепочках рассуждений",
     )
     last_executed_at: Optional[str] = Field(
-        default=None,
+        default="",
         description="Временная метка последнего запуска в формате ISO 8601",
     )
     created_at: str = Field(
@@ -111,7 +111,7 @@ class AIInstrument(BaseModel):
 class AIInstrumentCreate(BaseModel):
     """Схема запроса создания нового инструмента."""
 
-    tool_id: Optional[str] = Field(default=None, description="Желаемый идентификатор инструмента")
+    tool_id: Optional[str] = Field(default="", description="Желаемый идентификатор инструмента")
     name: str = Field(..., description="Название инструмента")
     tool_type: str = Field(default="python", description="Тип: python, powershell, cmd, utility, api, sql")
     command: str = Field(..., description="Исполняемый код или шаблон команды")

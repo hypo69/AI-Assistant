@@ -40,7 +40,7 @@
 
 # Copyright: © 2026 hypo69
 
-# Updated: 2026-10-28 16:55:00
+# Updated: 2026-11-10 16:56:00
 
 # =============================================================================
 
@@ -52,7 +52,7 @@ from __future__ import annotations
 
 
 
-import hashlib, json, re
+import hashlib, json, os, re
 
 from pathlib import Path
 
@@ -63,6 +63,8 @@ import numpy as np
 
 
 from logger import logger
+
+_WORD_RE = re.compile(r"\w+")
 
 
 
@@ -254,9 +256,10 @@ class TextRAG:
 
     def _save(self) -> None:
 
-        """Сохранение индекса и метаданных на диск."""
+        """Атомарное сохранение индекса и метаданных на диск."""
 
         faiss = _get_faiss()
+        tmp_meta = self.meta_file.with_suffix(".json.tmp")
 
         try:
 
@@ -264,13 +267,20 @@ class TextRAG:
 
                 faiss.write_index(self.index, str(self.index_file))
 
-            with open(self.meta_file, "w", encoding="utf-8") as f:
+            with open(tmp_meta, "w", encoding="utf-8") as f:
 
                 json.dump(self.metadatas, f, ensure_ascii=False, indent=2)
+
+            os.replace(tmp_meta, self.meta_file)
 
         except Exception as e:
 
             logger.error(f"[TextRAG] Ошибка сохранения индекса: {e}")
+            if tmp_meta.exists():
+                try:
+                    tmp_meta.unlink()
+                except OSError:
+                    pass
 
 
 
@@ -346,7 +356,7 @@ class TextRAG:
 
             vec = np.zeros(self.dimension, dtype=np.float32)
 
-            words = re.findall(r"\w+", text.lower())
+            words = _WORD_RE.findall(text.lower())
 
             for w in words:
 

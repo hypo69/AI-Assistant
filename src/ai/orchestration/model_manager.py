@@ -17,14 +17,15 @@
 # Package: src.ai.orchestration
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 20:41:00
+# Updated: 2026-11-10 16:48:00
 # =============================================================================
 
-"""Normalize model identifier for consistent comparison."""
+"""Менеджер обнаружения, фильтрации и кэширования моделей ИИ для всех провайдеров."""
 
 import asyncio
 import os
 from pathlib import Path
+import threading
 from typing import Any, Dict, List, Set
 import aiohttp
 from google import genai
@@ -53,6 +54,7 @@ def _get_active_config_path() -> Path:
 _GLOBAL_CONFIG_PATH: Path = __root__ / 'config.json'
 _GEMINI_UNSUPPORTED_PATH: Path = __root__ / 'src' / 'ai' / 'gemini' / 'unsopported_gemini_models.json'
 _CACHED_MODELS: Dict[str, List[str]] = {}
+_CACHE_LOCK = threading.RLock()
 _DEFAULT_GEMINI_FALLBACK: List[str] = ['gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-pro-latest']
 _GEMINI_PRIORITY_ORDER: List[str] = ['gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-pro-latest']
 _DEFAULT_GEMINI_CLI_FALLBACK: List[str] = ['gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3.5-flash-lite', 'gemini-pro-latest']
@@ -314,7 +316,7 @@ def _fetch_foundry_models_sync(base_url: str='', include_unsupported: bool=False
     import requests
     models: List[str] = []
     try:
-        resp = requests.get(f'{base_url}/v1/models', timeout=5)
+        resp = requests.get(f'{base_url}/v1/models', timeout=(2.0, 5.0))
         if resp.status_code == 200:
             data: Dict[str, Any] = resp.json()
             for item in data.get('data', []):
@@ -342,7 +344,7 @@ def _fetch_ollama_models_sync(base_url: str='', include_unsupported: bool=False)
     import requests
     models: List[str] = []
     try:
-        resp = requests.get(f'{base_url}/api/tags', timeout=5)
+        resp = requests.get(f'{base_url}/api/tags', timeout=(2.0, 5.0))
         if resp.status_code == 200:
             data: Dict[str, Any] = resp.json()
             for item in data.get('models', []):

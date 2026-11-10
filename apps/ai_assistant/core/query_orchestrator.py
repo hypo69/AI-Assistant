@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-15 09:38:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -97,12 +97,12 @@ class QueryOrchestrator:
         active_links: List[EvidenceLinkSchema] = []
         try:
             candidate_ids = [c.commit_hash for c in commits] + [w.get("canonical_key", "") for w in wiki_entities]
-            candidate_ids = [cid for cid in candidate_ids if cid]
-            all_links = self.temporal_graph.get_active_links()
-            if candidate_ids:
+            candidate_ids_set = {cid for cid in candidate_ids if cid}
+            all_links = await asyncio.to_thread(self.temporal_graph.get_active_links)
+            if candidate_ids_set:
                 active_links = [
                     lnk for lnk in all_links
-                    if lnk.source_id in candidate_ids or lnk.target_id in candidate_ids
+                    if lnk.source_id in candidate_ids_set or lnk.target_id in candidate_ids_set
                 ][:limit]
             else:
                 active_links = all_links[:limit]
@@ -138,7 +138,7 @@ class QueryOrchestrator:
     async def _search_rag(self, query: str, limit: int) -> List[Dict[str, Any]]:
         """Ищет чанки в векторном индексе FAISS."""
         try:
-            return self.rag_engine.search(query=query, top_k=limit)
+            return await asyncio.to_thread(self.rag_engine.search, query=query, top_k=limit)
         except Exception as exc:
             logger.warning(f"[QueryOrchestrator] Сбой поиска в RAG FAISS: {exc}")
             return []
@@ -146,7 +146,7 @@ class QueryOrchestrator:
     async def _search_wiki(self, query: str, limit: int) -> List[Dict[str, Any]]:
         """Ищет сущности в WikiLLM."""
         try:
-            return self.wiki_linker.find_matching_wiki_entities(text=query, limit=limit)
+            return await asyncio.to_thread(self.wiki_linker.find_matching_wiki_entities, text=query, limit=limit)
         except Exception as exc:
             logger.warning(f"[QueryOrchestrator] Сбой поиска в WikiLLM: {exc}")
             return []

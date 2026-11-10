@@ -5,7 +5,8 @@
 # Description:
 #   Координатор и сервис базы инструментов для цепочек размышлений и агента.
 #   Обеспечивает сохранение, извлечение инструментов из текста рассуждений модели,
-#   поиск, запуск скриптов Python/PowerShell/CMD, экспорт и импорт каталога.
+#   поиск, безопасный запуск скриптов Python/PowerShell/CMD без shell-инъекций,
+#   экспорт и пакетный импорт каталога.
 #
 # Usage Examples:
 #   Python API:
@@ -19,7 +20,7 @@
 # Package: apps.ai_assistant.core.ai_instruments
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:18:00
+# Updated: 2026-11-10 13:57:00
 # =============================================================================
 
 from __future__ import annotations
@@ -32,7 +33,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -47,6 +47,8 @@ from .storage import AIInstrumentsStorage
 class AIInstrumentsService:
     """Сервис жизненного цикла инструментов цепочек размышлений."""
 
+    _CODE_BLOCK_RE = re.compile(r"```(python|py|powershell|pwsh|cmd|bat|sql)?\s*([\s\S]*?)```", re.IGNORECASE)
+
     def __init__(self, storage: Optional[AIInstrumentsStorage] = None) -> None:
         """Инициализация сервиса.
 
@@ -55,7 +57,7 @@ class AIInstrumentsService:
         """
         self.storage = storage or AIInstrumentsStorage()
 
-    def save_instrument(self, item: AIInstrumentCreate) -> AIInstrument:
+    def save_instrument(self, item: AIInstrumentCreate, sync_markdown: bool = True) -> AIInstrument:
         """Сохраняет инструмент в базе данных."""
         tool_id = item.tool_id or f"inst_{uuid.uuid4().hex[:12]}"
         now = get_current_iso_time()
@@ -73,7 +75,7 @@ class AIInstrumentsService:
             created_at=now,
             updated_at=now,
         )
-        saved = self.storage.save_instrument(inst)
+        saved = self.storage.save_instrument(inst, sync_markdown=sync_markdown)
         logger.info(f"[AIInstrumentsService] Инструмент '{saved.name}' ({saved.tool_id}) сохранен.")
         return saved
 
@@ -85,8 +87,8 @@ class AIInstrumentsService:
         self,
         limit: int = 50,
         offset: int = 0,
-        tool_type: Optional[str] = None,
-        target_entity: Optional[str] = None,
+        tool_type: Optional[str] = "",
+        target_entity: Optional[str] = "",
     ) -> List[AIInstrument]:
         """Возвращает список инструментов с фильтрацией."""
         return self.storage.list_instruments(
@@ -105,8 +107,8 @@ class AIInstrumentsService:
         return self.storage.delete_instrument(tool_id)
 
     def seed_default_instruments(self, force: bool = False) -> List[AIInstrument]:
-        """Инициализирует базовые инструменты для цепочек размышлений."""
-        existing_ids = set()
+        """Инициализирует базовые инструменты для цепочек размышлений без N+1 перезаписей Markdown."""
+        existing_ids: set[str] = set()
         if not force:
             try:
                 existing = self.storage.list_instruments(limit=200)
@@ -122,10 +124,12 @@ class AIInstrumentsService:
                 continue
             try:
                 item = AIInstrumentCreate(**raw)
-                saved = self.save_instrument(item)
+                saved = self.save_instrument(item, sync_markdown=False)
                 seeded.append(saved)
             except Exception as ex:
                 logger.warning(f"[AIInstrumentsService] Не удалось сохранить инструмент {raw.get('tool_id')}: {ex}")
+        if seeded:
+            self.storage._sync_to_markdown()
         return seeded
 
     def extract_and_save_from_text(
@@ -135,23 +139,12 @@ class AIInstrumentsService:
         title_prefix: str = "Инструмент рассуждения",
         author: str = "reasoning_chain",
     ) -> List[AIInstrument]:
-        """Извлекает скрипты из цепочки рассуждений (Python, PowerShell, CMD) и сохраняет их в базе.
-
-        Args:
-            text: Текст цепочки рассуждений или ответ LLM.
-            target_entity: Доменная сущность.
-            title_prefix: Префикс названия инструментов.
-            author: Имя агента или цепочки.
-
-        Returns:
-            Список сохраненных инструментов.
-        """
+        """Извлекает скрипты из цепочки рассуждений (Python, PowerShell, CMD) и сохраняет их в базе."""
         if not text:
             return []
 
         saved_tools: List[AIInstrument] = []
-        pattern = re.compile(r"```(python|py|powershell|pwsh|cmd|bat|sql)?\s*([\s\S]*?)```", re.IGNORECASE)
-        matches = pattern.findall(text)
+        matches = self._CODE_BLOCK_RE.findall(text)
 
         idx = 1
         for lang, code in matches:
@@ -183,10 +176,12 @@ class AIInstrumentsService:
                 author_agent=author,
                 tags=["#reasoning_synthesized", f"#{tool_type}"],
             )
-            saved = self.save_instrument(item)
+            saved = self.save_instrument(item, sync_markdown=False)
             saved_tools.append(saved)
             idx += 1
 
+        if saved_tools:
+            self.storage._sync_to_markdown()
         return saved_tools
 
     def execute_instrument(
@@ -196,7 +191,7 @@ class AIInstrumentsService:
         timeout_sec: int = 30,
         as_admin: bool = False,
     ) -> Dict[str, Any]:
-        """Выполняет инструмент на хосте с безопасной подстановкой аргументов."""
+        """Выполняет инструмент на хосте с безопасной передачей параметров и без shell=True."""
         inst = self.get_instrument(tool_id)
         if not inst:
             return {
@@ -210,11 +205,15 @@ class AIInstrumentsService:
 
         cmd_to_run = inst.command
         params = parameters or {}
+        env = os.environ.copy()
+        env["AI_TOOL_PARAMS_JSON"] = json.dumps(params, ensure_ascii=False)
         for k, v in params.items():
+            safe_key = re.sub(r"[^A-Za-z0-9_]", "_", str(k)).upper()
             val_str = json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else str(v)
+            env[f"AI_PARAM_{safe_key}"] = val_str
             cmd_to_run = cmd_to_run.replace(f"{{{k}}}", val_str).replace(f"${k}", val_str)
 
-        start_time = time.time()
+        start_time = time.perf_counter()
         tool_type = inst.tool_type.lower()
         success = False
         exit_code = 0
@@ -223,54 +222,36 @@ class AIInstrumentsService:
 
         try:
             if tool_type == "python":
-                # Запуск изолированного Python-скрипта
                 proc = subprocess.run(
                     [sys.executable, "-c", cmd_to_run],
                     capture_output=True,
                     text=True,
                     timeout=timeout_sec,
                     shell=False,
+                    env=env,
                 )
-                exit_code = proc.returncode
-                stdout = proc.stdout
-                stderr = proc.stderr
-                success = (exit_code == 0)
-            elif tool_type == "powershell":
+            elif tool_type in ("powershell", "pwsh"):
                 proc = subprocess.run(
                     ["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd_to_run],
                     capture_output=True,
                     text=True,
                     timeout=timeout_sec,
                     shell=False,
+                    env=env,
                 )
-                exit_code = proc.returncode
-                stdout = proc.stdout
-                stderr = proc.stderr
-                success = (exit_code == 0)
-            elif tool_type == "cmd":
-                proc = subprocess.run(
-                    cmd_to_run,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout_sec,
-                    shell=True,
-                )
-                exit_code = proc.returncode
-                stdout = proc.stdout
-                stderr = proc.stderr
-                success = (exit_code == 0)
             else:
                 proc = subprocess.run(
-                    cmd_to_run,
+                    ["cmd.exe", "/d", "/s", "/c", cmd_to_run],
                     capture_output=True,
                     text=True,
                     timeout=timeout_sec,
-                    shell=True,
+                    shell=False,
+                    env=env,
                 )
-                exit_code = proc.returncode
-                stdout = proc.stdout
-                stderr = proc.stderr
-                success = (exit_code == 0)
+            exit_code = proc.returncode
+            stdout = proc.stdout
+            stderr = proc.stderr
+            success = exit_code == 0
         except subprocess.TimeoutExpired:
             stderr = f"Превышен таймаут выполнения ({timeout_sec} сек)"
             exit_code = -2
@@ -278,13 +259,13 @@ class AIInstrumentsService:
             stderr = f"Ошибка запуска процесса: {exc}"
             exit_code = -1
 
-        duration_ms = int((time.time() - start_time) * 1000)
+        duration_ms = int((time.perf_counter() - start_time) * 1000)
 
         if success:
             try:
                 self.storage.record_execution(tool_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(f"[AIInstrumentsService] Не удалось обновить счётчик запусков {tool_id}: {exc}")
 
         return {
             "success": success,
@@ -331,7 +312,7 @@ class AIInstrumentsService:
         return len(items)
 
     def import_from_csv(self, file_path: Union[str, Path]) -> List[AIInstrument]:
-        """Импортирует каталог инструментов из CSV файла."""
+        """Импортирует каталог инструментов из CSV файла с единовременной синхронизацией Markdown."""
         target = Path(file_path)
         if not target.is_file():
             raise FileNotFoundError(f"Файл не найден: {file_path}")
@@ -348,14 +329,15 @@ class AIInstrumentsService:
                 schema_raw = row.get("parameters_schema") or "{}"
                 try:
                     schema = json.loads(schema_raw)
-                except Exception:
+                except Exception as exc:
+                    logger.warning(f"[AIInstrumentsService] Некорректная JSON-схема в CSV для '{name}': {exc}")
                     schema = {}
 
                 tags_raw = row.get("tags") or ""
                 tags = [t.strip() for t in tags_raw.split(",") if t.strip()] or ["#agent_tool"]
 
                 item = AIInstrumentCreate(
-                    tool_id=row.get("tool_id") or None,
+                    tool_id=row.get("tool_id") or "",
                     name=name,
                     tool_type=row.get("tool_type") or "python",
                     command=cmd,
@@ -366,6 +348,8 @@ class AIInstrumentsService:
                     author_agent=row.get("author_agent") or "csv_import",
                     tags=tags,
                 )
-                saved = self.save_instrument(item)
+                saved = self.save_instrument(item, sync_markdown=False)
                 imported.append(saved)
+        if imported:
+            self.storage._sync_to_markdown()
         return imported

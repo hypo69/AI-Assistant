@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-01 20:05:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -43,6 +43,8 @@ from apps.ai_assistant.api.schemas import (
     TimelineResponse,
 )
 
+_SAFE_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{4,40}$|^HEAD(?:[~^]\d*)*$")
+
 
 class GitHistoryEngine:
     """Асинхронный движок выполнения операций Git для модуля умной истории."""
@@ -54,6 +56,14 @@ class GitHistoryEngine:
             repo_path: Корневой путь Git-репозитория.
         """
         self.repo_path = Path(repo_path).resolve()
+
+    @staticmethod
+    def _validate_commit_hash(commit_hash: str) -> str:
+        """Проверяет ревизию/хэш коммита для защиты от Git Option Injection."""
+        clean_hash = (commit_hash or "").strip()
+        if not clean_hash or clean_hash.startswith("-") or not _SAFE_COMMIT_RE.match(clean_hash):
+            raise ValueError(f"Недопустимый идентификатор ревизии Git: {commit_hash!r}")
+        return clean_hash
 
     def _run_git_sync(self, args: List[str], timeout_sec: int = 15) -> str:
         """Синхронное выполнение команды Git с изоляцией таймаута и UTF-8 декодированием.
@@ -181,14 +191,15 @@ class GitHistoryEngine:
         Returns:
             DiffResponse: Структурированный diff.
         """
+        safe_commit = self._validate_commit_hash(commit_hash)
         args = ["show", "--format=", "--unified=3"]
 
         if file_path:
             clean_path = file_path.replace("\\", "/")
-            args.extend([commit_hash, "--", clean_path])
+            args.extend([safe_commit, "--", clean_path])
         else:
             args.extend([
-                commit_hash,
+                safe_commit,
                 "--",
                 ":(exclude)*.json",
                 ":(exclude)*.sqlite",
@@ -278,13 +289,14 @@ class GitHistoryEngine:
         Returns:
             BlameResponse: Построчные сведения об авторах и коде.
         """
+        safe_commit = self._validate_commit_hash(commit_hash)
         clean_path = file_path.replace("\\", "/")
-        args = ["blame", "-p", commit_hash, "--", clean_path]
+        args = ["blame", "-p", safe_commit, "--", clean_path]
         raw_blame = await self._run_git_async(args, timeout_sec=15)
 
         lines: List[BlameLine] = []
         if not raw_blame:
-            return BlameResponse(file_path=file_path, commit_hash=commit_hash, lines=[])
+            return BlameResponse(file_path=file_path, commit_hash=safe_commit, lines=[])
 
         line_num = 1
         current_commit = ""
@@ -312,7 +324,7 @@ class GitHistoryEngine:
                     )
                 )
 
-        return BlameResponse(file_path=file_path, commit_hash=commit_hash, lines=lines)
+        return BlameResponse(file_path=file_path, commit_hash=safe_commit, lines=lines)
 
     async def get_file_content(self, commit_hash: str = "HEAD", file_path: str = "") -> str:
         """Извлекает точное содержимое файла на ревизии.
@@ -324,13 +336,15 @@ class GitHistoryEngine:
         Returns:
             str: Содержимое файла.
         """
+        safe_commit = self._validate_commit_hash(commit_hash)
         clean_path = file_path.replace("\\", "/").lstrip("/")
-        return await self._run_git_async(["show", f"{commit_hash}:{clean_path}"], timeout_sec=10)
+        return await self._run_git_async(["show", f"{safe_commit}:{clean_path}"], timeout_sec=10)
 
     async def get_blob_hash(self, commit_hash: str = "HEAD", file_path: str = "") -> str:
         """Возвращает хэш Git blob для файла на указанном коммите."""
+        safe_commit = self._validate_commit_hash(commit_hash)
         clean_path = file_path.replace("\\", "/").lstrip("/")
-        out = await self._run_git_async(["ls-tree", commit_hash, clean_path], timeout_sec=5)
+        out = await self._run_git_async(["ls-tree", safe_commit, clean_path], timeout_sec=5)
         if out:
             parts = out.strip().split()
             if len(parts) >= 3:

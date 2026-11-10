@@ -11,14 +11,14 @@
 # Package: apps.ai_assistant.core.store
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 02:35:00
+# Updated: 2026-11-10 13:52:00
 # =============================================================================
 
 from __future__ import annotations
 """Репозиторий состояния активного пространства и статистики индекса знаний."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional
 
 from logger import logger
 
@@ -62,15 +62,6 @@ class WorkspaceRepoMixin:
             with conn:
                 conn.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS app_settings (
-                        key TEXT PRIMARY KEY,
-                        value TEXT NOT NULL,
-                        updated_at TEXT NOT NULL
-                    )
-                    """
-                )
-                conn.execute(
-                    """
                     INSERT INTO app_settings (key, value, updated_at)
                     VALUES ('active_workspace_id', ?, ?)
                     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
@@ -86,15 +77,6 @@ class WorkspaceRepoMixin:
         try:
             conn = self._get_conn()
             try:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS app_settings (
-                        key TEXT PRIMARY KEY,
-                        value TEXT NOT NULL,
-                        updated_at TEXT NOT NULL
-                    )
-                    """
-                )
                 cur = conn.execute("SELECT value FROM app_settings WHERE key = 'active_workspace_id'")
                 row = cur.fetchone()
                 return str(row["value"]) if row else None
@@ -104,21 +86,12 @@ class WorkspaceRepoMixin:
             logger.warning(f"[WorkspaceRepoMixin] Ошибка чтения active_workspace_id: {exc}")
             return None
 
-    def set_active_repo(self, repo_path: str, workspace_id: Optional[str] = None) -> bool:
+    def set_active_repo(self, repo_path: str, workspace_id: Optional[str] = "") -> bool:
         """Сохраняет глобально активный Git-репозиторий и связанную рабочую область в app_settings."""
         now = get_utc_now_iso()
         conn = self._get_conn()
         try:
             with conn:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS app_settings (
-                        key TEXT PRIMARY KEY,
-                        value TEXT NOT NULL,
-                        updated_at TEXT NOT NULL
-                    )
-                    """
-                )
                 conn.execute(
                     """
                     INSERT INTO app_settings (key, value, updated_at)
@@ -127,7 +100,7 @@ class WorkspaceRepoMixin:
                     """,
                     (repo_path, now),
                 )
-                if workspace_id is not None:
+                if workspace_id:
                     conn.execute(
                         """
                         INSERT INTO app_settings (key, value, updated_at)
@@ -144,16 +117,9 @@ class WorkspaceRepoMixin:
         """Возвращает сохранённый глобально активный репозиторий и рабочую область."""
         conn = self._get_conn()
         try:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS app_settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
+            cur = conn.execute(
+                "SELECT key, value FROM app_settings WHERE key IN ('active_repo_path', 'active_workspace_id')"
             )
-            cur = conn.execute("SELECT key, value FROM app_settings WHERE key IN ('active_repo_path', 'active_workspace_id')")
             rows = dict(cur.fetchall())
             return {
                 "repo_path": rows.get("active_repo_path"),

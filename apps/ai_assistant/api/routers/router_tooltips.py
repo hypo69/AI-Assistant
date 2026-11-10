@@ -10,12 +10,14 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:33:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -29,23 +31,24 @@ router = APIRouter(prefix="/api/v1/tooltips", tags=["tooltips"])
 WEBGUI_DIR = Path(__file__).resolve().parent.parent / "webgui"
 COMMON_DIR = Path(__file__).resolve().parent.parent.parent.parent / "common" / "webgui"
 SUPPORTED_LANGS = ["ru", "en", "he", "uk"]
+_tooltips_lock = asyncio.Lock()
 
 
 class TooltipItem(BaseModel):
     """Модель отдельной всплывающей подсказки интерфейса."""
     key: str = Field(..., description="Уникальный идентификатор или i18n-ключ подсказки")
-    category: str = Field("Навигация", description="Функциональная категория подсказки")
-    icon: str = Field("💡", description="Иконка подсказки (эмодзи или класс Bootstrap Icons)")
+    category: str = Field(default="Навигация", description="Функциональная категория подсказки")
+    icon: str = Field(default="💡", description="Иконка подсказки (эмодзи или класс Bootstrap Icons)")
     titles: Dict[str, str] = Field(default_factory=dict, description="Заголовки на поддерживаемых языках")
     summaries: Dict[str, str] = Field(default_factory=dict, description="Описания и подсказки на поддерживаемых языках")
-    source: str = Field("locale", description="Источник подсказки (kb, locale, title_attr)")
-    status: str = Field("complete", description="Статус перевода (complete, partial, missing)")
+    source: str = Field(default="locale", description="Источник подсказки (kb, locale, title_attr)")
+    status: str = Field(default="complete", description="Статус перевода (complete, partial, missing)")
 
 
 class TooltipUpdateRequest(BaseModel):
     """Модель обновления всплывающей подсказки."""
-    category: Optional[str] = None
-    icon: Optional[str] = None
+    category: Optional[str] = Field(default=None)
+    icon: Optional[str] = Field(default=None)
     titles: Dict[str, str] = Field(default_factory=dict)
     summaries: Dict[str, str] = Field(default_factory=dict)
 
@@ -53,12 +56,14 @@ class TooltipUpdateRequest(BaseModel):
 class TooltipTranslateRequest(BaseModel):
     """Модель запроса одноразового перевода текста подсказки."""
     text: str = Field(..., description="Исходный текст подсказки")
-    source_lang: str = Field("ru", description="Исходный язык")
+    source_lang: str = Field(default="ru", description="Исходный язык")
     target_langs: List[str] = Field(default=["en", "he", "uk"], description="Целевые языки")
 
 
 def _load_locale(lang: str) -> dict:
     """Загружает словарь локализации для указанного языка."""
+    if lang not in SUPPORTED_LANGS:
+        return {}
     loc_file = WEBGUI_DIR / "locales" / f"{lang}.json"
     if loc_file.exists():
         try:
@@ -68,15 +73,28 @@ def _load_locale(lang: str) -> dict:
     return {}
 
 
+def _atomic_write_text(file_path: Path, content: str) -> None:
+    """Атомарно записывает текстовый файл через временный файл .tmp и os.replace()."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = file_path.with_suffix(f"{file_path.suffix}.tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(content)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, file_path)
+
+
 def _save_locale(lang: str, data: dict) -> None:
-    """Сохраняет словарь локализации в WebGUI и синхронизирует в common."""
+    """Атомарно сохраняет словарь локализации в WebGUI и синхронизирует в common."""
+    if lang not in SUPPORTED_LANGS:
+        return
     loc_file = WEBGUI_DIR / "locales" / f"{lang}.json"
     content = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
-    loc_file.write_text(content, encoding="utf-8")
+    _atomic_write_text(loc_file, content)
 
     common_file = COMMON_DIR / "locales" / f"{lang}.json"
     if common_file.parent.exists():
-        common_file.write_text(content, encoding="utf-8")
+        _atomic_write_text(common_file, content)
 
 
 def _get_nested(dict_obj: dict, key_path: str) -> Optional[str]:
@@ -101,12 +119,8 @@ def _set_nested(dict_obj: dict, key_path: str, value: str) -> None:
     cur[parts[-1]] = value
 
 
-@router.get("", response_model=dict)
-async def get_all_tooltips() -> dict:
-    """
-    Возвращает объединенный каталог всех всплывающих подсказок интерфейса,
-    статистику перевода и данные для аудита.
-    """
+def _sync_collect_tooltips() -> dict:
+    """Синхронно агрегирует все всплывающие подсказки из локалей."""
     locales = {lang: _load_locale(lang) for lang in SUPPORTED_LANGS}
     items_map: Dict[str, TooltipItem] = {}
 
@@ -178,16 +192,18 @@ async def get_all_tooltips() -> dict:
     }
 
 
-@router.put("/{key}", response_model=dict)
-async def update_tooltip(key: str, payload: TooltipUpdateRequest) -> dict:
+@router.get("", response_model=dict)
+async def get_all_tooltips() -> dict:
     """
-    Обновляет переводы и свойства всплывающей подсказки в словарях всех языков.
+    Возвращает объединенный каталог всех всплывающих подсказок интерфейса,
+    статистику перевода и данные для аудита.
     """
-    if not key:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не указан ключ подсказки")
+    return await asyncio.to_thread(_sync_collect_tooltips)
 
+
+def _sync_update_tooltip(key: str, payload: TooltipUpdateRequest) -> None:
+    """Синхронно обновляет словари локализации для выбранного ключа подсказки."""
     locales = {lang: _load_locale(lang) for lang in SUPPORTED_LANGS}
-
     is_kb = not key.startswith("titles.") and not key.startswith("workspace.") and not key.startswith("obsidian.")
 
     for lang in SUPPORTED_LANGS:
@@ -213,6 +229,18 @@ async def update_tooltip(key: str, payload: TooltipUpdateRequest) -> dict:
                 _set_nested(locales[lang], key, t_val)
 
         _save_locale(lang, locales[lang])
+
+
+@router.put("/{key}", response_model=dict)
+async def update_tooltip(key: str, payload: TooltipUpdateRequest) -> dict:
+    """
+    Обновляет переводы и свойства всплывающей подсказки в словарях всех языков.
+    """
+    if not key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не указан ключ подсказки")
+
+    async with _tooltips_lock:
+        await asyncio.to_thread(_sync_update_tooltip, key, payload)
 
     logger.info(f"[TooltipsRouter] Подсказка '{key}' успешно обновлена.")
     return {"status": "ok", "key": key}

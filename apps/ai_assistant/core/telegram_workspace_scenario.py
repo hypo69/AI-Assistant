@@ -21,7 +21,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 05:00:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 import re
 import time
@@ -45,6 +46,10 @@ from apps.ai_assistant.core.workspace_registry import (
 
 if TYPE_CHECKING:
     from apps.ai_assistant.core.workspace_manager import WorkspaceManager
+
+DEFAULT_SCENARIO_TARGET_FILE = (
+    Path.home() / "Desktop" / "דוד מושה — רשימת מסמכים" / "שיחה בין דוד משה לשמוליק.md"
+)
 
 
 def _normalize_hebrew_token(value: Optional[str]) -> str:
@@ -105,7 +110,8 @@ class TelegramWorkspaceScenarioService:
             ),
             "target_file_path": str(
                 cfg_data.get("target_file_path")
-                or r"C:\Users\onela\Desktop\דוד מושה — רשימת מסמכים\שיחה בין דוד משה לשמוליק.md"
+                or os.environ.get("AI_ASSISTANT_DAVID_MOSHE_TARGET_FILE")
+                or DEFAULT_SCENARIO_TARGET_FILE
             ),
             "delay_seconds": float(cfg_data.get("delay_seconds", 10)),
         }
@@ -173,13 +179,15 @@ class TelegramWorkspaceScenarioService:
             return {"status": "idle"}
 
     def _write_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Записывает состояние сценария в JSON-файл для межпроцессной синхронизации (бот <-> WebGUI)."""
+        """Атомарно записывает состояние сценария в JSON-файл для межпроцессной синхронизации (бот <-> WebGUI)."""
         try:
             self.state_file.parent.mkdir(parents=True, exist_ok=True)
-            self.state_file.write_text(
+            tmp_path = self.state_file.with_suffix(".json.tmp")
+            tmp_path.write_text(
                 json.dumps(state, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            os.replace(tmp_path, self.state_file)
         except Exception as exc:
             logger.warning(f"[TelegramWorkspaceScenario] Не удалось сохранить состояние: {exc}")
         return state
@@ -321,10 +329,12 @@ class TelegramWorkspaceScenarioService:
                     "source_mtime": st.st_mtime,
                     "source_size": st.st_size,
                 }
-                manifest_file.write_text(
+                tmp_manifest = manifest_file.with_suffix(".json.tmp")
+                tmp_manifest.write_text(
                     json.dumps(manifest_data, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
+                os.replace(tmp_manifest, manifest_file)
             except Exception as man_exc:
                 logger.debug(f"[TelegramWorkspaceScenario] Запись .tracked_sources.json: {man_exc}")
 

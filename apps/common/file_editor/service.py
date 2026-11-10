@@ -17,7 +17,7 @@
 # Package: apps.common.file_editor
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:02:00
+# Updated: 2026-11-10 14:31:20
 # =============================================================================
 
 from __future__ import annotations
@@ -28,6 +28,8 @@ import csv
 import difflib
 import io
 import json
+import os
+import re
 import xml.dom.minidom
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -40,6 +42,9 @@ from apps.common.file_editor.models import (
     FileFormatRequest,
     FileSaveRequest,
 )
+
+# Максимальный размер файла для чтения целиком в ОЗУ (50 МБ)
+MAX_FILE_SIZE_BYTES: int = 50 * 1024 * 1024
 
 
 class FileEditorService:
@@ -81,9 +86,11 @@ class FileEditorService:
         Raises:
             ValueError: При пустом пути или попытке выхода за пределы каталога (path traversal).
         """
-        clean_rel = (rel_path or "").strip().replace("\\", "/").strip("/")
-        if not clean_rel or clean_rel in {".", ".."}:
-            raise ValueError("Относительный путь к файлу не может быть пустым.")
+        clean_rel = (rel_path or "").replace("\x00", "").strip().replace("\\", "/").strip("/")
+        parts = [p for p in clean_rel.split("/") if p and p != "."]
+        if not parts or ".." in parts:
+            raise ValueError("Недопустимый относительный путь к файлу.")
+        clean_rel = "/".join(parts)
 
         if self._base_root is not None:
             ws_root = self._base_root
@@ -99,9 +106,15 @@ class FileEditorService:
                 resolved_ws = target_ws
             else:
                 from header import __root__
-                ws_root = (__root__ / "data" / "workspaces" / (workspace_id or "demo")).resolve()
+                safe_ws_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "", (workspace_id or "demo")).strip(".") or "demo"
+                ws_base = (__root__ / "data" / "workspaces").resolve()
+                ws_root = (ws_base / safe_ws_id).resolve()
+                try:
+                    ws_root.relative_to(ws_base)
+                except ValueError:
+                    raise ValueError(f"Недопустимый идентификатор рабочего пространства: {workspace_id}")
                 ws_root.mkdir(parents=True, exist_ok=True)
-                resolved_ws = workspace_id or "demo"
+                resolved_ws = safe_ws_id
 
         ws_root_resolved = ws_root.resolve()
         target = (ws_root_resolved / clean_rel).resolve()
@@ -146,6 +159,12 @@ class FileEditorService:
             raise FileNotFoundError(f"Файл '{clean_rel}' не найден в рабочем пространстве '{resolved_ws}'.")
         if target.is_dir():
             raise ValueError(f"Путь '{clean_rel}' указывает на директорию, а не на файл.")
+
+        stat_size = target.stat().st_size
+        if stat_size > MAX_FILE_SIZE_BYTES:
+            raise ValueError(
+                f"Размер файла '{clean_rel}' ({stat_size} байт) превышает максимально допустимый лимит редактора ({MAX_FILE_SIZE_BYTES} байт)."
+            )
 
         raw_bytes = target.read_bytes()
         size_bytes = len(raw_bytes)
@@ -203,29 +222,48 @@ class FileEditorService:
 
         # 1. Побайтовый патч существующего файла из Hex-редактора
         if req.hex_patches:
+            if target.exists() and target.stat().st_size > MAX_FILE_SIZE_BYTES:
+                raise ValueError(
+                    f"Размер файла '{clean_rel}' превышает лимит ({MAX_FILE_SIZE_BYTES} байт) для побайтового патча."
+                )
             current = bytearray(target.read_bytes() if target.exists() else b"")
             for patch in req.hex_patches:
+                if patch.offset >= MAX_FILE_SIZE_BYTES:
+                    raise ValueError(f"Смещение байта {patch.offset} превышает максимально допустимый размер файла.")
                 if patch.offset >= len(current):
                     current.extend(b"\x00" * (patch.offset - len(current) + 1))
                 current[patch.offset] = patch.value & 0xFF
             final_bytes = bytes(current)
-            target.write_bytes(final_bytes)
         # 2. Запись бинарного содержимого из Base64 (например, после редактирования изображения на Canvas)
         elif req.base64_content is not None:
             raw_b64 = req.base64_content
             if "," in raw_b64 and raw_b64.startswith("data:"):
                 raw_b64 = raw_b64.split(",", 1)[1]
             final_bytes = base64.b64decode(raw_b64)
-            target.write_bytes(final_bytes)
+            if len(final_bytes) > MAX_FILE_SIZE_BYTES:
+                raise ValueError(f"Размер сохраняемых данных превышает лимит ({MAX_FILE_SIZE_BYTES} байт).")
         # 3. Запись текстового содержимого с учётом выбранного типа переводов строк (LF / CRLF)
         elif req.content is not None:
             normalized = req.content.replace("\r\n", "\n")
             if req.line_ending.upper() == "CRLF":
                 normalized = normalized.replace("\n", "\r\n")
             final_bytes = normalized.encode(req.encoding or "utf-8")
-            target.write_bytes(final_bytes)
+            if len(final_bytes) > MAX_FILE_SIZE_BYTES:
+                raise ValueError(f"Размер сохраняемого текста превышает лимит ({MAX_FILE_SIZE_BYTES} байт).")
         else:
             raise ValueError("Не передано содержимое для сохранения (content, base64_content или hex_patches).")
+
+        # Атомарная запись через временный файл для защиты от повреждения при сбое
+        tmp_target = target.with_name(f".{target.name}.tmp")
+        try:
+            tmp_target.write_bytes(final_bytes)
+            os.replace(tmp_target, target)
+        finally:
+            if tmp_target.exists():
+                try:
+                    tmp_target.unlink()
+                except OSError:
+                    pass
 
         commit_msg = (
             req.commit_message.strip()
@@ -321,6 +359,10 @@ class FileEditorService:
         _, _, clean_rel, target = self.resolve_workspace_and_file(req.rel_path, req.workspace_id)
         original_text = ""
         if target.exists() and target.is_file():
+            if target.stat().st_size > MAX_FILE_SIZE_BYTES:
+                raise ValueError(
+                    f"Размер файла '{clean_rel}' превышает допустимый лимит ({MAX_FILE_SIZE_BYTES} байт) для вычисления Diff."
+                )
             original_text = target.read_bytes().decode("utf-8", errors="replace")
 
         orig_lines = original_text.splitlines()

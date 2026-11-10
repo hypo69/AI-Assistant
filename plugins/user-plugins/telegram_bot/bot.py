@@ -11,7 +11,7 @@
 # Package: plugins.telegram_bot
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:36:00
+# Updated: 2026-11-10 16:45:00
 # =============================================================================
 
 """Модуль сервиса и диспетчера команд Telegram-бота.
@@ -41,6 +41,9 @@ from telegram.ext import (
 from logger import logger
 from plugins.telegram_bot import user_auth as user_manager
 from plugins.telegram_bot.tts import handle_telegram_voiceover_request
+
+_HEX_TOKEN_8_RE = re.compile(r"^[A-F0-9]{8}$")
+_LINK_CODE_RE = re.compile(r"^(?:/?link\s+)?/?([A-F0-9]{8})$", re.IGNORECASE)
 
 
 class TelegramBotEngine:
@@ -90,7 +93,14 @@ class TelegramBotEngine:
             return False
 
         try:
-            self.app = ApplicationBuilder().token(self.token).build()
+            self.app = (
+                ApplicationBuilder()
+                .token(self.token)
+                .connect_timeout(10.0)
+                .read_timeout(20.0)
+                .write_timeout(20.0)
+                .build()
+            )
 
             # Обработчики команд
             for cmd in ["start", "auth", "login", "register"]:
@@ -195,7 +205,7 @@ class TelegramBotEngine:
         args = context.args or []
         if args:
             token = args[0].strip().upper()
-            if len(token) == 8 and re.match(r"^[A-F0-9]{8}$", token):
+            if len(token) == 8 and _HEX_TOKEN_8_RE.match(token):
                 if user_manager.link_telegram_account(token, tg_id, tg_username or user_name):
                     await update.message.reply_text(
                         f"🎉 <b>Telegram-аккаунт успешно привязан!</b>\n🆔 ID: <code>{tg_id}</code>",
@@ -377,7 +387,7 @@ class TelegramBotEngine:
         user_name = update.effective_user.first_name or "Пользователь"
 
         # 1. Проверяем ввод 8-значного кода привязки
-        token_match = re.match(r"^(?:/?link\s+)?/?([A-F0-9]{8})$", user_text, re.IGNORECASE)
+        token_match = _LINK_CODE_RE.match(user_text)
         if token_match:
             token = token_match.group(1).upper()
             if user_manager.link_telegram_account(token, tg_id, tg_username or user_name):
@@ -413,9 +423,9 @@ class TelegramBotEngine:
         try:
             await update.message.chat.send_action("typing")
             if hasattr(self.ai_model, "chat") and callable(self.ai_model.chat):
-                res = self.ai_model.chat(user_text)
+                res = self.ai_model.chat(user_text) if asyncio.iscoroutinefunction(self.ai_model.chat) else await asyncio.to_thread(self.ai_model.chat, user_text)
             elif hasattr(self.ai_model, "generate") and callable(self.ai_model.generate):
-                res = self.ai_model.generate(user_text)
+                res = self.ai_model.generate(user_text) if asyncio.iscoroutinefunction(self.ai_model.generate) else await asyncio.to_thread(self.ai_model.generate, user_text)
             else:
                 res = f"Ответ: {user_text}"
             reply = await res if asyncio.iscoroutine(res) else str(res)

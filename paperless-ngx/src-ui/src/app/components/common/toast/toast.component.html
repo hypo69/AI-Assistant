@@ -1,0 +1,70 @@
+<ngb-toast
+    [autohide]="false"
+    [class.mb-2]="autohide"
+    [class.toast-list-item]="!autohide"
+    [class.toast-new]="isNew"
+    [class.toast-success]="toast.level === ToastLevel.Success"
+    [class.toast-error]="toast.level === ToastLevel.Error"
+    (mouseenter)="setHovered(true)"
+    (mouseleave)="setHovered(false)"
+    (focusin)="setFocused(true)"
+    (focusout)="setFocused(false)"
+    (shown)="onShown(toast)"
+    (hidden)="hidden.emit(toast)">
+        @if (autohide) {
+            <ngb-progressbar class="position-absolute w-100 start-0 bottom-0 pe-none" [max]="toast.delay" [value]="delayRemaining()"></ngb-progressbar>
+            <span class="visually-hidden">{{ delayRemaining() / 1000 | number: '1.0-0' }} seconds</span>
+        }
+        <div class="d-flex align-items-top">
+        @switch (toast.level) {
+            @case (ToastLevel.Success) {
+                <pngx-bs-icon width="0.9em" height="0.9em" name="check-circle" class="toast-icon"></pngx-bs-icon>
+            }
+            @case (ToastLevel.Error) {
+                <pngx-bs-icon width="0.9em" height="0.9em" name="exclamation-triangle" class="toast-icon"></pngx-bs-icon>
+            }
+            @default {
+                <pngx-bs-icon width="0.9em" height="0.9em" name="info-circle" class="toast-icon"></pngx-bs-icon>
+            }
+        }
+        <div class="toast-content">
+            <p class="ms-2 mb-0 text-break">{{toast.content}}</p>
+            @if (toast.error) {
+            <details class="ms-2">
+                <div class="mt-2 ms-n4 me-n2 small">
+                @if (isDetailedError(toast.error)) {
+                    <dl class="row mb-0">
+                    <dt class="col-sm-3 fw-normal text-end">URL</dt>
+                    <dd class="col-sm-9">{{ toast.error.url }}</dd>
+                    <dt class="col-sm-3 fw-normal text-end" i18n>Status</dt>
+                    <dd class="col-sm-9">{{ toast.error.status }} <em>{{ toast.error.statusText }}</em></dd>
+                    <dt class="col-sm-3 fw-normal text-end" i18n>Error</dt>
+                    <dd class="col-sm-9">{{ getErrorText(toast.error) }}</dd>
+                    </dl>
+                }
+                <div class="row">
+                    <div class="col offset-sm-3">
+                    <button class="btn btn-sm btn-outline-secondary" (click)="copyError(toast.error)">
+                        @if (!copied()) {
+                        <pngx-bs-icon name="clipboard" class="me-1"></pngx-bs-icon>
+                        }
+                        @if (copied()) {
+                        <pngx-bs-icon name="clipboard-check" class="me-1"></pngx-bs-icon>
+                        }
+                        <ng-container i18n>Copy Raw Error</ng-container>
+                    </button>
+                    </div>
+                </div>
+                </div>
+            </details>
+            }
+            @if (toast.action) {
+            <button class="btn btn-sm toast-action ms-2 mt-2" (click)="actioned.emit(toast); toast.action()">{{toast.actionName}}</button>
+            }
+        </div>
+        @if (!autohide && toast.timestamp) {
+            <span class="toast-time small text-body-secondary text-nowrap ms-auto ps-2">{{relativeTimestamp}}</span>
+        }
+        <button type="button" class="btn-close ms-auto flex-shrink-0" data-bs-dismiss="toast" aria-label="Close" (click)="closed.emit(toast);"></button>
+    </div>
+</ngb-toast>

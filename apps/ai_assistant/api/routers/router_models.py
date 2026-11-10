@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:05:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -19,7 +19,9 @@ from __future__ import annotations
 """Маршрутизатор моделей, провайдеров, ключей и настроек ИИ."""
 
 import asyncio
+from datetime import datetime, timezone
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,6 +33,8 @@ from header import __root__
 from logger import logger
 
 router = APIRouter(tags=["AI Models & Providers"])
+
+_config_lock = asyncio.Lock()
 
 
 # -----------------------------------------------------------------------------
@@ -48,8 +52,19 @@ def resolve_active_config_path() -> Path:
     return root_cfg
 
 
+def _atomic_write_json_file(target_path: Path, data: Dict[str, Any], indent: int = 4) -> None:
+    """Атомарно записывает JSON-файл через временный файл .tmp и os.replace()."""
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = target_path.with_suffix(f"{target_path.suffix}.tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=indent, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, target_path)
+
+
 def save_ai_config(provider: Optional[str] = None, model_name: str = "") -> None:
-    """Сохраняет выбранную модель и провайдера в конфигурационных файлах."""
+    """Сохраняет выбранную модель и провайдера в конфигурационных файлах атомарно."""
     cfg = _load_root_config()
     ai_sec = cfg.setdefault("ai_providers_and_models_configuration", {})
     if model_name:
@@ -85,10 +100,10 @@ def save_ai_config(provider: Optional[str] = None, model_name: str = "") -> None
                 app_cfg["llm"]["default_model"] = model_name
             if provider:
                 app_cfg["llm"]["default_provider"] = provider
-            with open(app_cfg_path, "w", encoding="utf-8") as f:
-                json.dump(app_cfg, f, indent=2, ensure_ascii=False)
+            _atomic_write_json_file(app_cfg_path, app_cfg, indent=2)
         except Exception as exc:
             logger.warning(f"[router_models] Ошибка синхронизации apps/ai_assistant/config.json: {exc}")
+
 
 def _load_root_config() -> Dict[str, Any]:
     """Загружает главный конфигурационный файл config.json."""
@@ -103,11 +118,10 @@ def _load_root_config() -> Dict[str, Any]:
 
 
 def _save_root_config(cfg: Dict[str, Any]) -> None:
-    """Сохраняет главный конфигурационный файл config.json."""
+    """Атомарно сохраняет главный конфигурационный файл config.json."""
     cfg_path = resolve_active_config_path()
     try:
-        with open(cfg_path, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=4, ensure_ascii=False)
+        _atomic_write_json_file(cfg_path, cfg, indent=4)
     except Exception as exc:
         logger.error(f"[router_models] Ошибка записи {cfg_path}: {exc}")
 
@@ -142,16 +156,16 @@ def _update_provider_config(provider_key: str, data: Dict[str, Any]) -> Dict[str
 class SetModelRequest(BaseModel):
     """Полезная нагрузка установки активной модели."""
     model: str = Field(..., description="Название модели")
-    provider: Optional[str] = Field(None, description="Провайдер модели")
-    save_to_config: Optional[bool] = Field(True, description="Сохранить в config.json")
+    provider: Optional[str] = Field(default=None, description="Провайдер модели")
+    save_to_config: Optional[bool] = Field(default=True, description="Сохранить в config.json")
 
 
 class TestModelPayload(BaseModel):
     """Полезная нагрузка тестового запроса к модели."""
-    model: str = Field("", description="Название модели")
-    provider: str = Field("", description="Провайдер")
-    message: str = Field("", description="Текст тестового сообщения")
-    system_instruction: Optional[str] = Field(None, description="Системная инструкция")
+    model: str = Field(default="", description="Название модели")
+    provider: str = Field(default="", description="Провайдер")
+    message: str = Field(default="", description="Текст тестового сообщения")
+    system_instruction: Optional[str] = Field(default=None, description="Системная инструкция")
 
 
 # -----------------------------------------------------------------------------
@@ -332,7 +346,7 @@ async def get_favorite_models() -> Dict[str, Any]:
 
 @router.post("/auth/favorites/{model_name:path}", summary="Добавить модель в избранное")
 async def add_favorite_model(model_name: str, request: Request) -> Dict[str, Any]:
-    """Добавляет модель в избранное с опциональной заметкой."""
+    """Добавляет модель в избранное с опциональной заметкой и меткой UTC ISO 8601."""
     try:
         body = await request.json()
     except Exception:
@@ -341,10 +355,13 @@ async def add_favorite_model(model_name: str, request: Request) -> Dict[str, Any
 
     try:
         from src.user_manager import user_manager
-        settings = user_manager.get_user_settings(1) or {}
+        settings = await asyncio.to_thread(user_manager.get_user_settings, 1) or {}
         favs = dict(settings.get("favorite_models", {}))
-        favs[model_name] = {"note": note, "added_at": time.time()}
-        user_manager.update_user_settings(1, favorite_models=favs)
+        favs[model_name] = {
+            "note": note,
+            "added_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await asyncio.to_thread(user_manager.update_user_settings, 1, favorite_models=favs)
         return {"status": "ok", "model": model_name, "favorites": favs}
     except Exception as exc:
         return {"status": "error", "message": str(exc)}
@@ -487,8 +504,13 @@ async def save_system_instruction(request: Request) -> Dict[str, Any]:
                 pass
 
             prompt_file = __root__ / "apps" / "windows" / "prompts" / "tc" / "system_instruction.md"
-            prompt_file.parent.mkdir(parents=True, exist_ok=True)
-            prompt_file.write_text(content, encoding="utf-8")
+            def _save_prompt() -> None:
+                prompt_file.parent.mkdir(parents=True, exist_ok=True)
+                tmp_prompt = prompt_file.with_suffix(".md.tmp")
+                tmp_prompt.write_text(content, encoding="utf-8")
+                os.replace(tmp_prompt, prompt_file)
+
+            await asyncio.to_thread(_save_prompt)
 
         return {"status": "success", "content": content}
     except Exception as exc:

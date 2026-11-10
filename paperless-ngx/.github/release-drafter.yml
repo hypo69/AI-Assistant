@@ -1,0 +1,56 @@
+categories:
+  - type: 'pre-include'
+    when:
+      - label: 'enhancement'
+      - label: 'bug'
+      - label: 'chore'
+      - label: 'deployment'
+      - label: 'translation'
+      - label: 'dependencies'
+      - label: 'documentation'
+      - label: 'frontend'
+      - label: 'backend'
+      - label: 'ci-cd'
+      - label: 'breaking-change'
+      - label: 'notable'
+  - type: 'pre-exclude'
+    when:
+      - label: 'skip-changelog'
+  - title: 'Breaking Changes'
+    when:
+      - label: 'breaking-change'
+  - title: 'Notable Changes'
+    when:
+      - label: 'notable'
+  - title: 'Features / Enhancements'
+    when:
+      - label: 'enhancement'
+  - title: 'Bug Fixes'
+    when:
+      - label: 'bug'
+  - title: 'Documentation'
+    when:
+      - label: 'documentation'
+  - title: 'Maintenance'
+    when:
+      - label: 'chore'
+      - label: 'deployment'
+      - label: 'translation'
+      - label: 'ci-cd'
+  - title: 'Dependencies'
+    collapse-after: 3
+    when:
+      - label: 'dependencies'
+  - title: 'All App Changes'
+    collapse-after: 1
+    when:
+      - label: 'frontend'
+      - label: 'backend'
+filter-by-commitish: true
+category-template: '### $TITLE'
+change-template: '- $TITLE @$AUTHOR ([#$NUMBER]($URL))'
+change-title-escapes: '\<*_&#@'
+template: |
+  ## paperless-ngx $RESOLVED_VERSION
+
+  $CHANGES

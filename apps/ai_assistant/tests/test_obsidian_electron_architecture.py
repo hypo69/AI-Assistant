@@ -25,7 +25,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-26 01:13:00
+# Updated: 2026-11-10 15:42:00
 # =============================================================================
 
 from __future__ import annotations
@@ -88,8 +88,8 @@ def test_on_the_fly_obsidian_vault_enrichment_on_import(obsidian_env) -> None:
         commit_message="Добавлен документ про маму",
     )
 
-    # Проверяем, что для .txt создан обогащённый Obsidian-документ mama.md (или обновлён .md)
-    doc_md = ws_path / "mama.md"
+    # Проверяем, что для .txt создан обогащённый Obsidian-документ .mama.md (сопутствующий dotfile)
+    doc_md = ws_path / ".mama.md"
     assert doc_md.exists(), "Должна автоматически создаваться компактная Markdown-заметка документа"
     md_text = doc_md.read_text(encoding="utf-8")
 
@@ -123,7 +123,7 @@ def test_on_the_fly_obsidian_vault_enrichment_on_import(obsidian_env) -> None:
     assert kb_file.exists(), "В корне рабочей области должен автоматически поддерживаться сводный _Knowledge_Base.md"
     kb_text = kb_file.read_text(encoding="utf-8")
     assert "---\n" in kb_text
-    assert "[[mama]]" in kb_text or "[[mama.md]]" in kb_text
+    assert "[[mama]]" in kb_text or "[[mama.md]]" in kb_text or "[[.mama.md|mama.txt]]" in kb_text or "mama.txt" in kb_text
     assert "[[farm]]" in kb_text or "[[farm.md]]" in kb_text
     assert "```mermaid" in kb_text
 

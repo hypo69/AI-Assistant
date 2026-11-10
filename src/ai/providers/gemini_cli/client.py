@@ -18,7 +18,7 @@
 # Package: src.ai.providers.gemini_cli
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:05:00
+# Updated: 2026-11-10 16:53:00
 # =============================================================================
 
 from __future__ import annotations
@@ -38,6 +38,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, AsyncGenerator, Generator, List, Optional, Union
 from logger import logger
+
+_JSON_BLOCK_RE = re.compile(r'```(?:json)?\s*\n(.*?)```', re.DOTALL | re.IGNORECASE)
 
 @dataclass
 class GeminiCliResponse:
@@ -204,7 +206,7 @@ class GeminiCliProvider:
             return json.loads(cleaned)
         except json.JSONDecodeError:
             pass
-        match = re.search('```(?:json)?\\s*\\n(.*?)```', cleaned, re.DOTALL | re.IGNORECASE)
+        match = _JSON_BLOCK_RE.search(cleaned)
         if match:
             candidate = match.group(1).strip()
             try:

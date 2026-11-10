@@ -12,12 +12,13 @@
 # Package: plugins.generate_rag_from_codebase
 # Author: hypo69
 # Copyright: © 2026 hypo69
+# Updated: 2026-11-10 14:38:10
 # =============================================================================
 
-"""Codebase RAG generator plugin module.
+"""Модуль плагина генерации RAG-индекса кодовой базы.
 
-Integrates AST Python code analysis, hierarchical Markdown sectioning, secret filtering,
-multi-index naming, user directory isolation, and dual (Symbol + Vector) indexing.
+Объединяет AST-анализ кода Python, иерархическое разбиение Markdown, фильтрацию секретов,
+поддержку мульти-индексов, пользовательскую изоляцию и двойной поиск (символьный + векторный).
 """
 
 from __future__ import annotations
@@ -37,6 +38,9 @@ from plugins.generate_rag_from_codebase.ignore_filter import IgnoreFilter
 from plugins.generate_rag_from_codebase.md_parser import MarkdownParser
 from plugins.generate_rag_from_codebase.symbol_index import CodeSymbolIndex
 from plugins.generate_rag_from_codebase.vector_indexer import CodebaseVectorIndexer
+
+# Максимальный размер индексируемого файла (5 МБ)
+MAX_INDEXED_FILE_BYTES: int = 5 * 1024 * 1024
 
 
 class GenerateRagCodebasePlugin(BasePlugin):
@@ -400,11 +404,13 @@ class GenerateRagCodebasePlugin(BasePlugin):
                 if p.is_file() and not custom_filter.is_ignored(p):
                     candidate_paths.append(p)
 
-        # 2. Parse files
+        # 2. Разбор файлов с проверкой лимита размера
         for path in candidate_paths:
             suffix = path.suffix.lower()
 
             try:
+                if path.stat().st_size > MAX_INDEXED_FILE_BYTES:
+                    continue
                 content = path.read_text(encoding="utf-8", errors="replace")
             except Exception:
                 continue
@@ -467,7 +473,16 @@ class GenerateRagCodebasePlugin(BasePlugin):
             "index_dir": str(target_index_dir),
         }
         meta_file = target_index_dir / "meta.json"
-        meta_file.write_text(json.dumps(meta_info, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp_meta = meta_file.with_name(".meta.json.tmp")
+        try:
+            tmp_meta.write_text(json.dumps(meta_info, indent=2, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp_meta, meta_file)
+        finally:
+            if tmp_meta.exists():
+                try:
+                    tmp_meta.unlink()
+                except OSError:
+                    pass
 
         # Update active default in-memory instances if matching
         if idx_name == self.default_index_name and user_id is None:

@@ -18,12 +18,13 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-01 17:40:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """Маршрутизатор эндпоинтов истории Git, диффов и таймлайна с поддержкой рабочих областей."""
 
+import asyncio
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
@@ -59,7 +60,7 @@ async def get_history(
 ) -> List[CommitSummary]:
     """Возвращает структурированный список коммитов с информацией об авторе и изменениях."""
     try:
-        engine = _get_engine(workspace_id=workspace_id, repo_path=repo_path)
+        engine = await asyncio.to_thread(_get_engine, workspace_id, repo_path)
         return await engine.get_file_history(file_path=file_path, limit=limit, search_query=search)
     except Exception as exc:
         logger.error(f"[RouterFileHistory] Ошибка получения истории: {exc}")
@@ -75,8 +76,10 @@ async def get_diff(
     repo_path: Optional[str] = Query(None, description="Путь к репозиторию Git"),
 ) -> DiffResponse:
     """Возвращает diff изменений между ревизиями с защитой от переполнения буфера."""
+    if commit_hash.strip().startswith("-") or (parent_hash and parent_hash.strip().startswith("-")):
+        raise HTTPException(status_code=400, detail="Недопустимый формат commit_hash: ведущий дефис запрещён")
     try:
-        engine = _get_engine(workspace_id=workspace_id, repo_path=repo_path)
+        engine = await asyncio.to_thread(_get_engine, workspace_id, repo_path)
         return await engine.get_diff(commit_hash=commit_hash, file_path=file_path, parent_hash=parent_hash)
     except Exception as exc:
         logger.error(f"[RouterFileHistory] Ошибка формирования diff: {exc}")
@@ -92,7 +95,7 @@ async def get_timeline(
 ) -> TimelineResponse:
     """Формирует хронологическую шкалу контрольных точек изменений файла."""
     try:
-        engine = _get_engine(workspace_id=workspace_id, repo_path=repo_path)
+        engine = await asyncio.to_thread(_get_engine, workspace_id, repo_path)
         return await engine.get_timeline(file_path=file_path, limit=limit)
     except Exception as exc:
         logger.error(f"[RouterFileHistory] Ошибка формирования таймлайна: {exc}")
@@ -107,9 +110,11 @@ async def get_blame(
     repo_path: Optional[str] = Query(None, description="Путь к репозиторию Git"),
 ) -> BlameResponse:
     """Возвращает построчный blame для детального аудита изменений строк кода."""
+    commit = commit_hash or "HEAD"
+    if commit.strip().startswith("-"):
+        raise HTTPException(status_code=400, detail="Недопустимый формат commit_hash: ведущий дефис запрещён")
     try:
-        commit = commit_hash or "HEAD"
-        engine = _get_engine(workspace_id=workspace_id, repo_path=repo_path)
+        engine = await asyncio.to_thread(_get_engine, workspace_id, repo_path)
         return await engine.get_blame(file_path=file_path, commit_hash=commit)
     except Exception as exc:
         logger.error(f"[RouterFileHistory] Ошибка построения blame: {exc}")
@@ -124,8 +129,10 @@ async def get_file_content(
     repo_path: Optional[str] = Query(None, description="Путь к репозиторию Git"),
 ) -> Dict[str, Any]:
     """Возвращает текстовое содержимое файла в выбранной ревизии."""
+    if commit_hash.strip().startswith("-"):
+        raise HTTPException(status_code=400, detail="Недопустимый формат commit_hash: ведущий дефис запрещён")
     try:
-        engine = _get_engine(workspace_id=workspace_id, repo_path=repo_path)
+        engine = await asyncio.to_thread(_get_engine, workspace_id, repo_path)
         content = await engine.get_file_content(commit_hash=commit_hash, file_path=file_path)
         blob_hash = await engine.get_blob_hash(commit_hash=commit_hash, file_path=file_path)
         return {

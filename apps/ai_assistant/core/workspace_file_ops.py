@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:15:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -25,6 +25,8 @@ from logger import logger
 
 if TYPE_CHECKING:
     from apps.ai_assistant.core.workspace_manager import WorkspaceManager
+
+MAX_TEXT_READ_BYTES = 10 * 1024 * 1024
 
 
 class WorkspaceFileOps:
@@ -149,6 +151,7 @@ class WorkspaceFileOps:
 
         if not target.exists():
             assets_cand = (ws_path / "assets" / clean_rel).resolve()
+            assets_cand.relative_to(ws_path.resolve())
             if assets_cand.exists():
                 target = assets_cand
                 clean_rel = f"assets/{clean_rel}"
@@ -201,6 +204,7 @@ class WorkspaceFileOps:
 
         if not target.exists():
             assets_cand = (ws_path / "assets" / clean_rel).resolve()
+            assets_cand.relative_to(ws_path.resolve())
             if assets_cand.exists():
                 target = assets_cand
                 clean_rel = f"assets/{clean_rel}"
@@ -209,19 +213,23 @@ class WorkspaceFileOps:
         if target.is_dir():
             raise ValueError(f"Путь '{clean_rel}' является каталогом, а не файлом.")
 
-        raw_bytes = target.read_bytes()
-        # Проверка на бинарный файл (нулевой байт в первых 8 КБ)
-        is_binary = b"\x00" in raw_bytes[:8192]
-        if is_binary:
+        file_size = target.stat().st_size
+        with open(target, "rb") as f:
+            head_chunk = f.read(8192)
+
+        # Проверка на бинарный файл (нулевой байт в первых 8 КБ) или превышение лимита чтения текста
+        is_binary = b"\x00" in head_chunk
+        if is_binary or file_size > MAX_TEXT_READ_BYTES:
             return {
                 "status": "ok",
                 "workspace_id": workspace_id,
                 "rel_path": clean_rel,
                 "is_binary": True,
                 "content": None,
-                "size": len(raw_bytes),
+                "size": file_size,
             }
 
+        raw_bytes = target.read_bytes()
         text = raw_bytes.decode("utf-8", errors="replace")
         return {
             "status": "ok",
@@ -260,6 +268,7 @@ class WorkspaceFileOps:
 
         if not target.exists():
             assets_cand = (ws_path / "assets" / clean_rel).resolve()
+            assets_cand.relative_to(ws_path.resolve())
             if assets_cand.exists():
                 target = assets_cand
                 clean_rel = f"assets/{clean_rel}"
@@ -298,6 +307,7 @@ class WorkspaceFileOps:
 
         if not target.exists():
             assets_cand = (ws_path / "assets" / clean_rel).resolve()
+            assets_cand.relative_to(ws_path.resolve())
             if assets_cand.exists():
                 target = assets_cand
                 clean_rel = f"assets/{clean_rel}"

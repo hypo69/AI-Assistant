@@ -13,7 +13,7 @@
 # Package: apps.common.file_editor
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:00:00
+# Updated: 2026-11-10 14:31:00
 # =============================================================================
 
 from __future__ import annotations
@@ -298,6 +298,9 @@ class SupportedFileCatalog:
     """Реестр типов файлов и определения оптимального режима редактирования."""
 
     _BY_EXT: Dict[str, FileTypeDescriptor] = {d.extension: d for d in _RAW_DESCRIPTORS}
+    _SPECIAL_NAMES: frozenset[str] = frozenset(
+        {"dockerfile", "makefile", ".gitignore", ".gitattributes", ".env"}
+    )
 
     @classmethod
     def get_descriptor(cls, file_path_or_name: str, is_binary_detected: bool = False) -> FileTypeDescriptor:
@@ -311,7 +314,7 @@ class SupportedFileCatalog:
             Дескриптор `FileTypeDescriptor` с режимами редактирования VS Code.
         """
         name = Path(file_path_or_name).name.lower()
-        if name in {"dockerfile", "makefile", ".gitignore", ".gitattributes", ".env"}:
+        if name in cls._SPECIAL_NAMES:
             special_key = name.lstrip(".")
             if special_key in cls._BY_EXT:
                 return cls._BY_EXT[special_key]

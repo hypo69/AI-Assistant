@@ -17,7 +17,7 @@
 # Package: src
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 16:47:30
+# Updated: 2026-11-10 14:35:00
 # =============================================================================
 
 """Модуль основной системы (`config`)."""
@@ -126,7 +126,7 @@ if isinstance(raw_dir, str):
     if '%LOCALAPPDATA%' in raw_dir:
         raw_dir = raw_dir.replace('%LOCALAPPDATA%', str(LOCALAPPDATA_DIR))
     storage_cfg.users_dir = raw_dir
-    logger.info(f'Resolved users_dir to {raw_dir}')
+    logger.info(f'Директория пользователей (users_dir) установлена: {raw_dir}')
 
 plugins_cfg = getattr(global_settings, 'plugins', SimpleNamespace())
 schedulers_cfg = getattr(global_settings, 'schedulers', getattr(global_settings, 'scheduler', SimpleNamespace()))

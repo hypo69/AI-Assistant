@@ -20,20 +20,23 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:24:00
+# Updated: 2026-11-10 16:50:00
 # =============================================================================
 
 from __future__ import annotations
 """REST API роутер управления рабочими областями, фактами и вопросно-ответной системой."""
 
-import asyncio, json
-from fastapi.responses import FileResponse, StreamingResponse
-from typing import Any, Dict, List, Optional
+import asyncio
+import json
+from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from logger import logger
+from apps.ai_assistant.api.middleware import get_http_telemetry_snapshot
 from apps.ai_assistant.core.qa_engine import KnowledgeQAEngine
+from apps.ai_assistant.core.workspace_creator_engine import WorkspaceCreatorEngine
 from apps.ai_assistant.core.workspace_manager import WorkspaceManager
 from apps.ai_assistant.core.workspace_prompt_generator import WorkspacePromptGenerator
 
@@ -43,6 +46,7 @@ router = APIRouter(prefix="/api/v1", tags=["Multilingual Knowledge & Workspaces"
 _workspace_manager = WorkspaceManager()
 _qa_engine = KnowledgeQAEngine(workspace_manager=_workspace_manager)
 _prompt_generator = WorkspacePromptGenerator(workspace_manager=_workspace_manager)
+_creator_engine = WorkspaceCreatorEngine(workspace_manager=_workspace_manager)
 
 
 def _resolve_target_workspace(workspace_id: Optional[str] = None) -> Optional[str]:
@@ -63,7 +67,23 @@ class WorkspaceCreateRequest(BaseModel):
     workspace_id: str = Field(..., description="Уникальный идентификатор рабочей области (например, my_docs)")
     name: str = Field(..., description="Отображаемое название рабочей области")
     description: str = Field("", description="Описание рабочей области")
-    language: Optional[str] = Field("ru", description="Основной язык рабочего пространства ('he', 'ru', 'en', 'uk')")
+    language: Optional[str] = Field("ru", description="Основной язык рабочего пространства ('he', 'ru', 'en', 'uk', 'ua')")
+    custom_path: Optional[str] = Field(None, description="Опциональная локальная директория на диске")
+
+
+class AuditDirectoryRequest(BaseModel):
+    """Запрос на аудит локальной директории перед созданием пространства."""
+    directory_path: str = Field(..., description="Путь к локальной директории на диске")
+
+
+class CreateWorkspaceFromDirectoryRequest(BaseModel):
+    """Запрос на создание рабочего пространства на основе локальной директории."""
+    directory_path: str = Field(..., description="Путь к локальной директории на диске")
+    workspace_id: Optional[str] = Field(None, description="Идентификатор пространства (авто при None)")
+    name: Optional[str] = Field(None, description="Человекочитаемое имя (авто при None)")
+    description: Optional[str] = Field(None, description="Описание (авто при None)")
+    language: Optional[str] = Field(None, description="Язык пространства ('ru', 'he', 'en', 'ua')")
+    in_place: bool = Field(True, description="Слежение на месте без копирования файлов")
 
 
 class DocumentImportRequest(BaseModel):
@@ -311,17 +331,61 @@ async def open_workspace_folder(workspace_id: str) -> Dict[str, Any]:
 async def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
     """Создаёт или открывает рабочую область и инициализирует в ней Git-репозиторий."""
     try:
-        ws = _workspace_manager.create_or_select_workspace(
+        if req.custom_path:
+            return await _creator_engine.create_workspace_from_directory(
+                directory_path=req.custom_path,
+                workspace_id=req.workspace_id,
+                name=req.name,
+                description=req.description,
+                language=req.language,
+                in_place=True,
+            )
+
+        ws = await asyncio.to_thread(
+            _workspace_manager.create_or_select_workspace,
             workspace_id=req.workspace_id,
             name=req.name,
             description=req.description,
             language=req.language or "ru",
         )
         # Если в папке уже есть файлы — сканируем и индексируем их
-        scan_info = _workspace_manager.scan_and_index_workspace(ws["workspace_id"])
+        scan_info = await asyncio.to_thread(_workspace_manager.scan_and_index_workspace, ws["workspace_id"])
         return {"status": "ok", "workspace": ws, "scan": scan_info}
     except Exception as exc:
         logger.error(f"[RouterKnowledge] Ошибка создания рабочей области: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/workspaces/audit-directory", summary="Аудит локальной папки перед созданием пространства")
+async def audit_workspace_directory(req: AuditDirectoryRequest) -> Dict[str, Any]:
+    """Выполняет аудит и профилирование локальной папки на диске (файлы, языки, домен)."""
+    try:
+        return await asyncio.to_thread(_creator_engine.audit_directory, req.directory_path)
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except NotADirectoryError as nde:
+        raise HTTPException(status_code=400, detail=str(nde))
+    except Exception as exc:
+        logger.error(f"[RouterKnowledge] Ошибка аудита директории {req.directory_path}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/workspaces/create-from-directory", summary="Интеллектуальное создание пространства из локальной папки")
+async def create_workspace_from_directory_endpoint(req: CreateWorkspaceFromDirectoryRequest) -> Dict[str, Any]:
+    """Развёртывает полноценное рабочее пространство на базе указанной локальной директории (In-Place Grounding)."""
+    try:
+        return await _creator_engine.create_workspace_from_directory(
+            directory_path=req.directory_path,
+            workspace_id=req.workspace_id,
+            name=req.name,
+            description=req.description,
+            language=req.language,
+            in_place=req.in_place,
+        )
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except Exception as exc:
+        logger.error(f"[RouterKnowledge] Ошибка создания пространства из папки {req.directory_path}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -473,11 +537,12 @@ async def get_workspace_suggested_questions(
 @router.post("/documents/import", summary="Импорт/обновление документа с коммитом в Git и извлечением фактов")
 async def import_document(req: DocumentImportRequest) -> Dict[str, Any]:
     """Сохраняет файл в рабочей области, создаёт коммит в Git и извлекает структурированные факты."""
-    target_ws = _resolve_target_workspace(req.workspace_id)
+    target_ws = await asyncio.to_thread(_resolve_target_workspace, req.workspace_id)
     if not target_ws:
         raise HTTPException(status_code=400, detail="Рабочее пространство не выбрано")
     try:
-        res = _workspace_manager.import_document(
+        res = await asyncio.to_thread(
+            _workspace_manager.import_document,
             workspace_id=target_ws,
             document_id=req.document_id,
             content=req.content,
@@ -826,15 +891,16 @@ async def extract_preview(req: ExtractPreviewRequest) -> Dict[str, Any]:
 @router.post("/documents/reanalyze", summary="Повторный анализ документа")
 async def reanalyze_document(req: ReanalyzeRequest) -> Dict[str, Any]:
     """Перезапускает NLP-анализ и перестроение фактов для документа рабочей области."""
-    target_ws = _resolve_target_workspace(req.workspace_id)
+    target_ws = await asyncio.to_thread(_resolve_target_workspace, req.workspace_id)
     if not target_ws:
         raise HTTPException(status_code=400, detail="Рабочее пространство не выбрано")
-    docs = _workspace_manager.store.list_documents(target_ws)
+    docs = await asyncio.to_thread(_workspace_manager.store.list_documents, target_ws)
     target = next((d for d in docs if d["document_id"] == req.document_id), None)
     if not target:
         raise HTTPException(status_code=404, detail=f"Документ '{req.document_id}' не найден в '{target_ws}'")
 
-    return _workspace_manager.import_document(
+    return await asyncio.to_thread(
+        _workspace_manager.import_document,
         workspace_id=target_ws,
         document_id=req.document_id,
         content=target.get("content") or "",
@@ -1013,10 +1079,10 @@ async def search_entities(
 @router.post("/faiss/rebuild", summary="Перестроение векторного индекса FAISS")
 async def rebuild_faiss(req: FaissRebuildRequest) -> Dict[str, Any]:
     """Перестраивает локальный индекс FAISS из первичных документов SQLite."""
-    target_ws = _resolve_target_workspace(req.workspace_id)
+    target_ws = await asyncio.to_thread(_resolve_target_workspace, req.workspace_id)
     if not target_ws:
         raise HTTPException(status_code=400, detail="Рабочее пространство не выбрано")
-    return _workspace_manager.rebuild_faiss_index(target_ws)
+    return await asyncio.to_thread(_workspace_manager.rebuild_faiss_index, target_ws)
 
 
 @router.get("/ai-models", summary="Список доступных провайдеров и моделей из модуля src/ai")
@@ -1034,7 +1100,7 @@ async def list_ai_models() -> Dict[str, Any]:
     providers = []
     for prov, label in prov_labels.items():
         try:
-            models = get_available_models(provider=prov)
+            models = await asyncio.to_thread(get_available_models, provider=prov)
         except Exception:
             models = []
         providers.append({
@@ -1049,6 +1115,11 @@ async def list_ai_models() -> Dict[str, Any]:
 async def get_metrics(
     workspace_id: Optional[str] = Query(None, description="Фильтр по рабочей области"),
 ) -> Dict[str, Any]:
-    """Возвращает метрики времени ответа, количества фактов и вызовов облачных моделей."""
-    metrics = _workspace_manager.store.get_metrics(workspace_id=workspace_id)
-    return {"status": "ok", **metrics}
+    """Возвращает метрики времени ответа, перцентили HTTP RED, количество фактов и вызовов облачных моделей."""
+    metrics = await asyncio.to_thread(_workspace_manager.store.get_metrics, workspace_id=workspace_id)
+    http_red = get_http_telemetry_snapshot()
+    return {
+        "status": "ok",
+        **metrics,
+        "http_telemetry": http_red,
+    }

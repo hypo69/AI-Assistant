@@ -18,7 +18,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:28:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -50,11 +50,13 @@ def resolve_repo_path(
         if p.exists() and p.is_dir():
             return p
 
+    registry = WorkspaceRegistry(resolve_workspaces_dir())
+
     # 2. Передан идентификатор рабочего пространства
     clean_ws = (workspace_id or "").strip()
     if clean_ws and clean_ws.lower() not in ("main", "root", "project", "none", "null"):
         try:
-            ws = WorkspaceRegistry(resolve_workspaces_dir()).get_workspace(clean_ws)
+            ws = registry.get_workspace(clean_ws)
             if ws:
                 return Path(ws["path"]).resolve()
             logger.warning(f"[RepoResolver] Рабочее пространство {clean_ws} не найдено в каталоге workspaces")
@@ -75,14 +77,14 @@ def resolve_repo_path(
 
             active_id = saved.get("workspace_id")
             if active_id and active_id.lower() not in ("main", "root", "project", "none", "null"):
-                ws = WorkspaceRegistry(resolve_workspaces_dir()).get_workspace(active_id)
+                ws = registry.get_workspace(active_id)
                 if ws:
                     return Path(ws["path"]).resolve()
         except Exception as exc:
             logger.debug(f"[RepoResolver] Активный репозиторий по умолчанию не разрешен: {exc}")
 
     # 4. Fallback: первое доступное рабочее пространство в data или корень
-    workspaces = WorkspaceRegistry(resolve_workspaces_dir()).list_workspaces()
+    workspaces = registry.list_workspaces()
     if workspaces and clean_ws.lower() not in ("main", "root"):
         return Path(workspaces[0]["path"]).resolve()
     return Path(".").resolve()

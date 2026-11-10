@@ -27,7 +27,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:05:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -172,6 +173,14 @@ class ObsidianVaultBuilder:
         encoded_path = quote(str(target_path.resolve()), safe="")
         return f"obsidian://open?path={encoded_path}"
 
+    @staticmethod
+    def _atomic_write_text(target: Path, content: str) -> None:
+        """Атомарно записывает текстовый файл через временный .tmp и os.replace."""
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = target.with_name(f"{target.name}.tmp")
+        tmp_path.write_text(content, encoding="utf-8")
+        os.replace(tmp_path, target)
+
     def _resolve_doc_md_path(self, ws_path: Path, doc_id: str) -> Path:
         """Определяет путь к компактному .md файлу документа внутри рабочей области.
 
@@ -179,21 +188,25 @@ class ObsidianVaultBuilder:
         конспекту с префиксом точки (.stem.md), обеспечивая первичную файловую
         аутентификацию служебного dot-файла.
         """
+        ws_resolved = ws_path.resolve()
         clean_rel = str(doc_id).replace("\\", "/").lstrip("/")
         rel_path = Path(clean_rel)
         if rel_path.suffix.lower() == ".md":
-            return ws_path / rel_path
+            target_md = (ws_path / rel_path).resolve()
+            target_md.relative_to(ws_resolved)
+            return target_md
 
         companion_name = ServiceFileAuthenticator.resolve_obsidian_companion_filename(clean_rel)
-        target = ws_path / rel_path.parent / companion_name
+        target = (ws_path / rel_path.parent / companion_name).resolve()
+        target.relative_to(ws_resolved)
 
         # Миграция устаревших конспектов без точки
-        legacy_target = ws_path / rel_path.with_suffix(".md")
+        legacy_target = (ws_path / rel_path.with_suffix(".md")).resolve()
+        legacy_target.relative_to(ws_resolved)
         if legacy_target != target and legacy_target.exists() and legacy_target.is_file():
             try:
                 if not target.exists():
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_text(legacy_target.read_text(encoding="utf-8", errors="replace"), encoding="utf-8")
+                    self._atomic_write_text(target, legacy_target.read_text(encoding="utf-8", errors="replace"))
                 legacy_target.unlink()
                 logger.info(f"[ObsidianVault] Миграция служебного файла в dotfile: {legacy_target.name} -> {target.name}")
             except Exception as mig_err:
@@ -307,7 +320,6 @@ class ObsidianVaultBuilder:
         entities = analysis.get("entities", [])
 
         md_target = self._resolve_doc_md_path(ws_path, doc_id)
-        md_target.parent.mkdir(parents=True, exist_ok=True)
         enriched_md = self.render_compact_document_markdown(
             workspace_id=workspace_id,
             doc_id=doc_id,
@@ -319,7 +331,7 @@ class ObsidianVaultBuilder:
             version_num=version_num,
             original_path=original_path,
         )
-        md_target.write_text(enriched_md, encoding="utf-8")
+        self._atomic_write_text(md_target, enriched_md)
         self.rebuild_knowledge_base_index(workspace_id)
         return md_target
 
@@ -459,7 +471,7 @@ class ObsidianVaultBuilder:
             lines.append("*Задайте вопрос во вкладке «Вопрос-Ответ (QA)» или «Чат», и ответы автоматически появятся здесь.*\n")
 
         kb_path = ws_path / KNOWLEDGE_BASE_FILENAME
-        kb_path.write_text("\n".join(lines), encoding="utf-8")
+        self._atomic_write_text(kb_path, "\n".join(lines))
         return kb_path
 
     def build_workspace_vault(
@@ -467,11 +479,25 @@ class ObsidianVaultBuilder:
         workspace_id: str,
         commit_to_git: bool = True,
     ) -> Dict[str, Any]:
-        """Целенаправленно пересобирает все компактные .md документы и `_Knowledge_Base.md` в рабочей области."""
+        """Целенаправленно пересобирает все компактные .md документы и `_Knowledge_Base.md` в рабочей области (без N+1 запросов)."""
         ws, ws_path = self.wm._get_or_create_workspace(workspace_id)
         self.ensure_vault_config(ws_path)
 
         docs = self.wm.store.list_documents(workspace_id)
+        all_facts = self.wm.store.get_facts(workspace_id=workspace_id, include_stale=False)
+        facts_by_doc: Dict[str, List[Dict[str, Any]]] = {}
+        for f in all_facts:
+            fid_doc = str(f.get("document_id") or (f.get("source") or {}).get("document_id") or "")
+            if fid_doc:
+                facts_by_doc.setdefault(fid_doc, []).append(f)
+
+        all_ents = self.wm.store.list_entities(workspace_id=workspace_id)
+        ents_by_doc: Dict[str, List[Dict[str, Any]]] = {}
+        for e in all_ents:
+            eid_doc = str(e.get("document_id") or "")
+            if eid_doc:
+                ents_by_doc.setdefault(eid_doc, []).append(e)
+
         enriched_files: List[str] = []
 
         for d in docs:
@@ -484,12 +510,10 @@ class ObsidianVaultBuilder:
             commit_hash = d.get("commit_hash") or "HEAD"
             lang = d.get("language") or "ru"
             ver = int(d.get("current_version") or 1)
-            facts = self.wm.store.get_facts(workspace_id=workspace_id, document_id=doc_id, include_stale=False)
-            all_ents = self.wm.store.list_entities(workspace_id=workspace_id)
-            doc_ents = [e for e in all_ents if e.get("document_id") == doc_id]
+            facts = facts_by_doc.get(doc_id, [])
+            doc_ents = ents_by_doc.get(doc_id, [])
 
             md_path = self._resolve_doc_md_path(ws_path, doc_id)
-            md_path.parent.mkdir(parents=True, exist_ok=True)
             rendered = self.render_compact_document_markdown(
                 workspace_id=workspace_id,
                 doc_id=doc_id,
@@ -501,8 +525,8 @@ class ObsidianVaultBuilder:
                 version_num=ver,
                 original_path=d.get("file_path"),
             )
-            md_path.write_text(rendered, encoding="utf-8")
-            enriched_files.append(str(md_path.relative_to(ws_path)).replace("\\", "/"))
+            self._atomic_write_text(md_path, rendered)
+            enriched_files.append(str(md_path.relative_to(ws_path.resolve())).replace("\\", "/"))
 
         kb_path = self.rebuild_knowledge_base_index(workspace_id)
 
@@ -628,7 +652,7 @@ class ObsidianVaultBuilder:
                 lines.append(f"- [[{Path(rd).stem}|{rd}]]")
             lines.append("")
 
-        note_path.write_text("\n".join(lines), encoding="utf-8")
+        self._atomic_write_text(note_path, "\n".join(lines))
 
         # Обновляем сводный индекс, чтобы новая тема появилась в _Knowledge_Base.md
         self.rebuild_knowledge_base_index(workspace_id)

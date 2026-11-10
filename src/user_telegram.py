@@ -12,18 +12,24 @@
 # Package: src
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 19:15:00
+# Updated: 2026-11-10 14:21:00
 # =============================================================================
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import datetime
 from pathlib import Path
 import secrets
 import sqlite3
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Generator, Optional
 
 from logger import logger
+
+
+def _utc_now() -> datetime.datetime:
+    """Возвращает текущее время UTC."""
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
 class UserTelegramService:
@@ -34,11 +40,22 @@ class UserTelegramService:
         self.db_path = db_path
         self._init_tables()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Создает и возвращает соединение с SQLite."""
-        conn = sqlite3.connect(self.db_path)
+    @contextmanager
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """Создает соединение с SQLite в режиме WAL и гарантированно закрывает его."""
+        conn = sqlite3.connect(self.db_path, timeout=15.0)
         conn.row_factory = sqlite3.Row
-        return conn
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=15000;")
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_tables(self) -> None:
         """Создает таблицу токенов привязки, если она еще не создана."""
@@ -55,19 +72,12 @@ class UserTelegramService:
                     )
                     """
                 )
-                conn.commit()
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_tg_tokens_user ON telegram_link_tokens (user_id)")
         except Exception as exc:
             logger.error(f"[UserTelegramService] Ошибка инициализации таблицы токенов: {exc}")
 
     def get_user_by_telegram_id(self, telegram_id: int) -> Optional[Dict[str, Any]]:
-        """Ищет активного пользователя по его Telegram ID.
-
-        Args:
-            telegram_id: Числовой идентификатор пользователя в Telegram.
-
-        Returns:
-            Optional[Dict[str, Any]]: Запись пользователя или None.
-        """
+        """Ищет активного пользователя по его Telegram ID."""
         try:
             with self._get_connection() as conn:
                 row = conn.execute(
@@ -80,45 +90,27 @@ class UserTelegramService:
             return None
 
     def generate_link_token(self, user_id: int, ttl_seconds: int = 900) -> str:
-        """Генерирует уникальный 8-значный код привязки для пользователя.
-
-        Args:
-            user_id: Числовой идентификатор пользователя.
-            ttl_seconds: Время жизни токена в секундах (по умолчанию 15 минут).
-
-        Returns:
-            str: 8-значный токен (например, 'A1B2C3D4').
-        """
+        """Генерирует уникальный 8-значный код привязки для пользователя."""
         token = secrets.token_hex(4).upper()
-        now = datetime.datetime.now()
+        now = _utc_now()
         expires = now + datetime.timedelta(seconds=ttl_seconds)
-        now_str = now.strftime("%Y-%m-%d %H:%M:%S")
-        exp_str = expires.strftime("%Y-%m-%d %H:%M:%S")
+        now_str = now.isoformat()
+        exp_str = expires.isoformat()
 
         with self._get_connection() as conn:
-            conn.execute("DELETE FROM telegram_link_tokens WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM telegram_link_tokens WHERE user_id = ?", (int(user_id),))
             conn.execute(
                 "INSERT INTO telegram_link_tokens (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
-                (token, user_id, exp_str, now_str),
+                (token, int(user_id), exp_str, now_str),
             )
-            conn.commit()
 
         logger.info(f"[UserTelegramService] Сгенерирован код привязки Telegram для пользователя #{user_id}: {token}")
         return token
 
     def link_account(self, token: str, telegram_id: int, telegram_username: str = "") -> bool:
-        """Привязывает Telegram ID к пользователю по действительному токену.
-
-        Args:
-            token: Одноразовый код привязки.
-            telegram_id: Числовой ID в Telegram.
-            telegram_username: Имя пользователя Telegram.
-
-        Returns:
-            bool: True при успехе, False при недействительном или просроченном коде.
-        """
+        """Привязывает Telegram ID к пользователю по действительному токену."""
         clean_token = token.strip().upper()
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = _utc_now().isoformat()
 
         with self._get_connection() as conn:
             row = conn.execute(
@@ -130,47 +122,34 @@ class UserTelegramService:
                 return False
 
             user_id = row["user_id"]
-            expires_at = row["expires_at"]
+            expires_at = str(row["expires_at"])
             if expires_at < now_str:
                 conn.execute("DELETE FROM telegram_link_tokens WHERE token = ?", (clean_token,))
-                conn.commit()
                 logger.warning(f"[UserTelegramService] Код привязки {clean_token} просрочен")
                 return False
 
-            # Очищаем telegram_id у других пользователей при необходимости
             conn.execute(
                 "UPDATE users SET telegram_id = NULL, telegram_username = NULL WHERE telegram_id = ?",
                 (int(telegram_id),),
             )
-
-            # Привязываем к текущему пользователю
             conn.execute(
                 "UPDATE users SET telegram_id = ?, telegram_username = ?, updated_at = ? WHERE id = ?",
-                (int(telegram_id), str(telegram_username or ""), now_str, user_id),
+                (int(telegram_id), str(telegram_username or ""), now_str, int(user_id)),
             )
             conn.execute("DELETE FROM telegram_link_tokens WHERE token = ?", (clean_token,))
-            conn.commit()
 
         logger.info(f"[UserTelegramService] Telegram ID {telegram_id} успешно привязан к пользователю #{user_id}")
         return True
 
     def unlink_account(self, user_id: int) -> bool:
-        """Отвязывает Telegram от профиля пользователя.
-
-        Args:
-            user_id: Идентификатор пользователя.
-
-        Returns:
-            bool: True при успехе.
-        """
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        """Отвязывает Telegram от профиля пользователя."""
+        now_str = _utc_now().isoformat()
         with self._get_connection() as conn:
             conn.execute(
                 "UPDATE users SET telegram_id = NULL, telegram_username = NULL, updated_at = ? WHERE id = ?",
-                (now_str, user_id),
+                (now_str, int(user_id)),
             )
-            conn.execute("DELETE FROM telegram_link_tokens WHERE user_id = ?", (user_id,))
-            conn.commit()
+            conn.execute("DELETE FROM telegram_link_tokens WHERE user_id = ?", (int(user_id),))
 
         logger.info(f"[UserTelegramService] Telegram отвязан от пользователя #{user_id}")
         return True

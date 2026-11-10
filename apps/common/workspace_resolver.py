@@ -12,13 +12,14 @@
 # Package: apps.common
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:55:00
+# Updated: 2026-11-10 14:28:30
 # =============================================================================
 
 from __future__ import annotations
 """Единый сервис разрешения рабочих пространств и безопасной навигации по путям."""
 
 from pathlib import Path
+import re
 from typing import Any, Dict, Optional, Tuple
 
 from logger import logger
@@ -43,7 +44,7 @@ def format_file_size(size_bytes: int) -> str:
 
 
 def sanitize_relative_path(rel_path: str = "") -> str:
-    """Очищает и нормализует относительный путь, удаляя лишние слэши.
+    """Очищает и нормализует относительный путь, удаляя лишние слэши и нулевые байты.
 
     Args:
         rel_path: Входной относительный путь.
@@ -51,7 +52,7 @@ def sanitize_relative_path(rel_path: str = "") -> str:
     Returns:
         Нормализованный относительный путь с прямыми слэшами.
     """
-    clean = (rel_path or "").strip().replace("\\", "/").strip("/")
+    clean = (rel_path or "").replace("\x00", "").strip().replace("\\", "/").strip("/")
     if clean in {".", "/"}:
         return ""
     return clean
@@ -106,14 +107,19 @@ class CommonWorkspaceResolver:
 
         try:
             from apps.ai_assistant.core.workspace_registry import resolve_workspaces_dir
-            ws_dir = resolve_workspaces_dir()
+            ws_dir = resolve_workspaces_dir().resolve()
         except Exception:
             from header import __root__
-            ws_dir = __root__ / "data" / "workspaces"
-        resolved_ws = workspace_id or "demo"
-        ws_root = (ws_dir / resolved_ws).resolve()
+            ws_dir = (__root__ / "data" / "workspaces").resolve()
+        raw_ws = (workspace_id or "demo").strip()
+        safe_ws = re.sub(r'[\\/:*?"<>|\x00]', "_", raw_ws).strip(".") or "demo"
+        ws_root = (ws_dir / safe_ws).resolve()
+        try:
+            ws_root.relative_to(ws_dir)
+        except ValueError:
+            raise ValueError(f"Недопустимый идентификатор рабочего пространства: '{workspace_id}'")
         ws_root.mkdir(parents=True, exist_ok=True)
-        return resolved_ws, ws_root
+        return safe_ws, ws_root
 
     def resolve_path(
         self,
@@ -170,7 +176,12 @@ class CommonWorkspaceResolver:
                                 break
                         elif clean_rel.startswith(f"{s_name}/"):
                             sub_rel = clean_rel[len(s_name) + 1:]
-                            cand = (s_path / sub_rel).resolve()
+                            s_path_resolved = s_path.resolve()
+                            cand = (s_path_resolved / sub_rel).resolve()
+                            try:
+                                cand.relative_to(s_path_resolved)
+                            except ValueError:
+                                continue
                             if cand.exists() or not must_exist:
                                 target = cand
                                 is_inside_root = True

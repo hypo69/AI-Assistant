@@ -21,7 +21,7 @@
 # Package: logger
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:37:00
+# Updated: 2026-11-10 14:35:00
 # =============================================================================
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from __future__ import annotations
 import atexit
 from collections import Counter
 import copy
+from datetime import datetime, timezone
 import inspect
 import json
 import logging
@@ -185,11 +186,12 @@ class SingletonMeta(type):
 
 
 class JsonFormatter(logging.Formatter):
-    """Кастомный форматтер для сериализации лог-записей в JSON формат."""
+    """Кастомный форматтер для сериализации лог-записей в JSON формат со строгим UTC ISO 8601."""
 
     def format(self, record: logging.LogRecord) -> str:
+        utc_ts = datetime.fromtimestamp(record.created, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         log_entry: Dict[str, Any] = {
-            'timestamp': self.formatTime(record, self.datefmt),
+            'timestamp': utc_ts,
             'level': record.levelname,
             'levelname': record.levelname,
             'message': record.getMessage().replace('"', "'"),
@@ -223,22 +225,32 @@ class CompressingHandler(logging.handlers.RotatingFileHandler):
             if not self.buffer or not self._dirty:
                 return
             try:
-                if not self.stream:
+                if not self.stream or getattr(self.stream, 'closed', False):
                     self.stream = self._open()
                 for msg, count in self.buffer.items():
-                    if count > 1:
-                        self.stream.write(f'[{count}x] {msg}\n')
-                    else:
-                        self.stream.write(f'{msg}\n')
-                self.stream.flush()
+                    line = f'[{count}x] {msg}\n' if count > 1 else f'{msg}\n'
+                    if self.maxBytes > 0 and self.stream:
+                        try:
+                            self.stream.seek(0, 2)
+                            if self.stream.tell() + len(line.encode(self.encoding or 'utf-8', errors='replace')) >= self.maxBytes:
+                                self.doRollover()
+                                if not self.stream or getattr(self.stream, 'closed', False):
+                                    self.stream = self._open()
+                        except Exception:
+                            pass
+                    if self.stream:
+                        self.stream.write(line)
+                if self.stream:
+                    self.stream.flush()
                 self.buffer.clear()
                 self._dirty = False
             except Exception:
                 pass
 
     def close(self) -> None:
-        self.flush()
-        super().close()
+        with self._lock:
+            self.flush()
+            super().close()
 
 
 class PrettyConsoleFormatter(logging.Formatter):

@@ -2665,5 +2665,18 @@
   "theme": {
     "copyHexTitle": "העתק קוד HEX",
     "resetColorTitle": "אפס צבע לברירת מחדל"
-  }
+  },
+  "workspace.subtabs.chatTitle": "workspace.subtabs.chatTitle",
+  "workspace.blocks.block-dirTitle": "Содержимое репозитория (Git)",
+  "workspace.blocks.block-trackTitle": "Добавление файлов в слежение",
+  "workspace.blocks.block-obsidianTitle": "Раздел: Obsidian Vault",
+  "workspace.blocks.block-sourcesTitle": "Раздел: Внешние источники",
+  "tooltips.subtabs.catalogTitle": "tooltips.subtabs.catalogTitle",
+  "tooltips.subtabs.editorTitle": "tooltips.subtabs.editorTitle",
+  "tooltips.subtabs.kbTitle": "tooltips.subtabs.kbTitle",
+  "tooltips.subtabs.auditTitle": "tooltips.subtabs.auditTitle",
+  "tooltips.subtabs.panel-editor-lang-ruTitle": "Раздел: Русский (RU)",
+  "tooltips.subtabs.panel-editor-lang-enTitle": "Раздел: English (EN)",
+  "tooltips.subtabs.panel-editor-lang-heTitle": "Раздел: עברית (HE)",
+  "tooltips.subtabs.panel-editor-lang-ukTitle": "Раздел: Українська (UK)"
 }

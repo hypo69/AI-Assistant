@@ -194,5 +194,20 @@
     },
     "storage": {
         "workspaces_dir": "/data/workspaces"
+    },
+    "paperless": {
+        "base_url": "http://127.0.0.1:8000",
+        "api_version": 10,
+        "connect_timeout_sec": 5,
+        "read_timeout_sec": 30,
+        "upload_timeout_sec": 120,
+        "retries": 3,
+        "workspace_tag_prefix": "ws-",
+        "runtime_dir": "paperless-ngx/runtime",
+        "autostart": true,
+        "startup_timeout_sec": 180,
+        "startup_poll_sec": 5,
+        "sync_on_start": true,
+        "terminal_title": "Paperless-ngx"
     }
 }

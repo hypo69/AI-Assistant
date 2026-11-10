@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.core.store
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-26 00:19:00
+# Updated: 2026-11-10 15:56:03
 # =============================================================================
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS documents (
     commit_hash TEXT DEFAULT '',
     status TEXT DEFAULT 'indexed',
     updated_at TEXT NOT NULL,
+    paperless_id INTEGER DEFAULT NULL,
     PRIMARY KEY (workspace_id, document_id)
 );
 
@@ -79,11 +80,11 @@ CREATE TABLE IF NOT EXISTS facts (
     fact_type TEXT NOT NULL,
     relation TEXT NOT NULL,
     language TEXT NOT NULL,
-    subject_json TEXT,
-    predicate_json TEXT,
-    object_json TEXT,
-    owner_json TEXT,
-    possessed_json TEXT,
+    subject_json TEXT NOT NULL DEFAULT '',
+    predicate_json TEXT NOT NULL DEFAULT '',
+    object_json TEXT NOT NULL DEFAULT '',
+    owner_json TEXT NOT NULL DEFAULT '',
+    possessed_json TEXT NOT NULL DEFAULT '',
     raw_fact_json TEXT NOT NULL,
     is_negated INTEGER DEFAULT 0,
     confidence REAL DEFAULT 1.0,
@@ -179,12 +180,17 @@ CREATE TABLE IF NOT EXISTS app_settings (
     updated_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_facts_ws_status ON facts (workspace_id, status);
-CREATE INDEX IF NOT EXISTS idx_facts_doc ON facts (workspace_id, document_id);
-CREATE INDEX IF NOT EXISTS idx_facts_lang ON facts (workspace_id, language, fact_type);
+CREATE INDEX IF NOT EXISTS idx_documents_ws_hash ON documents (workspace_id, content_hash);
+CREATE INDEX IF NOT EXISTS idx_documents_ws_updated ON documents (workspace_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_facts_ws_status ON facts (workspace_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_facts_doc ON facts (workspace_id, document_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_facts_lang ON facts (workspace_id, language, fact_type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_doc_versions_ws_doc ON document_versions (workspace_id, document_id, version_num DESC);
 CREATE INDEX IF NOT EXISTS idx_doc_chunks_ws_doc ON document_chunks (workspace_id, document_id);
 CREATE INDEX IF NOT EXISTS idx_entities_ws_doc ON entities (workspace_id, document_id);
 CREATE INDEX IF NOT EXISTS idx_fact_sources_ws_doc ON fact_sources (workspace_id, document_id);
+CREATE INDEX IF NOT EXISTS idx_lang_analysis_ws_doc ON language_analysis (workspace_id, document_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_runs_ws_doc ON analysis_runs (workspace_id, document_id);
 CREATE INDEX IF NOT EXISTS idx_query_history_ws ON query_history (workspace_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_model_usage_ws ON model_usage (workspace_id, id DESC);
 """

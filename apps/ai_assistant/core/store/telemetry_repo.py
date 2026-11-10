@@ -4,14 +4,15 @@
 # =============================================================================
 # Description:
 #   Управление таблицами query_history, model_usage, embedding_registry
-#   и агрегация метрик качества и производительности (ТЗ п. 8, 9.2, 10.2).
+#   и агрегация метрик качества и производительности (ТЗ п. 8, 9.2, 10.2)
+#   с расчётом перцентилей p50/p95/p99 и метрик RED (SYSTEM_ENGINEERING § 6.3).
 #
 # File: core/store/telemetry_repo.py
 # Project: ai-windows-admin
 # Package: apps.ai_assistant.core.store
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-27 22:20:00
+# Updated: 2026-11-10 13:52:00
 # =============================================================================
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ class TelemetryRepoMixin:
         status: str,
         cloud_used: bool,
         latency_ms: float,
-    ) -> None:
+    ) -> bool:
         """Фиксирует выполненный поисковый вопрос в журнале query_history."""
         conn = self._get_conn(workspace_id=workspace_id)
         try:
@@ -58,6 +59,7 @@ class TelemetryRepoMixin:
                         get_utc_now_iso(),
                     ),
                 )
+            return True
         finally:
             self._close_conn(conn)
 
@@ -72,7 +74,7 @@ class TelemetryRepoMixin:
         prompt_chars: int = 0,
         response_chars: int = 0,
         error_message: str = "",
-    ) -> None:
+    ) -> bool:
         """Фиксирует вызов локальной или облачной модели ИИ в таблице model_usage."""
         conn = self._get_conn(workspace_id=workspace_id)
         try:
@@ -97,6 +99,7 @@ class TelemetryRepoMixin:
                         get_utc_now_iso(),
                     ),
                 )
+            return True
         finally:
             self._close_conn(conn)
 
@@ -107,7 +110,7 @@ class TelemetryRepoMixin:
         dimension: int,
         index_path: str,
         total_vectors: int,
-    ) -> None:
+    ) -> bool:
         """Обновляет сведения о векторном индексе FAISS для рабочей области."""
         conn = self._get_conn(workspace_id=workspace_id)
         try:
@@ -125,31 +128,45 @@ class TelemetryRepoMixin:
                     """,
                     (workspace_id, model_name, dimension, index_path, total_vectors, get_utc_now_iso()),
                 )
+            return True
         finally:
             self._close_conn(conn)
 
-    def get_metrics(self, workspace_id: Optional[str] = None) -> Dict[str, Any]:
-        """Возвращает агрегированную статистику качества, скорости и вызовов ИИ (ТЗ п. 8, 9.2, 10.2)."""
+    def get_metrics(self, workspace_id: Optional[str] = "") -> Dict[str, Any]:
+        """Возвращает агрегированную статистику качества, перцентилей задержек (p50/p95/p99) и вызовов ИИ."""
         conn = self._get_conn(workspace_id=workspace_id)
         try:
             ws_filter = "WHERE workspace_id = ?" if workspace_id else ""
             params = (workspace_id,) if workspace_id else ()
 
-            docs_cnt = conn.execute(f"SELECT COUNT(*) FROM documents {ws_filter}", params).fetchone()[0]
-            facts_active = conn.execute(
-                f"SELECT COUNT(*) FROM facts {ws_filter + (' AND ' if ws_filter else 'WHERE ')} status != 'stale'",
+            docs_cnt = int(conn.execute(f"SELECT COUNT(*) FROM documents {ws_filter}", params).fetchone()[0])
+            facts_row = conn.execute(
+                f"""
+                SELECT
+                    COALESCE(SUM(CASE WHEN status != 'stale' THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN status = 'stale' THEN 1 ELSE 0 END), 0)
+                FROM facts {ws_filter}
+                """,
                 params,
-            ).fetchone()[0]
-            facts_stale = conn.execute(
-                f"SELECT COUNT(*) FROM facts {ws_filter + (' AND ' if ws_filter else 'WHERE ')} status = 'stale'",
+            ).fetchone()
+            facts_active = int(facts_row[0]) if facts_row else 0
+            facts_stale = int(facts_row[1]) if facts_row else 0
+
+            lat_rows = conn.execute(
+                f"SELECT latency_ms, status FROM query_history {ws_filter} ORDER BY latency_ms ASC",
                 params,
-            ).fetchone()[0]
-            queries_cnt = conn.execute(f"SELECT COUNT(*) FROM query_history {ws_filter}", params).fetchone()[0]
-            avg_q_lat = conn.execute(
-                f"SELECT COALESCE(AVG(latency_ms), 0.0) FROM query_history {ws_filter}",
-                params,
-            ).fetchone()[0]
-            cloud_calls = conn.execute(f"SELECT COUNT(*) FROM model_usage {ws_filter}", params).fetchone()[0]
+            ).fetchall()
+            queries_cnt = len(lat_rows)
+            latencies = [float(r["latency_ms"]) for r in lat_rows]
+            err_queries = sum(1 for r in lat_rows if str(r["status"]).lower() in ("error", "failed"))
+
+            avg_q_lat = round(sum(latencies) / queries_cnt, 2) if queries_cnt else 0.0
+            p50_lat = round(latencies[int(queries_cnt * 0.50)], 2) if queries_cnt else 0.0
+            p95_lat = round(latencies[min(queries_cnt - 1, int(queries_cnt * 0.95))], 2) if queries_cnt else 0.0
+            p99_lat = round(latencies[min(queries_cnt - 1, int(queries_cnt * 0.99))], 2) if queries_cnt else 0.0
+            error_rate_pct = round((err_queries / queries_cnt) * 100.0, 2) if queries_cnt else 0.0
+
+            cloud_calls = int(conn.execute(f"SELECT COUNT(*) FROM model_usage {ws_filter}", params).fetchone()[0])
 
             recent_queries = [
                 dict(r)
@@ -171,7 +188,11 @@ class TelemetryRepoMixin:
                 "facts_active": facts_active,
                 "facts_stale": facts_stale,
                 "queries_total": queries_cnt,
-                "avg_query_latency_ms": round(float(avg_q_lat), 2),
+                "avg_query_latency_ms": avg_q_lat,
+                "p50_query_latency_ms": p50_lat,
+                "p95_query_latency_ms": p95_lat,
+                "p99_query_latency_ms": p99_lat,
+                "query_error_rate_pct": error_rate_pct,
                 "cloud_model_calls": cloud_calls,
                 "recent_queries": recent_queries,
                 "recent_model_usage": recent_models,

@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:24:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -493,7 +493,7 @@ class WorkspaceItemsTracker:
                             qual_path = str(meta["qualified_path"])
                         existing_item = existing_by_rel[doc_id]
                         existing_item["local_path"] = ext_path_str
-                        existing_item["external_path"] = ext_path_str
+                        existing_item["external_path"] = qual_path
                         existing_item["qualified_path"] = qual_path
                         existing_item["source_mode"] = "linked"
                         continue
@@ -786,7 +786,10 @@ class WorkspaceItemsTracker:
                     "system_files_count": len(system_files),
                     "items": manifest_items,
                 }
-                (meta_dir / "manifest.json").write_text(json.dumps(manifest_obj, indent=2, ensure_ascii=False), encoding="utf-8")
+                manifest_path = meta_dir / "manifest.json"
+                tmp_manifest = manifest_path.with_suffix(".json.tmp")
+                tmp_manifest.write_text(json.dumps(manifest_obj, indent=2, ensure_ascii=False), encoding="utf-8")
+                os.replace(tmp_manifest, manifest_path)
             except Exception as man_exc:
                 logger.debug(f"[WorkspaceItemsTracker] Запись .workspace/manifest.json: {man_exc}")
 
@@ -887,15 +890,20 @@ class WorkspaceItemsTracker:
 
         # 2. Если не найден среди внешних — резолвим внутри ws_path с защитой от path traversal
         if target_path is None:
+            ws_resolved = ws_path.resolve()
             target_path = (ws_path / clean_rel).resolve()
-            if not target_path.exists():
-                assets_cand = (ws_path / "assets" / clean_rel).resolve()
-                if assets_cand.exists():
-                    target_path = assets_cand
             try:
-                target_path.relative_to(ws_path)
+                target_path.relative_to(ws_resolved)
             except ValueError:
                 raise ValueError(f"Путь '{rel_path}' выходит за пределы каталога рабочей области.")
+            if not target_path.exists():
+                assets_cand = (ws_path / "assets" / clean_rel).resolve()
+                try:
+                    assets_cand.relative_to(ws_resolved)
+                except ValueError:
+                    raise ValueError(f"Путь '{rel_path}' выходит за пределы каталога рабочей области.")
+                if assets_cand.exists():
+                    target_path = assets_cand
 
         if not target_path.exists():
             raise FileNotFoundError(f"Файл '{clean_rel}' не найден в рабочей области '{workspace_id}'.")

@@ -19,12 +19,13 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-01 17:40:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """Связывание артефактов версий Git с базой знаний WikiLLM и графом связей."""
 
+import contextlib
 import re
 import sqlite3
 from pathlib import Path
@@ -42,20 +43,23 @@ class WikiLLMVersionLinker:
         self,
         db_path: Path | str = ":memory:",
         temporal_graph: Optional[TemporalCodeGraph] = None,
+        graph: Optional[TemporalCodeGraph] = None,
     ) -> None:
         """Инициализирует компонент связывания версий.
 
         Args:
             db_path: Путь к файлу базы данных SQLite базы знаний WikiLLM.
             temporal_graph: Опциональный экземпляр темпорального графа.
+            graph: Опциональный псевдоним экземпляра темпорального графа для совместимости DI.
         """
         self.db_path = Path(db_path) if str(db_path) != ":memory:" else ":memory:"
-        self.graph = temporal_graph or TemporalCodeGraph(db_path=self.db_path)
+        self.graph = graph or temporal_graph or TemporalCodeGraph(db_path=self.db_path)
 
     def _get_connection(self) -> sqlite3.Connection:
         """Возвращает соединение с базой знаний WikiLLM."""
-        conn = sqlite3.connect(str(self.db_path), timeout=10.0, check_same_thread=False)
+        conn = sqlite3.connect(str(self.db_path), timeout=15.0, check_same_thread=False)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=15000;")
         return conn
 
     def find_matching_wiki_entities(self, text: str, limit: int = 5) -> List[Dict[str, Any]]:
@@ -74,42 +78,40 @@ class WikiLLMVersionLinker:
             return []
 
         results: List[Dict[str, Any]] = []
-        conn = self._get_connection()
         try:
-            # Извлекаем слова длиной от 4 символов
-            words = [w.lower() for w in re.findall(r"[a-zA-Zа-яА-Я0-9_]+", text) if len(w) >= 4]
-            if not words:
-                return []
+            with contextlib.closing(self._get_connection()) as conn:
+                # Извлекаем слова длиной от 4 символов
+                words = [w.lower() for w in re.findall(r"[a-zA-Zа-яА-Я0-9_]+", text) if len(w) >= 4]
+                if not words:
+                    return []
 
-            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='entities'")
-            if not cursor.fetchone():
-                return []
+                cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='entities'")
+                if not cursor.fetchone():
+                    return []
 
-            placeholders = " OR ".join(["canonical_key LIKE ? OR name LIKE ?"] * min(len(words), 5))
-            params: List[str] = []
-            for w in words[:5]:
-                pattern = f"%{w}%"
-                params.extend([pattern, pattern])
+                placeholders = " OR ".join(["canonical_key LIKE ? OR name LIKE ?"] * min(len(words), 5))
+                params: List[Any] = []
+                for w in words[:5]:
+                    pattern = f"%{w}%"
+                    params.extend([pattern, pattern])
 
-            query = f"""
-                SELECT canonical_key, name, entity_type, summary
-                FROM entities
-                WHERE {placeholders}
-                LIMIT ?
-            """
-            params.append(str(limit))
-            cur = conn.execute(query, params)
-            for row in cur.fetchall():
-                results.append({
-                    "canonical_key": row["canonical_key"],
-                    "name": row["name"],
-                    "entity_type": row["entity_type"],
-                    "summary": row["summary"] or "",
-                })
+                query = f"""
+                    SELECT canonical_key, name, entity_type, summary
+                    FROM entities
+                    WHERE {placeholders}
+                    LIMIT ?
+                """
+                params.append(int(limit))
+                cur = conn.execute(query, params)
+                for row in cur.fetchall():
+                    results.append({
+                        "canonical_key": row["canonical_key"],
+                        "name": row["name"],
+                        "entity_type": row["entity_type"],
+                        "summary": row["summary"] or "",
+                    })
         except Exception as exc:
             logger.debug(f"[WikiLLMVersionLinker] Ошибка поиска сущностей в WikiLLM: {exc}")
-        finally:
-            conn.close()
 
         return results
 
@@ -192,30 +194,31 @@ class WikiLLMVersionLinker:
         if isinstance(self.db_path, Path) and not self.db_path.exists():
             return context
 
-        conn = self._get_connection()
         try:
-            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='entities'")
-            if cursor.fetchone():
-                cur = conn.execute(
-                    "SELECT canonical_key, name, entity_type, summary FROM entities WHERE canonical_key = ?",
-                    (entity_key,),
-                )
-                row = cur.fetchone()
-                if row:
-                    context["entity"] = {
-                        "canonical_key": row["canonical_key"],
-                        "name": row["name"],
-                        "entity_type": row["entity_type"],
-                        "summary": row["summary"] or "",
-                    }
+            with contextlib.closing(self._get_connection()) as conn:
+                cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='entities'")
+                if cursor.fetchone():
+                    cur = conn.execute(
+                        "SELECT canonical_key, name, entity_type, summary FROM entities WHERE canonical_key = ?",
+                        (entity_key,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        context["entity"] = {
+                            "canonical_key": row["canonical_key"],
+                            "name": row["name"],
+                            "entity_type": row["entity_type"],
+                            "summary": row["summary"] or "",
+                        }
         except Exception as exc:
             logger.debug(f"[WikiLLMVersionLinker] Ошибка выборки сущности {entity_key}: {exc}")
-        finally:
-            conn.close()
 
-        # Подтягиваем связи из графа
-        all_links = self.graph.get_active_links()
-        active = [lnk for lnk in all_links if lnk.target_id == entity_key or lnk.source_id == entity_key]
+        # Подтягиваем связи из графа напрямую через SQL-фильтрацию
+        if hasattr(self.graph, "get_active_links_for_entity"):
+            active = self.graph.get_active_links_for_entity(entity_key)
+        else:
+            all_links = self.graph.get_active_links()
+            active = [lnk for lnk in all_links if lnk.target_id == entity_key or lnk.source_id == entity_key]
         context["active_links"] = active
         context["history_count"] = len(active)
 

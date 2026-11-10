@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 14:00:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import re
 import time
@@ -152,10 +153,13 @@ class VirtualCategoryTreeEngine:
         }
 
     def _save_taxonomy_state(self, ws_path: Path, state: Dict[str, Any]) -> None:
-        """Сохраняет состояние виртуальных категорий и историю ревизий на диск."""
+        """Сохраняет состояние виртуальных категорий и историю ревизий на диск (атомарно)."""
         t_file = self._taxonomy_file_path(ws_path)
         try:
-            t_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+            t_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp_file = t_file.with_suffix(".json.tmp")
+            tmp_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+            os.replace(tmp_file, t_file)
         except Exception as exc:
             logger.warning(f"[VirtualCategoryTree] Ошибка сохранения {t_file}: {exc}")
 
@@ -202,23 +206,27 @@ class VirtualCategoryTreeEngine:
             except Exception:
                 pass
 
-        # Если это локальный текстовый файл в рабочей директории
+        # Если это локальный текстовый файл в рабочей директории (чтение превью до 64 КБ)
         local_cand = ws_path / rel_path
         if local_cand.exists() and local_cand.is_file():
             try:
-                raw = local_cand.read_bytes()
+                with open(local_cand, "rb") as f:
+                    raw = f.read(65536)
                 if b"\x00" not in raw[:4096]:
                     return raw.decode("utf-8", errors="replace")
             except Exception:
                 pass
 
-        # Если это внешний текстовый файл на текущем ПК
+        # Если это внешний текстовый файл на текущем ПК (чтение превью до 64 КБ)
         ext_cand_str = item.get("local_path")
         if ext_cand_str:
             ext_cand = Path(str(ext_cand_str))
             if ext_cand.exists() and ext_cand.is_file() and ext_cand.suffix.lower() in {".txt", ".md", ".csv", ".json", ".py", ".log"}:
                 try:
-                    return ext_cand.read_text(encoding="utf-8", errors="replace")
+                    with open(ext_cand, "rb") as f:
+                        raw = f.read(65536)
+                    if b"\x00" not in raw[:4096]:
+                        return raw.decode("utf-8", errors="replace")
                 except Exception:
                     pass
         return ""

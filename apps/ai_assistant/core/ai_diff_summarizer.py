@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-15 08:30:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -70,21 +70,23 @@ class AIDiffSummarizer:
         if not diff_text:
             return "Изменения отсутствуют или файл не был модифицирован."
 
+        diff_text = diff_text[:200_000]
         added_lines: List[str] = []
         removed_lines: List[str] = []
         changed_functions: List[str] = []
 
         for line in diff_text.splitlines():
-            if line.startswith("@@"):
-                func_match = re.search(r"@@\s+.*?\s+@@\s*(def\s+[a-zA-Z0-9_]+|class\s+[a-zA-Z0-9_]+)?", line)
+            safe_line = line[:2048]
+            if safe_line.startswith("@@"):
+                func_match = re.search(r"@@\s+.*?\s+@@\s*(def\s+[a-zA-Z0-9_]+|class\s+[a-zA-Z0-9_]+)?", safe_line)
                 if func_match and func_match.group(1):
                     changed_functions.append(func_match.group(1).strip())
-            elif line.startswith("+") and not line.startswith("+++"):
-                stripped = line[1:].strip()
+            elif safe_line.startswith("+") and not safe_line.startswith("+++"):
+                stripped = safe_line[1:].strip()
                 if stripped:
                     added_lines.append(stripped)
-            elif line.startswith("-") and not line.startswith("---"):
-                stripped = line[1:].strip()
+            elif safe_line.startswith("-") and not safe_line.startswith("---"):
+                stripped = safe_line[1:].strip()
                 if stripped:
                     removed_lines.append(stripped)
 
@@ -163,18 +165,20 @@ class AIDiffSummarizer:
             return False, sanitized, "Отсутствуют обязательные идентификаторы source_id или target_id."
 
         # 2. Проверка Prompt Injection в текстовых полях
-        text_to_check = f"{candidate.get('summary', '')} {candidate.get('target_id', '')}"
+        text_to_check = " ".join(str(v) for v in candidate.values() if isinstance(v, str))[:200_000]
         for pattern in self.INJECTION_PATTERNS:
             if pattern.search(text_to_check):
                 logger.warning(f"[AIDiffSummarizer] Обнаружена попытка Prompt Injection в кандидате: {pattern.pattern}")
                 return False, sanitized, "Отклонено политикой безопасности: обнаружены недопустимые команды или инъекции."
 
-        # 3. Фильтрация и маскирование секретов
-        summary = sanitized.get("summary", "")
-        for pattern in self.SECRET_PATTERNS:
-            if pattern.search(summary):
-                logger.info("[AIDiffSummarizer] В аннотации обнаружены секреты; выполняется маскирование.")
-                summary = pattern.sub(r"***REDACTED_SECRET***", summary)
+        # 3. Фильтрация и маскирование секретов во всех строковых полях кандидата
+        for key, val in list(sanitized.items()):
+            if isinstance(val, str):
+                masked_val = val[:200_000]
+                for pattern in self.SECRET_PATTERNS:
+                    if pattern.search(masked_val):
+                        logger.info(f"[AIDiffSummarizer] В поле '{key}' обнаружены секреты; выполняется маскирование.")
+                        masked_val = pattern.sub(r"***REDACTED_SECRET***", masked_val)
+                sanitized[key] = masked_val
 
-        sanitized["summary"] = summary
         return True, sanitized, None

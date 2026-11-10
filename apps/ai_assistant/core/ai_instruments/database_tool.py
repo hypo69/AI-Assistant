@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.core.ai_instruments
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-03 16:20:00
+# Updated: 2026-11-10 13:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -29,10 +29,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Dict, List, Optional
 
-from logger import logger
 from .models import AIInstrument
 from .service import AIInstrumentsService
 from .storage import AIInstrumentsStorage
+
+DEFAULT_TOOL_TIMEOUT_SEC = 30
 
 
 class DatabaseInstrumentTool:
@@ -54,25 +55,25 @@ class DatabaseInstrumentTool:
         self.tool_type = instrument.tool_type
         self.risk_level = instrument.risk_level
 
-    async def execute(self, **kwargs: Any) -> Dict[str, Any]:
+    async def execute(self, timeout_sec: int = DEFAULT_TOOL_TIMEOUT_SEC, **kwargs: Any) -> Dict[str, Any]:
         """Асинхронно исполняет инструмент в цепочке размышлений."""
         return await asyncio.to_thread(
             self.service.execute_instrument,
             tool_id=self.instrument.tool_id,
             parameters=kwargs,
-            timeout_sec=30,
+            timeout_sec=timeout_sec,
         )
 
 
 def load_reasoning_tools(
     storage: Optional[AIInstrumentsStorage] = None,
     limit: int = 100,
-    target_entity: Optional[str] = None,
+    target_entity: Optional[str] = "",
 ) -> List[DatabaseInstrumentTool]:
     """Загружает инструменты из базы данных для использования в цепочках размышлений.
 
     Args:
-        storage: Экземпляр хранилища или None для значения по умолчанию.
+        storage: Экземпляр хранилища.
         limit: Максимальное количество инструментов.
         target_entity: Фильтр по домену или сущности.
 
@@ -80,5 +81,5 @@ def load_reasoning_tools(
         Список объектов DatabaseInstrumentTool.
     """
     srv = AIInstrumentsService(storage=storage)
-    items = srv.list_instruments(limit=limit, target_entity=target_entity)
+    items = srv.list_instruments(limit=limit, target_entity=target_entity or None)
     return [DatabaseInstrumentTool(inst, srv) for inst in items]

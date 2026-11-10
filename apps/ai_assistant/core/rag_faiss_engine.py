@@ -19,15 +19,18 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 16:55:00
+# Updated: 2026-11-10 13:50:00
 # =============================================================================
 
 from __future__ import annotations
 """Инкрементальный FAISS RAG-движок для семантического поиска по истории версий."""
 
+from collections import Counter
 import hashlib
 import json
+import os
 import re
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -55,37 +58,47 @@ class RagFaissEngine:
         self.chunks: List[Dict[str, Any]] = []
         self._indexed_hashes: Set[str] = set()
         self._faiss_rag: Optional[TextRAG] = None
+        self._lock = threading.RLock()
         if self.index_dir.exists():
             self._load()
 
     @property
     def faiss_rag(self) -> TextRAG:
         """Ленивая инициализация TextRAG при фактическом обращении."""
-        if self._faiss_rag is None:
-            self.index_dir.mkdir(parents=True, exist_ok=True)
-            self._faiss_rag = TextRAG(db_path=self.index_dir / "faiss_vectors", dimension=256)
-        return self._faiss_rag
+        with self._lock:
+            if self._faiss_rag is None:
+                self.index_dir.mkdir(parents=True, exist_ok=True)
+                self._faiss_rag = TextRAG(db_path=self.index_dir / "faiss_vectors", dimension=256)
+            return self._faiss_rag
 
     def _load(self) -> None:
         """Загружает сохраненные чанки."""
-        if self.chunks_file.is_file():
-            try:
-                with open(self.chunks_file, "r", encoding="utf-8") as f:
-                    self.chunks = json.load(f)
-                self._indexed_hashes = {c["content_hash"] for c in self.chunks if "content_hash" in c}
-            except Exception as exc:
-                logger.warning(f"[RagFaissEngine] Ошибка чтения {self.chunks_file}: {exc}")
-                self.chunks = []
-                self._indexed_hashes = set()
+        with self._lock:
+            if self.chunks_file.is_file():
+                try:
+                    with open(self.chunks_file, "r", encoding="utf-8") as f:
+                        self.chunks = json.load(f)
+                    self._indexed_hashes = {c["content_hash"] for c in self.chunks if "content_hash" in c}
+                except Exception as exc:
+                    logger.warning(f"[RagFaissEngine] Ошибка чтения {self.chunks_file}: {exc}")
+                    self.chunks = []
+                    self._indexed_hashes = set()
 
     def _save(self) -> None:
-        """Сохраняет метаданные чанков."""
-        try:
-            self.index_dir.mkdir(parents=True, exist_ok=True)
-            with open(self.chunks_file, "w", encoding="utf-8") as f:
-                json.dump(self.chunks, f, ensure_ascii=False, indent=2)
-        except Exception as exc:
-            logger.error(f"[RagFaissEngine] Ошибка сохранения {self.chunks_file}: {exc}")
+        """Потокобезопасно и атомарно сохраняет метаданные чанков."""
+        with self._lock:
+            try:
+                self.index_dir.mkdir(parents=True, exist_ok=True)
+                tmp_file = self.chunks_file.with_suffix(".json.tmp")
+                serializable_chunks = [
+                    {k: v for k, v in c.items() if not k.startswith("_")}
+                    for c in self.chunks
+                ]
+                with open(tmp_file, "w", encoding="utf-8") as f:
+                    json.dump(serializable_chunks, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_file, self.chunks_file)
+            except Exception as exc:
+                logger.error(f"[RagFaissEngine] Ошибка сохранения {self.chunks_file}: {exc}")
 
     def index_commit(self, commit: CommitSummary, hunks: List[DiffHunkItem], file_path: Optional[str] = None) -> int:
         """Инкрементально индексирует коммит и связанные diff hunks.
@@ -98,61 +111,70 @@ class RagFaissEngine:
         Returns:
             int: Количество добавленных новых блоков.
         """
-        added = 0
+        with self._lock:
+            added = 0
 
-        # 1. Индексация текста коммита
-        msg_hash = compute_sha256(f"{commit.commit_hash}:{commit.message}")
-        if msg_hash not in self._indexed_hashes:
-            chunk = {
-                "chunk_id": f"commit_{commit.commit_hash[:8]}",
-                "source_type": "commit_message",
-                "commit_hash": commit.commit_hash,
-                "file_path": file_path or "",
-                "content_hash": msg_hash,
-                "text": f"Коммит: {commit.commit_hash[:8]} | Автор: {commit.author} | {commit.message}",
-                "timestamp": commit.timestamp,
-            }
-            self.chunks.append(chunk)
-            self._indexed_hashes.add(msg_hash)
-            added += 1
-
-        # 2. Индексация блоков diff
-        for idx, hunk in enumerate(hunks):
-            hunk_hash = compute_sha256(f"{commit.commit_hash}:{file_path}:{hunk.hunk_text}")
-            if hunk_hash in self._indexed_hashes:
-                continue
-
-            chunk = {
-                "chunk_id": f"diff_{commit.commit_hash[:8]}_{idx}",
-                "source_type": "diff_hunk",
-                "commit_hash": commit.commit_hash,
-                "file_path": file_path or "",
-                "content_hash": hunk_hash,
-                "text": f"Файл: {file_path}\nКоммит: {commit.commit_hash[:8]}\n{hunk.hunk_text}",
-                "timestamp": commit.timestamp,
-            }
-            self.chunks.append(chunk)
-            self._indexed_hashes.add(hunk_hash)
-            added += 1
-
-        if added > 0:
-            self._save()
-            new_docs = [
-                {
-                    "id": c["chunk_id"],
-                    "text": c["text"],
-                    "meta": {
-                        "chunk_id": c["chunk_id"],
-                        "source_type": c["source_type"],
-                        "commit_hash": c["commit_hash"],
-                        "file_path": c.get("file_path", ""),
-                    },
+            # 1. Индексация текста коммита
+            msg_hash = compute_sha256(f"{commit.commit_hash}:{commit.message}")
+            if msg_hash not in self._indexed_hashes:
+                text_val = f"Коммит: {commit.commit_hash[:8]} | Автор: {commit.author} | {commit.message}"
+                tokens = self._tokenize(text_val)
+                chunk = {
+                    "chunk_id": f"commit_{commit.commit_hash[:8]}",
+                    "source_type": "commit_message",
+                    "commit_hash": commit.commit_hash,
+                    "file_path": file_path or "",
+                    "content_hash": msg_hash,
+                    "text": text_val,
+                    "timestamp": commit.timestamp,
+                    "_token_counts": Counter(tokens),
+                    "_total_tokens": len(tokens),
                 }
-                for c in self.chunks[-added:]
-            ]
-            self.faiss_rag.add_documents(new_docs)
+                self.chunks.append(chunk)
+                self._indexed_hashes.add(msg_hash)
+                added += 1
 
-        return added
+            # 2. Индексация блоков diff
+            for idx, hunk in enumerate(hunks):
+                hunk_hash = compute_sha256(f"{commit.commit_hash}:{file_path}:{hunk.hunk_text}")
+                if hunk_hash in self._indexed_hashes:
+                    continue
+
+                text_val = f"Файл: {file_path}\nКоммит: {commit.commit_hash[:8]}\n{hunk.hunk_text}"
+                tokens = self._tokenize(text_val)
+                chunk = {
+                    "chunk_id": f"diff_{commit.commit_hash[:8]}_{idx}",
+                    "source_type": "diff_hunk",
+                    "commit_hash": commit.commit_hash,
+                    "file_path": file_path or "",
+                    "content_hash": hunk_hash,
+                    "text": text_val,
+                    "timestamp": commit.timestamp,
+                    "_token_counts": Counter(tokens),
+                    "_total_tokens": len(tokens),
+                }
+                self.chunks.append(chunk)
+                self._indexed_hashes.add(hunk_hash)
+                added += 1
+
+            if added > 0:
+                self._save()
+                new_docs = [
+                    {
+                        "id": c["chunk_id"],
+                        "text": c["text"],
+                        "meta": {
+                            "chunk_id": c["chunk_id"],
+                            "source_type": c["source_type"],
+                            "commit_hash": c["commit_hash"],
+                            "file_path": c.get("file_path", ""),
+                        },
+                    }
+                    for c in self.chunks[-added:]
+                ]
+                self.faiss_rag.add_documents(new_docs)
+
+            return added
 
     def _tokenize(self, text: str) -> List[str]:
         """Токенизирует строку на слова для лексического анализа."""
@@ -175,8 +197,10 @@ class RagFaissEngine:
             List[Dict[str, Any]]: Список ранжированных совпадений.
         """
         q_tokens = self._tokenize(query)
-        if not q_tokens or not self.chunks:
-            return []
+        with self._lock:
+            if not q_tokens or not self.chunks:
+                return []
+            chunks_snapshot = list(self.chunks)
 
         faiss_scores: Dict[str, float] = {}
         try:
@@ -188,23 +212,32 @@ class RagFaissEngine:
             logger.debug(f"[RagFaissEngine] Ошибка векторного поиска FAISS: {exc}")
 
         scored: List[Tuple[float, Dict[str, Any]]] = []
+        file_path_lower = file_path.lower() if file_path else None
 
-        for chunk in self.chunks:
+        for chunk in chunks_snapshot:
             c_file = chunk.get("file_path", "")
-            if file_path and file_path.lower() not in c_file.lower():
+            c_file_lower = c_file.lower() if c_file else ""
+            if file_path_lower and file_path_lower not in c_file_lower:
                 continue
 
-            c_tokens = self._tokenize(chunk.get("text", ""))
-            if not c_tokens:
+            token_counts = chunk.get("_token_counts")
+            total_tokens = chunk.get("_total_tokens", 0)
+            if token_counts is None:
+                c_tokens = self._tokenize(chunk.get("text", ""))
+                token_counts = Counter(c_tokens)
+                total_tokens = len(c_tokens)
+                chunk["_token_counts"] = token_counts
+                chunk["_total_tokens"] = total_tokens
+
+            if not total_tokens:
                 continue
 
             lex_score = 0.0
-            total_tokens = len(c_tokens)
             for token in q_tokens:
-                cnt = c_tokens.count(token)
+                cnt = token_counts.get(token, 0)
                 if cnt > 0:
                     tf = cnt / total_tokens
-                    boost = 2.0 if (c_file and token in c_file.lower()) else 1.0
+                    boost = 2.0 if (c_file_lower and token in c_file_lower) else 1.0
                     lex_score += tf * boost
 
             vec_score = faiss_scores.get(chunk.get("chunk_id", ""), 0.0)
