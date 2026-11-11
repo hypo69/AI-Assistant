@@ -126,7 +126,11 @@
     "modelPingResponseLabel": "תשובת המודל:",
     "activeModelBadgeTitle": "מודל פעיל: לחץ כדי לפתוח את קטלוג המודלים",
     "userDefault": "משתמש",
-    "close": "סגור"
+    "close": "סגור",
+    "watchdogSectionTitle": "לכידה אוטומטית ו-Watchdog (Git + תמלול)",
+    "autoTranscribeLabel": "תמלול אוטומטי של קובצי מדיה",
+    "autoTranscribeHint": "חילוץ אוטומטי של פס קול ותמלול קובצי מדיה חדשים (MP3, MP4, MKV, WAV וכו׳) דרך Watchdog",
+    "autoGitCommitLabel": "ביצוע Git commit אוטומטי בשינויים במרחב העבודה"
   },
   "cacheManager": {
     "title": "ניהול מטמון",
@@ -421,7 +425,15 @@
       "block-trackTitle": "הוספת קבצים ותיקיות למעקב Git",
       "block-obsidianTitle": "מאגר ידע ופתקים (Obsidian Vault)",
       "block-sourcesTitle": "מקורות נתונים והקשר חיצוניים"
-    }
+    },
+    "watchdogAutoTranscribeLabel": "תמלול אוטומטי של קובצי מדיה (Watchdog)",
+    "watchdogAutoTranscribeHint": "מחלץ אוטומטית פס קול ומתמלל קובצי מדיה חדשים",
+    "chatAddFactBtn": "הוסף עובדה",
+    "chatAddFactTitle": "שמור טקסט כעובדה חדשה בקבצים הפנימיים ובמאגר הידע",
+    "chatAddingFactStatus": "שומר עובדה...",
+    "chatFactSavedMsg": "העובדה נשמרה בקובץ הפנימי ובמאגר הידע",
+    "chatFactSavedStatus": "העובדה נוספה",
+    "chatFactAddError": "שגיאה בהוספת עובדה:"
   },
   "auth": {
     "googleSignIn": "התחבר באמצעות Google",
@@ -2084,7 +2096,7 @@
       "title_e3241394": "כווץ סייר (Ctrl+B)",
       "title_2df29703": "Обновить каталог плагинов",
       "title_17a110d9": "Свернуть панель (Ctrl+B)",
-      "title_c13990e0": "Открыть меню разделов",
+      "title_c13990e0": "פתח תפריט מדורים",
       "title_c21ce32d": "Главная страница — AI Assistant",
       "title_3987a67a": "Глобальный контекст Git-репозитория и рабочей области",
       "title_2231746c": "צור סביבת עבודה חדשה",
@@ -2112,7 +2124,9 @@
       "tasks": "משימות ותיקים חכמים",
       "instruments": "כלי שרשראות חשיבה CoT [Alt+0]",
       "expandSidebar": "הרחב / כווץ סרגל צד",
-      "tooltipsEditor": "עורך רמזים צפים בממשק"
+      "tooltipsEditor": "עורך רמזים צפים בממשק",
+      "confirmRename": "שנה שם אובייקט ושמור ב-Git",
+      "confirmCopy": "צור עותק קובץ ושמור ב-Git"
     },
     "cws": {
       "title_01c37831": "חזרה לרשימת מרחבי העבודה",
@@ -2200,7 +2214,9 @@
       "workspaceSearch": "חיפוש סביבת עבודה...",
       "createItemName": "לדוגמה: notes.md או script.py",
       "initialContent": "# כותרת מסמך...",
-      "commitMsgOptional": "הודעת Git Commit (אופציונלי)..."
+      "commitMsgOptional": "הודעת Git Commit (אופציונלי)...",
+      "renameNewName": "לדוגמה: new_notes.md",
+      "copyTargetPath": "לדוגמה: notes_copy.md או folder/notes_copy.md"
     },
     "commits": {
       "ph_ef75ffc3": "חפש בקומיטים..."
@@ -2614,8 +2630,37 @@
       "revealTitle": "הצג קובץ או תיקייה בסייר הקבצים של המערכת",
       "closeTab": "סגור",
       "closeOtherTabs": "סגור לשוניות אחרות",
-      "closeAllTabs": "סגור הכל"
+      "closeAllTabs": "סגור הכל",
+      "copyFile": "העתק קובץ...",
+      "copyFileTitle": "צור עותק של הקובץ במרחב העבודה",
+      "copyFilename": "העתק שם קובץ",
+      "copyFilenameTitle": "העתק את שם הקובץ או התיקייה ללוח",
+      "filesOnlyTitle": "הפעולה זמינה עבור קבצים בלבד",
+      "summaryDisabledTitle": "התקציר זמין עבור קבצים בלבד",
+      "wasmEditorDisabledTitle": "העורך זמין עבור קבצים בלבד",
+      "quickEditorDisabledTitle": "העריכה זמינה עבור קבצים בלבד",
+      "copyFilenameSuccess": "השם הועתק ללוח:",
+      "copyFilenameError": "נכשל בהעתקת שם הקובץ:",
+      "revealSuccess": "נפתח בסייר הקבצים:",
+      "revealError": "נכשל בפתיחה בסייר הקבצים:",
+      "rootFolderLabel": "שורש מרחב העבודה",
+      "folderWord": "תיקייה"
     },
+    "renameItemModalTitle": "שינוי שם אובייקט",
+    "currentPathLabel": "נתיב נוכחי:",
+    "newNameLabel": "שם חדש:",
+    "commitMessageLabel": "הודעת Git commit (אופציונלי):",
+    "btnRenameSubmit": "שנה שם",
+    "copyItemModalTitle": "העתקת קובץ",
+    "sourceFileLabel": "קובץ מקור:",
+    "copyTargetPathLabel": "שם או נתיב העותק:",
+    "btnCopySubmit": "צור עותק",
+    "specifyNewNameAlert": "ציין שם חדש השונה מהשם הנוכחי.",
+    "specifyCopyTargetAlert": "ציין שם או נתיב עבור עותק הקובץ.",
+    "renameSuccess": "השם שונה ל-",
+    "renameError": "שגיאת שינוי שם:",
+    "copySuccess": "נוצר עותק קובץ:",
+    "copyError": "שגיאת העתקת קובץ:",
     "linesWord": "שורות",
     "charsWord": "תווים",
     "rootFolder": "/ (שורש)",

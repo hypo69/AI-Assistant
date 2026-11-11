@@ -13,7 +13,7 @@
  * Package: apps/ai_assistant/api/webgui/tab_chat
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-03 13:20:00
+ * Updated: 2026-11-11 20:54:00
  * =============================================================================
  */
 
@@ -284,6 +284,84 @@ export function clearChatHistory() {
   }
 }
 
+export function extractFactCommandText(rawText) {
+  const trimmed = (rawText || '').trim();
+  const match = trimmed.match(/^(?:\/fact|\/факт|fact:|факт:|עובדה:)\s+(.+)$/i);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Сохраняет введённое утверждение как новый факт во внутренние файлы рабочей области и базу знаний.
+ * @param {string|null} [factOverride=null] - Явный текст факта (если не передан, берётся из поля ввода).
+ */
+export async function addFactFromChat(factOverride = null) {
+  if (isSending) return;
+
+  const inputEl = document.getElementById('ws-chat-input');
+  const sendBtn = document.getElementById('ws-chat-send-btn');
+  const addFactBtn = document.getElementById('chat-add-fact-btn');
+  const statusEl = document.getElementById('ws-chat-status');
+
+  const rawText = factOverride !== null ? String(factOverride).trim() : (inputEl ? inputEl.value.trim() : '');
+  if (!rawText) return;
+
+  isSending = true;
+  if (factOverride === null && inputEl) inputEl.value = '';
+  if (sendBtn) sendBtn.disabled = true;
+  if (addFactBtn) addFactBtn.disabled = true;
+  if (statusEl) statusEl.textContent = t('workspace.chatAddingFactStatus', 'Сохранение факта...');
+
+  appendMessage('user', `📌 ${rawText}`);
+  const pendingBubble = appendMessage('assistant', '', true);
+  const wsId = resolveCurrentWorkspaceId();
+
+  try {
+    if (!wsId) {
+      throw new Error(t('workspace.chatErrorNoWorkspace', 'Не выбрана рабочая область'));
+    }
+
+    const res = await fetchJson(`/api/v1/workspaces/${encodeURIComponent(wsId)}/facts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fact_text: rawText }),
+    });
+
+    const docName = res.document_id || 'chat_facts.md';
+    const commitShort = (res.commit_hash || 'HEAD').slice(0, 8);
+    const savedPrefix = t('workspace.chatFactSavedMsg', 'Факт сохранён во внутренний файл и базу знаний');
+    const confirmText = `✅ **${savedPrefix}:** \`${docName}\` (Git: \`${commitShort}\`, фактов в файле: **${res.facts_count || 1}**)\n\n> ${escapeHtml(res.fact_text || rawText)}`;
+
+    if (pendingBubble) {
+      pendingBubble.removeAttribute('data-pending');
+      pendingBubble.innerHTML = renderMessageContent(confirmText);
+    }
+    if (statusEl) {
+      statusEl.textContent = t('workspace.chatFactSavedStatus', 'Факт добавлен');
+    }
+    document.dispatchEvent(new CustomEvent('workspace:factsUpdated', { detail: { workspaceId: wsId, result: res } }));
+  } catch (err) {
+    if (pendingBubble) {
+      pendingBubble.removeAttribute('data-pending');
+      const errPrefix = t('workspace.chatFactAddError', 'Ошибка добавления факта:');
+      pendingBubble.innerHTML = `
+        <div class="text-danger small d-flex align-items-center gap-1.5">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>${errPrefix} ${escapeHtml(err.message || String(err))}</span>
+        </div>
+      `;
+    }
+    if (statusEl) {
+      statusEl.textContent = t('workspace.chatErrorStatus', 'Ошибка генерации');
+    }
+  } finally {
+    isSending = false;
+    if (sendBtn) sendBtn.disabled = false;
+    if (addFactBtn) addFactBtn.disabled = false;
+    if (inputEl) inputEl.focus();
+    scrollToBottom();
+  }
+}
+
 /**
  * Отправляет пользовательское сообщение в ИИ и отображает ответ в окне диалога.
  */
@@ -296,6 +374,13 @@ export async function sendChatMessage() {
 
   const text = inputEl ? inputEl.value.trim() : '';
   if (!text) return;
+
+  const cmdFact = extractFactCommandText(text);
+  if (cmdFact) {
+    if (inputEl) inputEl.value = '';
+    await addFactFromChat(cmdFact);
+    return;
+  }
 
   isSending = true;
   if (inputEl) inputEl.value = '';
@@ -421,11 +506,15 @@ export function initChatTab() {
 
   const container = getChatContainer();
   const sendBtn = container ? container.querySelector('#ws-chat-send-btn') : null;
+  const addFactBtn = container ? container.querySelector('#chat-add-fact-btn') : null;
   const inputEl = container ? container.querySelector('#ws-chat-input') : null;
   const clearBtn = container ? container.querySelector('#ws-chat-clear-btn') : null;
 
   if (sendBtn) {
     sendBtn.onclick = () => sendChatMessage();
+  }
+  if (addFactBtn) {
+    addFactBtn.onclick = () => addFactFromChat();
   }
 
   if (inputEl) {
@@ -478,6 +567,7 @@ if (typeof window !== 'undefined') {
   window.initChatTab = initChatTab;
   window.deactivateChatTab = deactivateChatTab;
   window.sendChatMessage = sendChatMessage;
+  window.addFactFromChat = addFactFromChat;
   window.clearChatHistory = clearChatHistory;
   window.loadDynamicQuickPrompts = loadDynamicQuickPrompts;
 }

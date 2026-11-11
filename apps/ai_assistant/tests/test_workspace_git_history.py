@@ -15,7 +15,7 @@
 # Package: apps/ai_assistant/tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:14:00
+# Updated: 2026-11-11 20:54:00
 # =============================================================================
 
 from __future__ import annotations
@@ -200,10 +200,10 @@ def test_frontend_workspace_synchronization_scripts() -> None:
     assert "workspace:changed" in top_code
     assert "repo:changed" in top_code
 
-    # 2. Проверяем index.html на наличие селектора в Command Center и отсутствие устаревшего контейнера
+    # 2. Проверяем index.html на отсутствие удаленных контейнеров верхнего селектора и Command Center
     index_html = _WEBGUI_DIR / "index.html"
     index_code = index_html.read_text(encoding="utf-8")
-    assert 'id="ide-command-center"' in index_code
+    assert 'id="ide-command-center"' not in index_code
     assert 'id="top-workspace-control-container"' not in index_code
 
     # 3. Проверяем panel-loader.js

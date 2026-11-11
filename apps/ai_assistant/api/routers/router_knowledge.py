@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 17:55:00
+# Updated: 2026-11-11 23:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -39,14 +39,17 @@ from apps.ai_assistant.core.qa_engine import KnowledgeQAEngine
 from apps.ai_assistant.core.workspace_creator_engine import WorkspaceCreatorEngine
 from apps.ai_assistant.core.workspace_manager import WorkspaceManager
 from apps.ai_assistant.core.workspace_prompt_generator import WorkspacePromptGenerator
+from apps.ai_assistant.core.workspace_watchdog import WorkspaceWatchdogService
 
 router = APIRouter(prefix="/api/v1", tags=["Multilingual Knowledge & Workspaces"])
 
-# Единый экземпляр менеджера рабочих областей и QA-движка
+# Единый экземпляр менеджера рабочих областей, QA-движка и watchdog
 _workspace_manager = WorkspaceManager()
 _qa_engine = KnowledgeQAEngine(workspace_manager=_workspace_manager)
 _prompt_generator = WorkspacePromptGenerator(workspace_manager=_workspace_manager)
 _creator_engine = WorkspaceCreatorEngine(workspace_manager=_workspace_manager)
+_watchdog_service = WorkspaceWatchdogService(workspace_manager=_workspace_manager)
+_workspace_manager._on_watches_changed = _watchdog_service.refresh_watches
 
 
 def _resolve_target_workspace(workspace_id: Optional[str] = None) -> Optional[str]:
@@ -105,6 +108,26 @@ class ReanalyzeRequest(BaseModel):
 class FactStatusUpdateRequest(BaseModel):
     """Запрос на изменение статуса проверки факта."""
     status: str = Field(..., description="Новый статус: extracted, validated, ambiguous, rejected, stale")
+
+
+class AddFactFromChatRequest(BaseModel):
+    """Запрос на добавление нового факта из чата во внутренние файлы рабочей области."""
+    fact_text: str = Field(..., min_length=1, description="Текст нового факта на естественном языке")
+    workspace_id: Optional[str] = Field(None, description="Идентификатор рабочей области")
+    document_id: str = Field("chat_facts.md", description="Внутренний файл рабочей области для сохранения факта")
+    language: Optional[str] = Field(None, description="Язык факта ('ru', 'he', 'en', 'ua') или автоопределение")
+    subject: Optional[str] = Field(None, description="Опциональный субъект / владелец факта")
+    predicate: Optional[str] = Field(None, description="Опциональное действие / отношение")
+    object: Optional[str] = Field(None, description="Опциональный объект / предмет обладания")
+    fact_type: Optional[str] = Field(None, description="Тип факта: 'action' или 'possession'")
+
+
+class WatchdogConfigUpdateRequest(BaseModel):
+    """Запрос на обновление настроек фонового наблюдателя watchdog."""
+    enabled: Optional[bool] = Field(None, description="Включить/выключить watchdog.Observer")
+    auto_transcribe_media: Optional[bool] = Field(None, description="Автозахват транскрибации медиафайлов со звуковой дорожкой")
+    auto_git_commit: Optional[bool] = Field(None, description="Автоматически собирать коммиты Git при изменениях в рабочей области")
+    debounce_seconds: Optional[float] = Field(None, ge=0.2, le=30.0, description="Задержка дебаунса событий (сек)")
 
 
 class AskQuestionRequest(BaseModel):
@@ -166,6 +189,11 @@ class OpenWorkspaceFileRequest(BaseModel):
     rel_path: str = Field(..., description="Относительный путь к файлу внутри рабочей области")
 
 
+class RevealWorkspaceItemRequest(BaseModel):
+    """Запрос на показ файла или папки в системном проводнике ОС."""
+    rel_path: str = Field("", description="Относительный путь к файлу или папке (пусто — корень рабочей области)")
+
+
 class CreateWorkspaceItemRequest(BaseModel):
     """Запрос на создание нового файла или директории в рабочей области."""
     rel_path: str = Field(..., description="Относительный путь к создаваемому объекту")
@@ -189,6 +217,13 @@ class MoveWorkspaceItemRequest(BaseModel):
     """Запрос на перенос или переименование файла без потери истории и рекомендаций."""
     old_rel_path: str = Field(..., description="Текущий относительный путь к файлу")
     new_rel_path: str = Field(..., description="Новый относительный путь к файлу")
+    commit_message: Optional[str] = Field(None, description="Сообщение коммита Git")
+
+
+class CopyWorkspaceItemRequest(BaseModel):
+    """Запрос на создание копии (дубликата) файла в рабочей области с фиксацией в Git."""
+    source_rel_path: str = Field(..., description="Относительный путь к исходному файлу")
+    target_rel_path: str = Field(..., description="Относительный путь к создаваемой копии файла")
     commit_message: Optional[str] = Field(None, description="Сообщение коммита Git")
 
 
@@ -665,6 +700,24 @@ async def open_workspace_file(workspace_id: str, req: OpenWorkspaceFileRequest) 
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.post("/workspaces/{workspace_id}/reveal-item", summary="Показ файла или папки в системном проводнике ОС")
+async def reveal_workspace_item_endpoint(
+    workspace_id: str,
+    req: Optional[RevealWorkspaceItemRequest] = None,
+) -> Dict[str, Any]:
+    """Открывает окно проводника операционной системы для выбранного файла или каталога."""
+    rel_path = req.rel_path if req else ""
+    try:
+        return _workspace_manager.reveal_workspace_item(workspace_id, rel_path)
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        logger.error(f"[RouterKnowledge] Ошибка показа '{rel_path}' в проводнике ОС ({workspace_id}): {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.post("/workspaces/{workspace_id}/items/create", summary="Создание файла или папки с фиксацией в Git")
 async def create_workspace_item_endpoint(workspace_id: str, req: CreateWorkspaceItemRequest) -> Dict[str, Any]:
     """Создаёт новый файл или каталог в рабочей области и коммитит изменения в Git."""
@@ -718,6 +771,28 @@ async def move_workspace_item_endpoint(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as exc:
         logger.error(f"[RouterKnowledge] Ошибка перемещения объекта {req.old_rel_path} -> {req.new_rel_path} в {workspace_id}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/workspaces/{workspace_id}/items/copy", summary="Копирование (дублирование) файла в рабочей области с фиксацией в Git")
+async def copy_workspace_item_endpoint(
+    workspace_id: str,
+    req: CopyWorkspaceItemRequest,
+) -> Dict[str, Any]:
+    """Создаёт копию файла в рабочей области и фиксирует её в Git."""
+    try:
+        return _workspace_manager.copy_workspace_item(
+            workspace_id=workspace_id,
+            source_rel_path=req.source_rel_path,
+            target_rel_path=req.target_rel_path,
+            commit_message=req.commit_message,
+        )
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except (ValueError, FileExistsError) as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        logger.error(f"[RouterKnowledge] Ошибка копирования файла {req.source_rel_path} -> {req.target_rel_path} в {workspace_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -953,6 +1028,55 @@ async def update_fact_status(fact_id: str, req: FactStatusUpdateRequest) -> Dict
         return {"status": "ok", "fact_id": fact_id, "new_status": req.status}
     except ValueError as ve:
         raise HTTPException(status_code=422, detail=str(ve))
+
+
+@router.post("/workspaces/{workspace_id}/facts", summary="Добавление факта через чат во внутренние файлы рабочей области")
+async def add_workspace_fact_from_chat(workspace_id: str, req: AddFactFromChatRequest) -> Dict[str, Any]:
+    """Добавляет факт из чата во внутренний файл рабочей области, SQLite, FAISS, Obsidian и Git."""
+    try:
+        return await asyncio.to_thread(
+            _workspace_manager.add_fact_from_chat,
+            workspace_id=workspace_id,
+            fact_text=req.fact_text,
+            document_id=req.document_id,
+            language=req.language,
+            subject=req.subject,
+            predicate=req.predicate,
+            obj=req.object,
+            fact_type=req.fact_type,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=422, detail=str(ve))
+    except Exception as exc:
+        logger.error(f"[RouterKnowledge] Ошибка добавления факта в '{workspace_id}': {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/facts/from-chat", summary="Добавление факта через чат в активную или указанную рабочую область")
+async def add_fact_from_chat_endpoint(req: AddFactFromChatRequest) -> Dict[str, Any]:
+    """Добавляет факт из чата в указанную (или активную) рабочую область и её внутренние файлы."""
+    target_ws = _resolve_target_workspace(req.workspace_id)
+    if not target_ws:
+        raise HTTPException(status_code=400, detail="Рабочее пространство не выбрано")
+    return await add_workspace_fact_from_chat(target_ws, req)
+
+
+@router.get("/watchdog/config", summary="Статус и конфигурация наблюдателя watchdog")
+async def get_watchdog_config() -> Dict[str, Any]:
+    """Возвращает настройки watchdog из config.json, список наблюдаемых путей и последние события."""
+    return await asyncio.to_thread(_watchdog_service.get_status)
+
+
+@router.post("/watchdog/config", summary="Обновление настроек наблюдателя watchdog")
+async def update_watchdog_config(req: WatchdogConfigUpdateRequest) -> Dict[str, Any]:
+    """Сохраняет настройки watchdog в config.json и применяет их без перезапуска сервера."""
+    patch = {k: v for k, v in req.model_dump().items() if v is not None}
+    updated = await asyncio.to_thread(_watchdog_service.update_config, patch)
+    status = await asyncio.to_thread(_watchdog_service.get_status)
+    return {
+        **status,
+        "config": updated,
+    }
 
 
 @router.post("/ask", summary="Поиск по вопросу и грамматически корректное формирование ответа")

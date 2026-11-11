@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 18:55:00
+# Updated: 2026-11-11 23:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -31,10 +31,16 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from logger import logger
+from apps.ai_assistant.core.content_extractor import (
+    IMAGE_EXTENSIONS,
+    MEDIA_WITH_AUDIO_EXTENSIONS,
+    PDF_EXTENSIONS,
+)
 from apps.ai_assistant.core.workspace_registry import (
     format_host_qualified_path,
     get_current_host_name,
@@ -45,10 +51,7 @@ from apps.ai_assistant.core.service_file_authenticator import ServiceFileAuthent
 if TYPE_CHECKING:
     from apps.ai_assistant.core.workspace_manager import WorkspaceManager
 
-CONVERTIBLE_EXTENSIONS = {
-    ".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff",
-    ".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac",
-}
+CONVERTIBLE_EXTENSIONS = PDF_EXTENSIONS | IMAGE_EXTENSIONS | MEDIA_WITH_AUDIO_EXTENSIONS
 
 
 class WorkspaceItemsTracker:
@@ -199,9 +202,9 @@ class WorkspaceItemsTracker:
                 try:
                     ext = item_path.suffix.lower()
                     force_raw_copy = (
-                        (pdf_mode == "raw" and ext == ".pdf")
-                        or (ocr_mode == "raw" and ext in {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff", ".gif"})
-                        or (audio_mode == "raw" and ext in {".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac"})
+                        (pdf_mode == "raw" and ext in PDF_EXTENSIONS)
+                        or (ocr_mode == "raw" and ext in IMAGE_EXTENSIONS)
+                        or (audio_mode == "raw" and ext in MEDIA_WITH_AUDIO_EXTENSIONS)
                     )
                     if copy_to_workspace or force_raw_copy:
                         safe_name = item_path.name
@@ -1006,5 +1009,68 @@ class WorkspaceItemsTracker:
             "path": str(ws_path),
             "method": method,
             "opened": success,
+        }
+
+    def reveal_workspace_item(self, workspace_id: str, rel_path: str = "") -> Dict[str, Any]:
+        """Открывает системный проводник ОС с выделением выбранного файла или открытием папки.
+
+        Args:
+            workspace_id: Идентификатор рабочего пространства.
+            rel_path: Относительный путь к файлу/папке (пустая строка открывает корень пространства).
+
+        Returns:
+            Словарь со статусом, абсолютным путём и способом запуска проводника.
+        """
+        from apps.ai_assistant.core.workspace_file_ops import WorkspaceFileOps
+
+        clean_input = (rel_path or "").strip()
+        if not clean_input:
+            self.ensure_workspace_folder(workspace_id)
+            _, ws_path = self._resolve_workspace_path(workspace_id)
+            if not ws_path.exists():
+                raise FileNotFoundError(f"Папка рабочей области '{workspace_id}' не найдена: {ws_path}")
+            clean_rel = ""
+            target_path = ws_path.resolve()
+        else:
+            clean_rel, target_path, _ = WorkspaceFileOps.resolve_item(
+                wm=self.wm,
+                workspace_id=workspace_id,
+                rel_path=clean_input,
+                must_exist=True,
+            )
+            target_path = target_path.resolve()
+
+        is_dir = target_path.is_dir()
+        method = "explorer_select"
+
+        try:
+            if os.name == "nt":
+                if is_dir:
+                    subprocess.Popen(["explorer.exe", str(target_path)], shell=False)
+                    method = "explorer_dir"
+                else:
+                    subprocess.Popen(["explorer.exe", "/select,", str(target_path)], shell=False)
+                    method = "explorer_select"
+            elif sys.platform == "darwin":
+                cmd = ["open", str(target_path)] if is_dir else ["open", "-R", str(target_path)]
+                subprocess.Popen(cmd, shell=False)
+                method = "finder"
+            else:
+                open_dir = target_path if is_dir else target_path.parent
+                subprocess.Popen(["xdg-open", str(open_dir)], shell=False)
+                method = "xdg_open"
+        except Exception as exc:
+            logger.error(f"[WorkspaceItemsTracker] Ошибка показа '{target_path}' в проводнике ОС: {exc}")
+            raise RuntimeError(f"Не удалось открыть проводник ОС для '{clean_rel or workspace_id}': {exc}")
+
+        logger.info(f"[WorkspaceItemsTracker] Открыт проводник ОС ({method}): {target_path}")
+        return {
+            "status": "ok",
+            "workspace_id": workspace_id,
+            "rel_path": clean_rel,
+            "path": str(target_path),
+            "is_dir": is_dir,
+            "method": method,
+            "opened": True,
         }
 

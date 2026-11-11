@@ -14,7 +14,7 @@
  * Package: windows/api/webgui/css
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 17:15:00
+ * Updated: 2026-11-11 20:54:00
  * =============================================================================
  */
 
@@ -820,143 +820,12 @@ body[dir="rtl"] .left-drawer-nav .list-group-item:hover {
   margin-left: 4px;
 }
 
-/* ── Верхнее Command Center окно поиска по рабочей области в стиле VS Code ── */
-.ide-command-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-grow: 1;
-  max-width: 520px;
-  position: relative;
-}
-
-.ide-search-box-wrapper {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-}
-
-.ide-command-search-group {
-  border-radius: 6px;
-  background-color: var(--surface-2);
-  border: 1px solid var(--border-color);
-  transition: all 0.15s ease;
-  overflow: hidden;
-}
-
-.ide-command-search-group:focus-within {
-  border-color: var(--accent-primary, #0d6efd);
-  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2);
-}
-
-.ide-command-search-input {
-  font-size: 0.82rem;
-  background-color: transparent !important;
-  color: var(--text-color);
-  border: none !important;
-  box-shadow: none !important;
-  height: 28px;
-}
-
-.ide-command-search-input::placeholder {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-}
-
-.ide-search-clear-btn {
-  line-height: 1;
-  text-decoration: none;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-}
-
-.ide-search-clear-btn:hover {
-  color: var(--danger, #dc3545) !important;
-}
-
-.ide-search-results-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background-color: var(--surface-1);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  z-index: 1060;
-  max-height: 380px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.ide-search-results-list {
-  overflow-y: auto;
-  max-height: 340px;
-}
-
-.ide-search-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  font-size: 0.82rem;
-  color: var(--text-color);
-  text-decoration: none;
-  background-color: transparent;
-  border: none;
-  border-bottom: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.15));
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.1s ease;
-}
-
-.ide-search-item:hover,
-.ide-search-item.active,
-.ide-search-item:focus {
-  background-color: var(--nav-hover-bg, rgba(13, 110, 253, 0.1));
-  color: var(--nav-active, #0d6efd);
-  outline: none;
-}
-
-.ide-search-item-match {
-  font-weight: 700;
-  text-decoration: underline;
-}
-
-.ide-command-center-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 28px;
-  padding: 0 14px;
-  border-radius: 6px;
-  background-color: var(--surface-2);
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  font-size: 0.82rem;
-  cursor: pointer;
-  width: 100%;
-  max-width: 380px;
-  transition: all 0.15s ease;
-}
-
-.ide-command-center-btn:hover {
-  background-color: var(--nav-hover-bg);
-  border-color: var(--nav-active);
-  color: var(--nav-active);
-}
-
 @media (max-width: 768px) {
   .ide-file-sidebar {
     width: 220px;
   }
   .ide-main-viewport {
     margin-left: 268px !important;
-  }
-  .ide-command-center {
-    max-width: 240px;
   }
 }
 

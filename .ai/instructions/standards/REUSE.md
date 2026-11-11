@@ -5,7 +5,7 @@
 **Принцип:** Zero Divergent Implementations  
 **Автор:** hypo69  
 **Copyright:** © 2026 hypo69  
-**Updated:** 2026-11-01 17:30:00
+**Updated:** 2026-11-11 23:40:30
 
 ---
 
@@ -75,7 +75,6 @@ apps/
     file_tree/             ← Проводник и дерево файлов
     obsidian/              ← Общий роутер и интеграция Obsidian
     webgui/                ← Общие компоненты UI, темы (themes/), стили (css/), скрипты (js/), ai_modal_dialog/
-  pdf_wasm_converter/      ← Конвертер PDF на базе Rust/WASM
 
 src/
   ai/                      ← Единый слой ИИ: UnifiedChatModel, провайдеры (gemini, agy, ollama, openai, hf, foundry, onnx), оркестрация, RAG, агенты

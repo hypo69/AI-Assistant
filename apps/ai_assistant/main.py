@@ -204,10 +204,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.warning(f"[AIAssistant] Не удалось запустить плагин telegram_bot при старте: {tg_exc}")
 
     worker_task = asyncio.create_task(_periodic_maintenance_worker())
+
+    # Запуск реального watchdog-наблюдателя за рабочими областями и связанными папками
+    watchdog_srv = None
+    try:
+        from apps.ai_assistant.api.routers.router_knowledge import _watchdog_service
+        watchdog_srv = _watchdog_service
+        watchdog_srv.start(asyncio.get_running_loop())
+    except Exception as wd_exc:
+        logger.warning(f"[AIAssistant] Не удалось запустить WorkspaceWatchdog: {wd_exc}")
+
     try:
         yield
     finally:
         worker_task.cancel()
+        if watchdog_srv is not None:
+            try:
+                watchdog_srv.stop()
+            except Exception:
+                pass
         if tg_plugin and getattr(tg_plugin, "is_running", False):
             try:
                 await tg_plugin.stop()

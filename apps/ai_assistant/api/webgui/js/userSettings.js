@@ -17,7 +17,7 @@
  * Package: windows/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-25 22:45:00
+ * Updated: 2026-11-11 20:50:00
  * =============================================================================
  */
 
@@ -169,11 +169,72 @@ export async function initUserSettings() {
     });
   });
 
+  // Инициализация тумблеров Watchdog (автотранскрибация медиа и авто-коммиты Git)
+  async function syncWatchdogToggles() {
+    const autoTranscribeEl = document.getElementById('user-settings-auto-transcribe-toggle');
+    const autoGitEl = document.getElementById('user-settings-auto-git-commit-toggle');
+    if (!autoTranscribeEl && !autoGitEl) return;
+    try {
+      const res = await fetch('/api/v1/watchdog/config');
+      if (!res.ok) return;
+      const data = await res.json();
+      const cfg = (data && data.config) || {};
+      if (autoTranscribeEl) autoTranscribeEl.checked = cfg.auto_transcribe_media !== false;
+      if (autoGitEl) autoGitEl.checked = cfg.auto_git_commit !== false;
+    } catch (err) {
+      console.debug('[UserSettings] Ошибка загрузки настроек watchdog:', err);
+    }
+  }
+
+  async function saveWatchdogPatch(patch) {
+    try {
+      const res = await fetch('/api/v1/watchdog/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.config) {
+        window.dispatchEvent(new CustomEvent('watchdog:configChanged', { detail: data.config }));
+      }
+    } catch (err) {
+      console.warn('[UserSettings] Ошибка сохранения настроек watchdog:', err);
+    }
+  }
+
+  const autoTranscribeToggle = document.getElementById('user-settings-auto-transcribe-toggle');
+  if (autoTranscribeToggle) {
+    autoTranscribeToggle.addEventListener('change', () => {
+      saveWatchdogPatch({ auto_transcribe_media: Boolean(autoTranscribeToggle.checked) });
+    });
+  }
+
+  const autoGitToggle = document.getElementById('user-settings-auto-git-commit-toggle');
+  if (autoGitToggle) {
+    autoGitToggle.addEventListener('change', () => {
+      saveWatchdogPatch({ auto_git_commit: Boolean(autoGitToggle.checked) });
+    });
+  }
+
+  window.addEventListener('watchdog:configChanged', (e) => {
+    const cfg = e.detail || {};
+    if (autoTranscribeToggle && typeof cfg.auto_transcribe_media === 'boolean') {
+      autoTranscribeToggle.checked = cfg.auto_transcribe_media;
+    }
+    if (autoGitToggle && typeof cfg.auto_git_commit === 'boolean') {
+      autoGitToggle.checked = cfg.auto_git_commit;
+    }
+  });
+
+  await syncWatchdogToggles();
+
   // Re-sync modal fields on modal show
   const modalEl = document.getElementById('userSettingsModal');
   if (modalEl) {
     modalEl.addEventListener('show.bs.modal', async () => {
       await refreshUserProfile();
+      await syncWatchdogToggles();
       const savedLang = localStorage.getItem('app_locale') || localStorage.getItem('app_language') || 'ru-RU';
       document.querySelectorAll('.lang-selector').forEach((s) => {
         const opt = Array.from(s.options).find(o => 

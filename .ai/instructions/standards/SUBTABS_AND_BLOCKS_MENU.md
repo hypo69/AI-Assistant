@@ -14,7 +14,7 @@ File: SUBTABS_AND_BLOCKS_MENU.md
 Package: .ai/instructions/standards
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-10-31 20:12:00
+Updated: 2026-11-11 21:25:00
 =============================================================================
 -->
 
@@ -76,10 +76,10 @@ http://localhost:8002/#tab-workspace#panel-files#block-<blockId>#workspace=<work
     <span class="fs-4 text-primary"><i class="bi bi-folder2-open"></i></span>
     <div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <h5 class="mb-0 fw-bold text-white" data-i18n="tabFilesTitle">Управление файлами</h5>
+        <h5 class="mb-0 fw-bold" data-i18n="tabFilesTitle" id="files-heading-title">{{tabFilesTitle}}</h5>
         <span class="badge bg-secondary-subtle text-secondary border border-secondary border-opacity-25" id="files-counter-badge">0</span>
       </div>
-      <small class="text-secondary" data-i18n="tabFilesSubtitle">Просмотр репозитория, Git-слежение и конвертация</small>
+      <small class="text-secondary" data-i18n="tabFilesSubtitle" id="files-heading-subtitle">{{tabFilesSubtitle}}</small>
     </div>
   </div>
 </div>
@@ -95,9 +95,9 @@ http://localhost:8002/#tab-workspace#panel-files#block-<blockId>#workspace=<work
             role="tab"
             data-panel-id="panel-browse"
             data-i18n-title="subtabBrowseTitle"
-            title="Просмотр структуры каталогов и файлов проекта">
+            title="{{subtabBrowseTitle}}">
       <i class="bi bi-folder2-open"></i>
-      <span data-i18n="subtabBrowseLabel">Обзор файлов</span>
+      <span data-i18n="subtabBrowseLabel" id="subtab-files-browse-label">{{subtabBrowseLabel}}</span>
     </button>
   </div>
 </div>
@@ -116,9 +116,9 @@ http://localhost:8002/#tab-workspace#panel-files#block-<blockId>#workspace=<work
             data-bs-toggle="pill"
             data-bs-target="#subpane-block-dir"
             data-i18n-title="blockDirTitle"
-            title="Отображение текущего дерева файлов Git-репозитория">
+            title="{{blockDirTitle}}">
       <i class="bi bi-folder-check"></i>
-      <span data-i18n="blockDirLabel">Содержимое репозитория</span>
+      <span data-i18n="blockDirLabel" id="span-block-dir">{{blockDirLabel}}</span>
     </button>
     <button type="button" 
             class="btn btn-outline-secondary d-flex align-items-center gap-1"
@@ -127,9 +127,9 @@ http://localhost:8002/#tab-workspace#panel-files#block-<blockId>#workspace=<work
             data-bs-toggle="pill"
             data-bs-target="#subpane-block-track"
             data-i18n-title="blockTrackTitle"
-            title="Добавить новые файлы и папки в список отслеживания">
+            title="{{blockTrackTitle}}">
       <i class="bi bi-plus-circle"></i>
-      <span data-i18n="blockTrackLabel">Добавление в слежение</span>
+      <span data-i18n="blockTrackLabel" id="span-block-track">{{blockTrackLabel}}</span>
     </button>
   </div>
 </div>
@@ -137,11 +137,11 @@ http://localhost:8002/#tab-workspace#panel-files#block-<blockId>#workspace=<work
 
 ---
 
-## 5. Стандарт локализации (i18n)
+## 5. Стандарт локализации и шаблонизации i18n (`{{key}}`)
 
-Каждая кнопка обязана содержать пару ключей во всех 4 языковых файлах (`ru.json`, `en.json`, `he.json`, `uk.json`):
-1. `*Label` — текст кнопки для атрибута `data-i18n`;
-2. `*Title` — исчерпывающий статический текст подсказки для атрибутов `data-i18n-title` и `title`.
+Каждая кнопка обязана содержать пару ключей во всех 4 языковых файлах (`ru.json`, `en.json`, `he.json`, `uk.json`) и использовать в HTML **только плейсхолдеры `{{key}}`** (без текста по умолчанию) и уникальный `id`:
+1. `*Label` — текст кнопки на внутреннем `<span data-i18n="key" id="...">{{key}}</span>` (иконка `<i>` выносится наружу!);
+2. `*Title` — исчерпывающий статический текст подсказки для `data-i18n-title="key"` и `title="{{key}}"`.
 
 Пример структуры в словарях:
 ```json

@@ -25,7 +25,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 15:42:00
+# Updated: 2026-11-11 21:24:00
 # =============================================================================
 
 from __future__ import annotations
@@ -312,5 +312,83 @@ def test_electron_active_workspace_persistence_and_routing(tmp_path: Path) -> No
             assert "ELECTRON_RUN_AS_NODE" not in called_env
         finally:
             os.environ.pop("ELECTRON_RUN_AS_NODE", None)
+
+
+def test_hebrew_workspace_obsidian_localization(obsidian_env) -> None:
+    """Проверяет полную локализацию заметок Obsidian, _Knowledge_Base.md и _Topics на языке рабочего пространства (he/en/uk)."""
+    wm: WorkspaceManager = obsidian_env["wm"]
+    builder: ObsidianVaultBuilder = obsidian_env["builder"]
+
+    ws = wm.create_or_select_workspace("דוד_משה", name="דּוֹד משה", language="he")
+    ws_id = ws["workspace_id"]
+    ws_path = Path(ws["path"])
+
+    wm.import_document(
+        workspace_id=ws_id,
+        document_id="דוד משה.txt",
+        content="לדוד משה היתה חווה",
+        commit_message="ייבוא קובץ דוד משה",
+    )
+
+    doc_md = ws_path / ".דוד משה.md"
+    assert doc_md.exists()
+    doc_text = doc_md.read_text(encoding="utf-8")
+
+    # Проверяем локализацию блока знаний в документе на иврите и отсутствие русского текста
+    assert "language: he" in doc_text
+    assert "ידע שחולץ" in doc_text
+    assert "מאגר הידע המרכזי" in doc_text
+    assert "עובדות מובנות" in doc_text
+    assert "שיוך (he)" in doc_text
+    assert "בעלים של (`has`)" in doc_text
+    assert "ישויות קשורות:" in doc_text
+    for forbidden_ru in ("Извлечённые знания", "Сводная база знаний", "Структурированные факты", "Принадлежность", "владеет", "Связанные сущности"):
+        assert forbidden_ru not in doc_text
+
+    # Проверяем _Knowledge_Base.md на иврите
+    kb_file = ws_path / "_Knowledge_Base.md"
+    assert kb_file.exists()
+    kb_text = kb_file.read_text(encoding="utf-8")
+    assert "language: he" in kb_text
+    assert "מאגר הידע המרכזי" in kb_text
+    assert "מסמכי מרחב העבודה" in kb_text
+    assert "עובדות קנוניות שחולצו" in kb_text
+    assert "גרף קשרים סמנטי" in kb_text
+    assert "אינדקס ישויות ומושגים" in kb_text
+    assert "תשובות AI וידע מאומת" in kb_text
+    for forbidden_ru in (
+        "Сводная база знаний",
+        "Документы рабочей области",
+        "Извлечённые канонические факты",
+        "Семантический граф связей",
+        "Индекс сущностей и понятий",
+        "Ответы ИИ и проверенные знания",
+        "Нет активных связей",
+    ):
+        assert forbidden_ru not in kb_text
+
+    # Проверяем тематический конспект _Topics на иврите
+    topic_res = builder.compile_topic_note(workspace_id=ws_id, topic="חווה", query="חווה")
+    topic_text = Path(topic_res["note_path"]).read_text(encoding="utf-8")
+    assert "סיכום נושא: חווה" in topic_text
+    assert "חזרה אל" in topic_text
+    assert "Тематический конспект" not in topic_text
+
+    # Проверяем английский и украинский языки для _Knowledge_Base.md
+    ws_en = wm.create_or_select_workspace("en_ws", name="English WS", language="en")
+    kb_en = (Path(ws_en["path"]) / "_Knowledge_Base.md")
+    builder.rebuild_knowledge_base_index("en_ws")
+    kb_en_text = kb_en.read_text(encoding="utf-8")
+    assert "Knowledge Base Summary" in kb_en_text
+    assert "Workspace Documents" in kb_en_text
+    assert "Сводная база знаний" not in kb_en_text
+
+    ws_uk = wm.create_or_select_workspace("uk_ws", name="Ukrainian WS", language="ua")
+    kb_uk = (Path(ws_uk["path"]) / "_Knowledge_Base.md")
+    builder.rebuild_knowledge_base_index("uk_ws")
+    kb_uk_text = kb_uk.read_text(encoding="utf-8")
+    assert "Зведена база знань" in kb_uk_text
+    assert "Документи робочого простору" in kb_uk_text
+    assert "Сводная база знаний" not in kb_uk_text
 
 

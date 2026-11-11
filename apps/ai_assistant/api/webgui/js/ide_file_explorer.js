@@ -2,45 +2,24 @@
 
  * =============================================================================
 
- * Process Name: AI Assistant WebGUI - IDE File Explorer & Command Center
-
+ * Process Name: AI Assistant WebGUI - IDE File Explorer
  * =============================================================================
-
  * Description:
-
  *   Модуль стандартного навигатора по файлам (Primary Side Bar Explorer) в стиле
-
- *   Visual Studio Code и верхнего выпадающего Command Center окна выбора
-
- *   рабочего пространства с Git.
-
+ *   Visual Studio Code.
  *
-
  *   Обеспечивает:
-
  *   - Интерактивное дерево файлов и папок рабочего пространства (VS Code Tree View)
-
  *   - Иконки типов файлов по расширениям (.md, .json, .py, .txt, .pdf, картинки)
-
  *   - Раскрытие/сворачивание папок с сохранением состояния
-
  *   - Клик по файлу открывает его в редакторе или Obsidian
-
  *   - Кнопки в шапке навигатора: новый файл, обновить, открыть в проводнике, свернуть
-
- *   - Верхнее окно Command Center в стиле VS Code с живым поиском и переключением пространств
-
  *
-
  * File: ide_file_explorer.js
-
  * Package: apps/ai_assistant/api/webgui/js
-
  * Author: hypo69
-
  * Copyright: © 2026 hypo69
-
- * Updated: 2026-11-10 20:10:00
+ * Updated: 2026-11-11 23:50:00
 
 
  * =============================================================================
@@ -49,11 +28,9 @@
 
 
 
-import { getActiveWorkspaceId, getActiveRepoPath, setGlobalActiveRepo, fetchAvailableRepositories } from './top_workspace_dropdown.js';
+import { getActiveWorkspaceId } from './top_workspace_dropdown.js';
 
-import { initIdeTreeContextMenu, openEditorModal } from './ide_tree_context_menu.js?v=20261110_v3';
-
-import { initIdeWorkspaceSearch } from './ide_workspace_search.js?v=20261110_v3';
+import { initIdeTreeContextMenu, openEditorModal } from './ide_tree_context_menu.js?v=20261111_v2';
 
 
 
@@ -1047,217 +1024,7 @@ window.handleFileClick = handleFileClick;
 
 
 /**
-
- * Инициализирует верхнее окно выбора рабочего пространства в стиле VS Code Command Center.
-
- */
-
-export async function initIdeWorkspacePicker() {
-
-  const pickerBtn = document.getElementById('ide-workspace-picker-btn');
-
-  const modalEl = document.getElementById('ideWorkspacePickerModal');
-
-  const listEl = document.getElementById('ide-ws-picker-list');
-
-  const searchInput = document.getElementById('ide-ws-quick-search');
-
-  const centerWsName = document.getElementById('ide-command-center-ws-name');
-
-  const centerBranch = document.getElementById('ide-command-center-branch');
-
-
-
-  const updateCommandCenterDisplay = (wsId) => {
-
-    const activeWs = wsId || getActiveWorkspaceId() || 'default';
-
-    if (centerWsName) centerWsName.textContent = activeWs;
-
-  };
-
-
-
-  updateCommandCenterDisplay();
-
-
-
-  const renderPickerList = async (filterText = '') => {
-
-    if (!listEl) return;
-
-    const repos = await fetchAvailableRepositories();
-
-    const activeWs = (getActiveWorkspaceId() || '').toLowerCase();
-
-    const normFilter = (filterText || '').trim().toLowerCase();
-
-
-
-    const filtered = (repos || []).filter((r) => {
-
-      const name = (r.name || r.workspace_id || '').toLowerCase();
-
-      const branch = (r.branch || '').toLowerCase();
-
-      return !normFilter || name.includes(normFilter) || branch.includes(normFilter);
-
-    });
-
-
-
-    if (filtered.length === 0) {
-
-      listEl.innerHTML = `<div class="p-3 text-center text-muted small">Рабочие пространства с Git не найдены</div>`;
-
-      return;
-
-    }
-
-
-
-    listEl.innerHTML = filtered.map((r) => {
-
-      const wsId = r.workspace_id || (r.id ? r.id.replace(/^ws-/, '') : '');
-
-      const isActive = wsId.toLowerCase() === activeWs;
-
-      const cleanName = (r.name || wsId).replace(/^Workspace:\s*/i, '');
-
-
-
-      return `
-
-        <button class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3 ide-ws-picker-item ${isActive ? 'active' : ''}" data-ws-id="${wsId}" data-repo-path="${r.path}" type="button">
-
-          <div class="d-flex align-items-center gap-2 text-truncate">
-
-            <i class="bi bi-folder-check ${isActive ? 'text-white' : 'text-primary'} fs-5"></i>
-
-            <div class="text-truncate text-start">
-
-              <div class="fw-semibold text-truncate">${cleanName}</div>
-
-              <div class="small ${isActive ? 'text-white-50' : 'text-muted'} font-size-75">
-
-                <i class="bi bi-git me-1"></i>Ветка: ${r.branch || 'master'} · ${r.path}
-
-              </div>
-
-            </div>
-
-          </div>
-
-          ${isActive ? '<span class="badge bg-success border border-white-50 font-size-75">Активно</span>' : '<span class="badge bg-body-secondary text-secondary border font-size-75">Выбрать</span>'}
-
-        </button>
-
-      `;
-
-    }).join('');
-
-
-
-    // Привязка кликов по пунктам списка
-
-    listEl.querySelectorAll('.ide-ws-picker-item').forEach((item) => {
-
-      item.addEventListener('click', async () => {
-
-        const targetWs = item.dataset.wsId;
-
-        const targetPath = item.dataset.repoPath;
-
-        if (!targetWs) return;
-
-
-
-        await setGlobalActiveRepo(targetPath, targetWs);
-
-        updateCommandCenterDisplay(targetWs);
-
-        await refreshFileTree(targetWs);
-
-
-
-        if (modalEl && window.bootstrap) {
-
-          bootstrap.Modal.getInstance(modalEl)?.hide();
-
-        }
-
-      });
-
-    });
-
-  };
-
-
-
-  if (pickerBtn && modalEl && window.bootstrap) {
-
-    pickerBtn.addEventListener('click', () => {
-
-      const m = bootstrap.Modal.getOrCreateInstance(modalEl);
-
-      m.show();
-
-      renderPickerList('');
-
-      setTimeout(() => searchInput?.focus(), 250);
-
-    });
-
-  }
-
-
-
-  if (searchInput) {
-
-    searchInput.addEventListener('input', (e) => {
-
-      renderPickerList(e.target.value);
-
-    });
-
-  }
-
-
-
-  // Обновление при смене контекста
-
-  document.addEventListener('workspace:items-changed', (e) => {
-    const wsId = e.detail?.workspaceId || getActiveWorkspaceId();
-    currentFilesData = null;
-    if (wsId) {
-      refreshFileTree(wsId);
-    }
-  });
-
-  document.addEventListener('workspace:changed', (e) => {
-
-    const wsId = e.detail?.workspaceId;
-
-    currentFilesData = null;
-
-    if (wsId) {
-
-      updateCommandCenterDisplay(wsId);
-
-      refreshFileTree(wsId);
-
-    }
-
-  });
-
-}
-
-
-
-/**
-
- * Инициализирует весь комплекс стандартного IDE-интерфейса: навигатор файлов, поиск и Command Center.
-
+ * Инициализирует стандартный навигатор по файлам (Primary Side Bar Explorer).
  */
 
 export function initIdeFileExplorer() {
@@ -1421,21 +1188,24 @@ export function initIdeFileExplorer() {
 
   refreshFileTree();
 
+  // 7. Обновление дерева при изменении состава файлов или смене рабочего пространства
+  document.addEventListener('workspace:items-changed', (e) => {
+    const wsId = e.detail?.workspaceId || getActiveWorkspaceId();
+    currentFilesData = null;
+    if (wsId) {
+      refreshFileTree(wsId);
+    }
+  });
 
+  document.addEventListener('workspace:changed', (e) => {
+    const wsId = e.detail?.workspaceId;
+    currentFilesData = null;
+    if (wsId) {
+      refreshFileTree(wsId);
+    }
+  });
 
-  // 7. Инициализация окна поиска по рабочей области (Quick Open в стиле VS Code)
-
-  initIdeWorkspaceSearch();
-
-
-
-  // 8. Инициализация раскрывающегося окна Command Center
-
-  initIdeWorkspacePicker();
-
-
-
-  // 9. Инициализация контекстного меню по ПКМ для дерева файлов
+  // 8. Инициализация контекстного меню по ПКМ для дерева файлов
 
   initIdeTreeContextMenu();
 

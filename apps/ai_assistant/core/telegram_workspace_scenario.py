@@ -21,7 +21,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 17:55:00
+# Updated: 2026-11-12 00:10:00
 # =============================================================================
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from header import __root__
 from logger import logger
+from apps.ai_assistant.core.demo_scenario_pack import DemoScenarioPack
 from apps.ai_assistant.core.workspace_registry import (
     format_host_qualified_path,
     get_current_host_name,
@@ -47,6 +48,8 @@ from apps.ai_assistant.core.workspace_registry import (
 
 if TYPE_CHECKING:
     from apps.ai_assistant.core.workspace_manager import WorkspaceManager
+
+DEMO_SCENARIOS_DIR = __root__ / "apps" / "ai_assistant" / "demo_scenarios"
 
 DEFAULT_SCENARIO_TARGET_FILE = (
     Path.home() / "Desktop" / "דוד מושה — רשימת מסמכים" / "02_transcript_david_moshe_shmulik_v3.md"
@@ -119,6 +122,7 @@ class TelegramWorkspaceScenarioService:
                 or os.environ.get("AI_ASSISTANT_DAVID_MOSHE_TARGET_FILE")
                 or DEFAULT_SCENARIO_TARGET_FILE
             ),
+            "pack_dir": str(cfg_data.get("pack_dir") or "david_moshe"),
             "delay_seconds": float(cfg_data.get("delay_seconds", 10)),
         }
 
@@ -206,52 +210,35 @@ class TelegramWorkspaceScenarioService:
                 src_transcript = cand
                 break
 
-        dest_dir = audio_path.parent
-        dest_dir.mkdir(parents=True, exist_ok=True)
         dest_filename = src_transcript.name if src_transcript else Path(target_path_str).name
-        dest_transcript_path = dest_dir / dest_filename
-
         transcript_text = ""
-        if src_transcript and src_transcript.resolve() != dest_transcript_path.resolve():
+        if src_transcript:
             try:
-                shutil.copy2(src_transcript, dest_transcript_path)
-                transcript_text = dest_transcript_path.read_text(encoding="utf-8")
-                logger.console(
-                    f"[DavidMosheScenario] Транскрипт '{src_transcript.name}' скопирован "
-                    f"туда же, где сохранён аудиофайл: {dest_transcript_path}"
-                )
-            except Exception as copy_exc:
-                logger.error(f"[DavidMosheScenario] Ошибка копирования транскрипта: {copy_exc}")
-        elif dest_transcript_path.exists():
-            try:
-                transcript_text = dest_transcript_path.read_text(encoding="utf-8")
-            except Exception:
-                pass
-
-        if transcript_text:
-            try:
-                companion_md = audio_path.with_name(f"{audio_path.name}.md")
-                companion_md.write_text(transcript_text, encoding="utf-8")
-            except Exception as comp_exc:
-                logger.debug(f"[DavidMosheScenario] Запись companion .md для аудио: {comp_exc}")
+                transcript_text = src_transcript.read_text(encoding="utf-8")
+            except OSError as read_exc:
+                logger.error(f"[DavidMosheScenario] Ошибка чтения транскрипта: {read_exc}")
 
         rel_doc_id = ""
-        try:
+        dest_transcript_path = audio_path.parent / dest_filename
+        if transcript_text:
+            audio_path.with_name(f"{audio_path.name}.md").write_text(transcript_text, encoding="utf-8")
             _, ws_path = wm._get_or_create_workspace(workspace_id)
-            rel_doc_id = str(dest_transcript_path.relative_to(ws_path)).replace("\\", "/")
-            if transcript_text:
-                wm.import_document(
-                    workspace_id=workspace_id,
-                    document_id=rel_doc_id,
-                    content=transcript_text,
-                    commit_message=(
-                        f"Сценарий דוד משה: скопирован транскрипт {dest_filename} "
-                        f"к аудио {clean_name}"
-                    ),
-                )
-        except Exception as imp_exc:
-            logger.debug(f"[DavidMosheScenario] Ошибка импорта в KnowledgeStore: {imp_exc}")
-
+            pack = DemoScenarioPack.load(DEMO_SCENARIOS_DIR / cfg["pack_dir"])
+            audio_rel = str(audio_path.relative_to(ws_path)).replace("\\", "/")
+            pack_res = await pack.apply(
+                wm=wm,
+                workspace_id=workspace_id,
+                transcript_text=transcript_text,
+                audio_rel=audio_rel,
+                workspace_name=cfg["workspace_name"],
+                transcript_name=dest_filename,
+            )
+            rel_doc_id = pack_res["transcript_rel"]
+            dest_transcript_path = ws_path / rel_doc_id
+            logger.console(
+                f"[DavidMosheScenario] Транскрипт '{dest_filename}' размещён в '{rel_doc_id}', "
+                f"Paperless: {pack_res['paperless_id']}, заметок Obsidian: {len(pack_res['notes'])}"
+            )
         if src_transcript:
             cur_host = get_current_host_name()
             try:

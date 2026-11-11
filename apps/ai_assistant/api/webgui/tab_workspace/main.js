@@ -12,7 +12,7 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-10 20:10:00
+ * Updated: 2026-11-11 20:55:00
  * =============================================================================
  */
 
@@ -44,8 +44,8 @@ import {
 } from './panel_documents/panel.js';
 import { initFactsPanel, loadFacts } from './panel_facts/panel.js';
 import { initQaPanel, executeAskQuestion } from './panel_qa/panel.js';
-import { initSourcesPanel, loadSources } from './panel_sources/panel.js';
-import { initChatPanel } from './panel_chat/panel.js';
+import { initSourcesPanel, loadSources } from './panel_sources/panel.js?v=20261111_v1';
+import { initChatPanel } from './panel_chat/panel.js?v=20261111_v1';
 import {
   initCommitsPanel,
   loadWorkspaceCommitsPanel,
@@ -408,6 +408,12 @@ export async function initWorkspaceTab() {
   };
   document.addEventListener('context:changed', handleContextOrWorkspaceChanged);
   document.addEventListener('workspace:changed', handleContextOrWorkspaceChanged);
+  document.addEventListener('workspace:factsUpdated', async (e) => {
+    const targetWs = e.detail?.workspaceId;
+    if (targetWs && areWorkspacesEqual(targetWs, getCurrentWorkspaceId())) {
+      await fetchActiveSubTabOnly(true);
+    }
+  });
 
   // Реакция на глобальное переключение на вкладку tab-workspace
   document.addEventListener('tab:activated', async (e) => {

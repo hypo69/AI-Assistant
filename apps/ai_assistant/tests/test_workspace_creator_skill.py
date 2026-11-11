@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:53:00
+# Updated: 2026-11-11 21:25:00
 # =============================================================================
 
 from __future__ import annotations
@@ -160,3 +160,45 @@ async def test_router_knowledge_audit_and_create_endpoints() -> None:
             create_data = create_res.json()
             assert create_data["status"] == "ok"
             assert create_data["workspace_id"] == "api_created_ws"
+
+
+@pytest.mark.asyncio
+async def test_workspace_creator_hebrew_directory_localization(temp_workspace_manager: WorkspaceManager) -> None:
+    """Проверяет создание рабочего пространства на иврите из локальной папки и локализацию README и Obsidian Vault."""
+    wm = temp_workspace_manager
+    engine = WorkspaceCreatorEngine(wm)
+
+    with tempfile.TemporaryDirectory() as local_dir:
+        local_p = Path(local_dir) / "דוד משה"
+        local_p.mkdir()
+        (local_p / "דוד משה.txt").write_text("לדוד משה היתה חווה", encoding="utf-8")
+
+        res = await engine.create_workspace_from_directory(
+            directory_path=local_p,
+            workspace_id="דוד_משה",
+            name="דּוֹד משה",
+            language="he",
+            in_place=True,
+        )
+        assert res["status"] == "ok"
+        assert res["language"] == "he"
+
+        ws_info = wm.get_workspace("דוד_משה")
+        assert ws_info is not None
+        assert ws_info["language"] == "he"
+
+        ws_path = wm.registry.workspace_path("דוד_משה")
+        readme_text = (ws_path / "README.md").read_text(encoding="utf-8")
+        assert readme_text.startswith("lang=he")
+        assert "## תיאור" in readme_text
+        assert "## מקור מקומי בדיסק" in readme_text
+        assert "Локальный источник на диске" not in readme_text
+
+        kb_text = (ws_path / "_Knowledge_Base.md").read_text(encoding="utf-8")
+        assert "מאגר הידע המרכזי" in kb_text
+        assert "Сводная база знаний" not in kb_text
+
+        companion_text = (ws_path / ".דוד משה.md").read_text(encoding="utf-8")
+        assert "ידע שחולץ" in companion_text
+        assert "Извлечённые знания" not in companion_text
+

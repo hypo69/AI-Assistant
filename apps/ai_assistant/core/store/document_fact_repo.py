@@ -13,7 +13,7 @@
 # Package: apps.ai_assistant.core.store
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:40:00
+# Updated: 2026-11-11 20:38:00
 # =============================================================================
 
 from __future__ import annotations
@@ -624,6 +624,83 @@ class DocumentFactRepoMixin:
             with conn:
                 cur = conn.execute("UPDATE facts SET status = ? WHERE fact_id = ?", (status, fact_id))
                 return cur.rowcount > 0
+        finally:
+            self._close_conn(conn)
+
+    def add_manual_fact(
+        self,
+        workspace_id: str,
+        document_id: str,
+        fact: Dict[str, Any],
+        version_num: int = 1,
+        commit_hash: str = "",
+        status: str = "validated",
+    ) -> Dict[str, Any]:
+        """Добавляет факт вручную (например, из чата) в таблицы facts и fact_sources."""
+        eff_status = status if status in self.VALID_FACT_STATUSES else "validated"
+        now = get_utc_now_iso()
+        fact_id = fact.get("fact_id") or f"fact_{uuid.uuid4().hex[:12]}"
+        src = fact.get("source") or {}
+        s_idx = int(src.get("sentence_index", 0))
+        fact_copy = dict(fact)
+        fact_copy["fact_id"] = fact_id
+        fact_copy["version_num"] = version_num
+        fact_copy["status"] = eff_status
+        fact_copy["commit_hash"] = commit_hash
+        fact_copy["document_id"] = document_id
+
+        conn = self._get_conn(workspace_id=workspace_id)
+        try:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO facts (
+                        fact_id, workspace_id, document_id, version_num, sentence_index,
+                        fact_type, relation, language, subject_json, predicate_json,
+                        object_json, owner_json, possessed_json, raw_fact_json,
+                        is_negated, confidence, status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        fact_id,
+                        workspace_id,
+                        document_id,
+                        version_num,
+                        s_idx,
+                        fact.get("fact_type", "action"),
+                        fact.get("relation", ""),
+                        fact.get("language", "ru"),
+                        json.dumps(fact.get("subject"), ensure_ascii=False) if fact.get("subject") else "",
+                        json.dumps(fact.get("predicate"), ensure_ascii=False) if fact.get("predicate") else "",
+                        json.dumps(fact.get("object"), ensure_ascii=False) if fact.get("object") else "",
+                        json.dumps(fact.get("owner"), ensure_ascii=False) if fact.get("owner") else "",
+                        json.dumps(fact.get("possessed_entity"), ensure_ascii=False) if fact.get("possessed_entity") else "",
+                        json.dumps(fact_copy, ensure_ascii=False),
+                        1 if fact.get("is_negated") else 0,
+                        float(fact.get("confidence", 1.0)),
+                        eff_status,
+                        now,
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO fact_sources (
+                        fact_id, workspace_id, document_id, commit_hash,
+                        sentence_index, char_start, char_end, quote_text
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        fact_id,
+                        workspace_id,
+                        document_id,
+                        commit_hash,
+                        s_idx,
+                        int(src.get("char_start", 0)),
+                        int(src.get("char_end", len(src.get("quote", "")))),
+                        src.get("quote", ""),
+                    ),
+                )
+            return fact_copy
         finally:
             self._close_conn(conn)
 

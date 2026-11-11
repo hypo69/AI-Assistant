@@ -21,7 +21,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:50:00
+# Updated: 2026-11-11 20:35:00
 # =============================================================================
 
 from __future__ import annotations
@@ -30,20 +30,27 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
+import os
 import random
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from logger import logger
-from src.utils.convertors.audio import _get_gemini_client, audio2text
+from src.utils.convertors.audio import MIME_TYPES as AUDIO_MIME_TYPES, _get_gemini_client, audio2text
 from src.utils.convertors.excel import excel2text
 from src.utils.convertors.google_sheet import extract_spreadsheet_id, read_google_sheet
 from src.utils.pdf import extract_pdf_text
 
 MAX_EXTRACT_FILE_SIZE_BYTES = 50 * 1024 * 1024
+MAX_MEDIA_CONTAINER_SIZE_BYTES = 500 * 1024 * 1024
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff", ".gif"}
-AUDIO_EXTENSIONS = {".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac"}
+AUDIO_EXTENSIONS = {".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac", ".opus", ".wma", ".amr", ".oga", ".spx"}
+VIDEO_MEDIA_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v", ".3gp", ".mpeg", ".mpg", ".ts"}
+MEDIA_WITH_AUDIO_EXTENSIONS = AUDIO_EXTENSIONS | VIDEO_MEDIA_EXTENSIONS
 PDF_EXTENSIONS = {".pdf"}
 TABLE_EXTENSIONS = {".csv", ".tsv", ".xlsx", ".xls"}
 DOC_EXTENSIONS = {".docx"}
@@ -54,7 +61,7 @@ TEXT_EXTENSIONS = {
 
 SUPPORTED_EXTENSIONS = (
     IMAGE_EXTENSIONS
-    | AUDIO_EXTENSIONS
+    | MEDIA_WITH_AUDIO_EXTENSIONS
     | PDF_EXTENSIONS
     | TABLE_EXTENSIONS
     | DOC_EXTENSIONS
@@ -90,6 +97,80 @@ class ContentExtractor:
         """Проверяет, поддерживается ли расширение файла."""
         ext = Path(path_or_name).suffix.lower()
         return ext in SUPPORTED_EXTENSIONS
+
+    @staticmethod
+    def is_media_with_audio_extension(path_or_name: Union[str, Path]) -> bool:
+        """Проверяет, относится ли файл к аудио или медиаконтейнерам со звуковой дорожкой."""
+        ext = Path(path_or_name).suffix.lower()
+        return ext in MEDIA_WITH_AUDIO_EXTENSIONS
+
+    @staticmethod
+    def has_audio_track(file_path: Path) -> bool:
+        """Проверяет наличие звуковой дорожки в медиафайле (через ffprobe или по расширению аудио)."""
+        suffix = file_path.suffix.lower()
+        if suffix not in MEDIA_WITH_AUDIO_EXTENSIONS:
+            return False
+
+        ffprobe_bin = shutil.which("ffprobe")
+        if ffprobe_bin:
+            try:
+                proc = subprocess.run(
+                    [
+                        ffprobe_bin,
+                        "-v", "error",
+                        "-select_streams", "a",
+                        "-show_entries", "stream=codec_type",
+                        "-of", "csv=p=0",
+                        str(file_path),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                if proc.returncode == 0:
+                    return bool(proc.stdout.strip())
+            except Exception as exc:
+                logger.debug(f"[ContentExtractor] Ошибка ffprobe для {file_path.name}: {exc}")
+
+        return suffix in AUDIO_EXTENSIONS or suffix in VIDEO_MEDIA_EXTENSIONS
+
+    @staticmethod
+    def _extract_audio_track_to_temp(file_path: Path) -> Optional[Path]:
+        """Извлекает звуковую дорожку из медиафайла во временный .mp3 через ffmpeg."""
+        ffmpeg_bin = shutil.which("ffmpeg")
+        if not ffmpeg_bin:
+            logger.warning(f"[ContentExtractor] ffmpeg не найден в PATH, извлечение дорожки из {file_path.name} невозможно.")
+            return None
+
+        fd, tmp_name = tempfile.mkstemp(prefix="ai_media_audio_", suffix=".mp3")
+        os.close(fd)
+        tmp_path = Path(tmp_name)
+        try:
+            proc = subprocess.run(
+                [
+                    ffmpeg_bin,
+                    "-y",
+                    "-i", str(file_path),
+                    "-vn",
+                    "-ac", "1",
+                    "-ar", "16000",
+                    "-acodec", "libmp3lame",
+                    "-q:a", "4",
+                    str(tmp_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            if proc.returncode != 0 or not tmp_path.exists() or tmp_path.stat().st_size == 0:
+                logger.info(f"[ContentExtractor] Звуковая дорожка не найдена или не извлечена из {file_path.name}.")
+                tmp_path.unlink(missing_ok=True)
+                return None
+            return tmp_path
+        except Exception as exc:
+            logger.warning(f"[ContentExtractor] Ошибка извлечения аудиодорожки из {file_path.name}: {exc}")
+            tmp_path.unlink(missing_ok=True)
+            return None
 
     def _extract_docx(self, file_path: Path) -> str:
         """Извлекает текст и таблицы из документа Microsoft Word (.docx)."""
@@ -289,19 +370,49 @@ class ContentExtractor:
         return await asyncio.to_thread(_pil_metadata)
 
     async def convert_audio(self, file_path: Path, mode: str = "model", language: str = "ru") -> str:
-        """Выполняет транскрибацию аудиофайла строго с подключением к внешней модели Gemini (или пропуск при raw).
+        """Выполняет транскрибацию аудио или медиафайла со звуковой дорожкой через Gemini.
+
+        Для видео- и нестандартных медиаконтейнеров предварительно извлекает звуковую дорожку
+        во временный `.mp3` с помощью `ffmpeg`. При `mode in ('raw', 'none')` транскрибация пропускается.
 
         Args:
-            file_path: Путь к аудиофайлу.
+            file_path: Путь к аудио- или медиафайлу.
             mode: Режим распознавания ('model' или 'raw').
-            language: Язык аудио.
+            language: Язык речи в медиафайле.
         """
         if mode in ("raw", "none"):
             return ""
-        # По ТЗ: транскрибацию аудио делать только с подключением к внешней модели
-        logger.info(f"[ContentExtractor] Транскрибация аудио через модель Gemini: {file_path.name}")
-        audio_text = await audio2text(file_path, language=language)
-        return audio_text or f"*(Не удалось транскрибировать аудиозапись: {file_path.name})*"
+
+        suffix = file_path.suffix.lower()
+        needs_extraction = suffix in VIDEO_MEDIA_EXTENSIONS or suffix not in AUDIO_MIME_TYPES
+        temp_audio: Optional[Path] = None
+        target_audio_path = file_path
+
+        try:
+            if needs_extraction:
+                has_audio = await asyncio.to_thread(self.has_audio_track, file_path)
+                if not has_audio:
+                    logger.info(f"[ContentExtractor] В медиафайле {file_path.name} отсутствует звуковая дорожка.")
+                    return ""
+                temp_audio = await asyncio.to_thread(self._extract_audio_track_to_temp, file_path)
+                if not temp_audio:
+                    return ""
+                target_audio_path = temp_audio
+                if target_audio_path.stat().st_size > MAX_EXTRACT_FILE_SIZE_BYTES:
+                    raise ValueError(
+                        f"Извлечённая звуковая дорожка из {file_path.name} превышает лимит {MAX_EXTRACT_FILE_SIZE_BYTES} байт."
+                    )
+
+            # По ТЗ: транскрибацию аудио делать только с подключением к внешней модели
+            logger.info(f"[ContentExtractor] Транскрибация аудио через модель Gemini: {file_path.name}")
+            audio_text = await audio2text(target_audio_path, language=language)
+            return audio_text or f"*(Не удалось транскрибировать аудиозапись: {file_path.name})*"
+        finally:
+            if temp_audio is not None:
+                try:
+                    temp_audio.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
     async def extract(
         self,
@@ -343,13 +454,13 @@ class ContentExtractor:
         if not file_path.exists():
             raise FileNotFoundError(f"Файл не найден: {file_path}")
 
-        file_size = file_path.stat().st_size
-        if file_size > MAX_EXTRACT_FILE_SIZE_BYTES:
-            raise ValueError(
-                f"Размер файла {file_path.name} ({file_size} байт) превышает максимально допустимый лимит ({MAX_EXTRACT_FILE_SIZE_BYTES} байт)."
-            )
-
         suffix = file_path.suffix.lower()
+        file_size = file_path.stat().st_size
+        size_limit = MAX_MEDIA_CONTAINER_SIZE_BYTES if suffix in VIDEO_MEDIA_EXTENSIONS else MAX_EXTRACT_FILE_SIZE_BYTES
+        if file_size > size_limit:
+            raise ValueError(
+                f"Размер файла {file_path.name} ({file_size} байт) превышает максимально допустимый лимит ({size_limit} байт)."
+            )
 
         # 2. PDF файл (локальный или расшифровка на модели)
         if suffix in PDF_EXTENSIONS:
@@ -403,29 +514,44 @@ class ContentExtractor:
                 "is_raw": False,
             }
 
-        # 4. Аудиофайлы (транскрибация внешней моделью Gemini или сохранение в сыром виде)
-        if suffix in AUDIO_EXTENSIONS:
+        # 4. Аудио- и видеофайлы со звуковой дорожкой (транскрибация или сохранение в сыром виде)
+        if suffix in MEDIA_WITH_AUDIO_EXTENSIONS:
+            is_video = suffix in VIDEO_MEDIA_EXTENSIONS
+            src_type = "media_audio" if is_video else "audio"
             if audio_mode in ("raw", "none"):
                 return {
                     "text": "",
-                    "source_type": "audio",
+                    "source_type": src_type,
                     "source_path": str(file_path),
                     "document_id": file_path.name,
-                    "title": f"Аудио (сырой): {file_path.stem}",
+                    "title": f"Медиа (сырой): {file_path.stem}" if is_video else f"Аудио (сырой): {file_path.stem}",
                     "extension": suffix,
                     "conversion_mode": "raw",
                     "is_raw": True,
                 }
-            logger.info(f"[ContentExtractor] Транскрибация аудио ({audio_mode}): {file_path.name}")
+            logger.info(f"[ContentExtractor] Транскрибация медиа ({audio_mode}): {file_path.name}")
             audio_text = await self.convert_audio(file_path, mode=audio_mode, language=language)
+            if is_video and not audio_text:
+                return {
+                    "text": "",
+                    "source_type": "media_no_audio",
+                    "source_path": str(file_path),
+                    "document_id": file_path.name,
+                    "title": f"Медиа без звука: {file_path.stem}",
+                    "extension": suffix,
+                    "conversion_mode": "no_audio",
+                    "has_audio": False,
+                    "is_raw": True,
+                }
             return {
                 "text": audio_text,
-                "source_type": "audio",
+                "source_type": src_type,
                 "source_path": str(file_path),
                 "document_id": file_path.name,
-                "title": f"Транскрипция аудио: {file_path.stem}",
+                "title": f"Транскрипция медиа: {file_path.stem}" if is_video else f"Транскрипция аудио: {file_path.stem}",
                 "extension": suffix,
                 "conversion_mode": audio_mode,
+                "has_audio": True,
                 "is_raw": False,
             }
 

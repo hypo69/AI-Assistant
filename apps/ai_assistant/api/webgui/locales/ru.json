@@ -126,7 +126,11 @@
     "modelPingResponseLabel": "Ответ модели:",
     "activeModelBadgeTitle": "Активная модель: нажмите для перехода к каталогу и выбору модели",
     "userDefault": "Пользователь",
-    "close": "Закрыть"
+    "close": "Закрыть",
+    "watchdogSectionTitle": "Автозахват и Watchdog (Git + Транскрибация)",
+    "autoTranscribeLabel": "Автозахват транскрибации медиафайлов",
+    "autoTranscribeHint": "Автоматически извлекать звуковую дорожку и транскрибировать новые медиафайлы (MP3, MP4, MKV, WAV и др.) через Watchdog",
+    "autoGitCommitLabel": "Авто-коммиты Git при изменениях в рабочей области"
   },
   "cacheManager": {
     "title": "Управление кешем",
@@ -426,7 +430,15 @@
       "block-trackTitle": "Добавление файлов и директорий в слежение Git",
       "block-obsidianTitle": "База знаний и заметки Obsidian Vault",
       "block-sourcesTitle": "Внешние источники данных и контекста"
-    }
+    },
+    "watchdogAutoTranscribeLabel": "Автозахват транскрибации медиафайлов (Watchdog)",
+    "watchdogAutoTranscribeHint": "Автоматически извлекает звуковую дорожку и транскрибирует новые медиафайлы",
+    "chatAddFactBtn": "Добавить факт",
+    "chatAddFactTitle": "Добавить текст как новый факт во внутренние файлы и базу знаний",
+    "chatAddingFactStatus": "Сохранение факта...",
+    "chatFactSavedMsg": "Факт сохранён во внутренний файл и базу знаний",
+    "chatFactSavedStatus": "Факт добавлен",
+    "chatFactAddError": "Ошибка добавления факта:"
   },
   "auth": {
     "googleSignIn": "Войти через Google",
@@ -2112,7 +2124,9 @@
       "tasks": "Умные задачи и поручения",
       "instruments": "Инструменты цепочек размышлений CoT [Alt+0]",
       "expandSidebar": "Развернуть / свернуть боковую панель",
-      "tooltipsEditor": "Редактор подсказок интерфейса (Tooltips Editor)"
+      "tooltipsEditor": "Редактор подсказок интерфейса (Tooltips Editor)",
+      "confirmRename": "Переименовать объект и зафиксировать изменение в Git",
+      "confirmCopy": "Создать копию файла и зафиксировать в Git"
     },
     "cws": {
       "title_01c37831": "Вернуться к списку рабочих областей",
@@ -2200,7 +2214,9 @@
       "workspaceSearch": "Поиск рабочего пространства...",
       "createItemName": "например: notes.md или script.py",
       "initialContent": "# Заголовок документа...",
-      "commitMsgOptional": "Сообщение коммита Git (опционально)..."
+      "commitMsgOptional": "Сообщение коммита Git (опционально)...",
+      "renameNewName": "например: new_notes.md",
+      "copyTargetPath": "например: notes_copy.md или folder/notes_copy.md"
     },
     "commits": {
       "ph_ef75ffc3": "Поиск по коммитам..."
@@ -2614,8 +2630,37 @@
       "revealTitle": "Показать файл или папку в проводнике системы",
       "closeTab": "Закрыть",
       "closeOtherTabs": "Закрыть другие",
-      "closeAllTabs": "Закрыть все"
+      "closeAllTabs": "Закрыть все",
+      "copyFile": "Копировать файл...",
+      "copyFileTitle": "Создать копию файла в рабочем пространстве",
+      "copyFilename": "Копировать имя файла",
+      "copyFilenameTitle": "Копировать имя файла или папки в буфер обмена",
+      "filesOnlyTitle": "Действие доступно только для файлов",
+      "summaryDisabledTitle": "Сводка доступна только для файлов",
+      "wasmEditorDisabledTitle": "Редактор доступен только для файлов",
+      "quickEditorDisabledTitle": "Редактирование доступно только для файлов",
+      "copyFilenameSuccess": "Имя скопировано в буфер обмена:",
+      "copyFilenameError": "Не удалось скопировать имя файла:",
+      "revealSuccess": "Открыто в проводнике:",
+      "revealError": "Не удалось открыть в проводнике:",
+      "rootFolderLabel": "Корень рабочей области",
+      "folderWord": "Папка"
     },
+    "renameItemModalTitle": "Переименование объекта",
+    "currentPathLabel": "Текущий путь:",
+    "newNameLabel": "Новое имя:",
+    "commitMessageLabel": "Сообщение коммита Git (необязательно):",
+    "btnRenameSubmit": "Переименовать",
+    "copyItemModalTitle": "Копирование файла",
+    "sourceFileLabel": "Исходный файл:",
+    "copyTargetPathLabel": "Имя или путь копии:",
+    "btnCopySubmit": "Создать копию",
+    "specifyNewNameAlert": "Укажите новое имя, отличное от текущего.",
+    "specifyCopyTargetAlert": "Укажите имя или путь для копии файла.",
+    "renameSuccess": "Переименовано в",
+    "renameError": "Ошибка переименования:",
+    "copySuccess": "Создана копия файла:",
+    "copyError": "Ошибка копирования файла:",
     "linesWord": "Строк",
     "charsWord": "Символов",
     "rootFolder": "/ (корень)",

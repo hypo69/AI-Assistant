@@ -10,8 +10,14 @@
     "last_gc_run": "2026-11-10T18:03:26.420364+00:00",
     "last_gc_status": "Успешно завершено за 0.0 сек (2026-11-10T18:03:26.420364+00:00)"
   },
-  "active_workspace": "test_doc_ws",
-  "last_active_workspace": "test_doc_ws",
+  "watchdog": {
+    "enabled": true,
+    "auto_transcribe_media": true,
+    "auto_git_commit": true,
+    "debounce_seconds": 2
+  },
+  "active_workspace": "דוד_משה",
+  "last_active_workspace": "דוד_משה",
   "llm": {
     "default_model": "agy-gemini-3.1-flash-lite",
     "default_provider": "agy"

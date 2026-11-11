@@ -478,6 +478,14 @@ Updated: 2026-11-07 00:36:00
 </button>
 </div>
 </div>
+<!-- Тумблер автозахвата транскрибации медиа Watchdog -->
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 px-2.5 py-2 rounded border bg-body-tertiary" id="ws-sources-watchdog-row">
+<div class="form-check form-switch mb-0" id="ws-sources-auto-transcribe-wrap">
+<input class="form-check-input" id="ws-sources-auto-transcribe-toggle" role="switch" type="checkbox"/>
+<label class="form-check-label small fw-semibold" data-i18n="workspace.watchdogAutoTranscribeLabel" for="ws-sources-auto-transcribe-toggle" id="ws-sources-auto-transcribe-label">Автозахват транскрибации медиафайлов (Watchdog)</label>
+</div>
+<span class="small text-muted" data-i18n="workspace.watchdogAutoTranscribeHint" id="ws-sources-auto-transcribe-hint">Автоматически извлекает звуковую дорожку и транскрибирует новые медиафайлы</span>
+</div>
 <!-- Список связанных внешних источников -->
 <div class="list-group list-group-flush mb-0" id="ws-sources-list"></div>
 </div>
@@ -661,9 +669,13 @@ Updated: 2026-11-07 00:36:00
 </div>
 <div class="d-flex flex-column gap-2.5" id="ws-chat-messages"></div>
 </div>
-<!-- Поле ввода и кнопка отправить -->
+<!-- Поле ввода и кнопки отправить / добавить факт -->
 <div class="input-group" id="ws-chat-input-group">
 <textarea class="form-control" data-i18n-placeholder="workspace.chatInputPlaceholder" id="ws-chat-input" placeholder="Введите сообщение... (Enter для отправки, Shift+Enter для новой строки)" rows="2"></textarea>
+<button class="btn btn-outline-success px-3 fw-semibold d-flex align-items-center gap-1.5" data-i18n-title="workspace.chatAddFactTitle" id="ws-chat-add-fact-btn" title="Добавить текст как новый факт во внутренние файлы и базу знаний" type="button">
+<i class="bi bi-plus-circle-fill" id="ws-chat-add-fact-icon"></i>
+<span data-i18n="workspace.chatAddFactBtn" id="ws-chat-add-fact-btn-text">Добавить факт</span>
+</button>
 <button class="btn btn-primary px-4 fw-semibold d-flex align-items-center gap-1.5" id="ws-chat-send-btn" type="button">
 <i class="bi bi-send-fill"></i>
 <span data-i18n="workspace.chatSendBtn" id="ws-chat-send-btn-text">Отправить</span>

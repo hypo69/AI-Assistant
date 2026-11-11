@@ -11,13 +11,13 @@
  * File: main.js
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
- * Updated: 2026-11-10 20:30:00
+ * Updated: 2026-11-11 23:50:00
  * =============================================================================
  */
 
 import { initI18n, switchLang, applyTranslations } from './i18n.js';
 import { initTheme } from './theme.js';
-import { initUserSettings } from './userSettings.js';
+import { initUserSettings } from './userSettings.js?v=20261111_v1';
 import { initCacheUI } from './cache-ui.js';
 import { switchTab, loadTab, setupTabClicks } from './tab-core.js';
 import { initTopWorkspaceDropdown, updateTopWorkspaceDropdown, areWorkspacesEqual } from './top_workspace_dropdown.js?v=20261110_v1';
@@ -29,8 +29,8 @@ import {
   switchToWorkspace,
   findWorkspaceMatch,
 } from './drawer_workspaces.js';
-import { initIdeNavigation } from './ide_navigation.js';
-import { initIdeFileExplorer } from './ide_file_explorer.js?v=20261106_v2';
+import { initIdeNavigation } from './ide_navigation.js?v=20261111_v1';
+import { initIdeFileExplorer } from './ide_file_explorer.js?v=20261111_v3';
 import { initModelTester, sendModelPing } from './model-tester.js';
 import './api-cache.js';
 
@@ -44,7 +44,7 @@ window.sendModelPing = sendModelPing;
 
 // Карта соответствия вкладок: id -> [htmlUrl, jsUrl]
 const TABS = {
-  'workspace':        ['/html/tab_workspace/index.html?v=20261107_v2', '/html/tab_workspace/main.js?v=20261107_v2'],
+  'workspace':        ['/html/tab_workspace/index.html?v=20261111_v1', '/html/tab_workspace/main.js?v=20261111_v1'],
   'create-workspace': ['/html/tab_create_workspace/index.html?v=20261110_v2', '/html/tab_create_workspace/main.js?v=20261110_v2'],
   'timeline':         ['/html/tab_timeline/index.html',         '/html/tab_timeline/main.js'],
   'commits':          ['/html/tab_commits/index.html',          '/html/tab_commits/main.js'],
@@ -65,7 +65,7 @@ const TABS = {
   'file-tree':        ['/html/tab_file_tree/index.html',        '/html/tab_file_tree/main.js'],
   'obsidian':         ['/html/tab_obsidian/index.html',         '/html/tab_obsidian/main.js'],
   'doc-categorizer':  ['/html/tab_doc_categorizer/index.html',  '/html/tab_doc_categorizer/main.js'],
-  'chat':             ['/html/tab_chat/index.html',             '/html/tab_chat/main.js'],
+  'chat':             ['/html/tab_chat/index.html?v=20261111_v1', '/html/tab_chat/main.js?v=20261111_v1'],
   'tasks':            ['/html/tab_tasks/index.html',            '/html/tab_tasks/main.js'],
   'instruments':      ['/html/tab_instruments/index.html',      '/html/tab_instruments/main.js'],
   'wikillm':          ['/html/tab_wikillm/index.html',          '/html/tab_wikillm/main.js'],

@@ -14,8 +14,9 @@
 #      Models, Search RAG, Verification, Extensions, Mail).
 #   2. Наличие стандартного навигатора по файлам (#ide-file-navigator) слева с
 #      интерактивным деревом файлов/папок и кнопками управления.
-#   3. Наличие верхнего раскрывающегося окна выбора рабочего пространства
-#      (#ide-command-center, #ide-workspace-picker-btn, #ideWorkspacePickerModal).
+#   3. Отсутствие удаленных элементов Command Center и поиска по рабочей области
+#      (#ide-command-center, #ide-workspace-picker-btn, #ide-search-box-wrapper, #ideWorkspacePickerModal)
+#      в верхнем меню и разметке.
 #   4. Наличие статических стилей IDE навигации в nav.css и скрипта ide_file_explorer.js.
 #   5. Контракт Electron оболочки: сканирование папок с .git (scanGitWorkspaces),
 #      IPC-мост (workspaces:list-git, workspaces:set-active) и нативное меню.
@@ -25,7 +26,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:14:00
+# Updated: 2026-11-11 21:03:00
 # =============================================================================
 
 from __future__ import annotations
@@ -50,7 +51,9 @@ async def test_ide_activity_bar_and_file_explorer_in_index() -> None:
         assert 'id="ide-activity-bar"' in html
         assert 'class="ide-activity-bar' in html
 
-        # 2. Проверяем основные кнопки IDE инструментов
+        # 2. Проверяем основные кнопки IDE инструментов и перенос открытия меню разделов в Activity Bar
+        assert 'id="ide-nav-toggle-sidebar"' in html
+        assert 'id="left-drawer-toggle-btn"' not in html
         assert 'id="ide-nav-workspace"' in html
         assert 'data-tab="tab-workspace"' in html
         assert 'id="ide-nav-commits"' in html
@@ -70,13 +73,13 @@ async def test_ide_activity_bar_and_file_explorer_in_index() -> None:
         assert 'id="ide-btn-refresh-explorer"' in html
         assert 'id="ide-btn-collapse-explorer"' in html
 
-        # 4. Проверяем верхнее раскрывающееся окно выбора рабочего пространства (Command Center)
-        assert 'id="ide-command-center"' in html
-        assert 'id="ide-workspace-picker-btn"' in html
-        assert 'id="ide-command-center-ws-name"' in html
-        assert 'id="ideWorkspacePickerModal"' in html
-        assert 'id="ide-ws-quick-search"' in html
-        assert 'id="ide-ws-picker-list"' in html
+        # 4. Проверяем удаление элементов выбора рабочего пространства и поиска из верхнего меню
+        assert 'id="ide-command-center"' not in html
+        assert 'id="ide-workspace-picker-btn"' not in html
+        assert 'id="ide-command-center-ws-name"' not in html
+        assert 'id="ide-search-box-wrapper"' not in html
+        assert 'id="ide-workspace-search-input"' not in html
+        assert 'id="ideWorkspacePickerModal"' not in html
 
         # 5. Проверяем служебные кнопки нижней группы IDE
         assert 'id="ide-nav-electron-btn"' in html
@@ -96,19 +99,22 @@ async def test_ide_navigation_and_file_explorer_assets_served() -> None:
     """Проверяет отдачу клиентских скриптов и стилей навигатора по файлам."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # Проверяем наличие стилей .ide-file-sidebar и .ide-command-center в nav.css
+        # Проверяем наличие стилей .ide-file-sidebar и отсутствие удаленного .ide-command-center в nav.css
         res_css = await client.get("/html/css/nav.css")
         assert res_css.status_code == 200
         css = res_css.text
         assert ".ide-activity-bar" in css
         assert ".ide-file-sidebar" in css
-        assert ".ide-command-center" in css
+        assert ".ide-command-center" not in css
         assert ".ide-tree-item" in css
 
         # Проверяем наличие скриптов ide_navigation.js и ide_file_explorer.js
         res_nav_js = await client.get("/html/js/ide_navigation.js")
         assert res_nav_js.status_code == 200
         assert "initIdeNavigation" in res_nav_js.text
+        assert "toggleSideBar" in res_nav_js.text
+        assert "shown.bs.offcanvas" in res_nav_js.text
+        assert "hidden.bs.offcanvas" in res_nav_js.text
 
         res_exp_js = await client.get("/html/js/ide_file_explorer.js")
         assert res_exp_js.status_code == 200

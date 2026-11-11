@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-11 20:00:00
+# Updated: 2026-11-11 20:54:00
 # =============================================================================
 
 from __future__ import annotations
@@ -224,8 +224,8 @@ async def test_tab_create_workspace_assets_and_navigation():
         assert res.status_code == 200
         html = res.text
 
-        # 1. Верхняя панель навигации: современный центр управления и отсутствие устаревшего контейнера
-        assert 'id="ide-command-center"' in html
+        # 1. Верхняя панель навигации: отсутствие удаленного Command Center и устаревшего контейнера
+        assert 'id="ide-command-center"' not in html
         assert 'id="top-workspace-control-container"' not in html
         assert 'data-tab="tab-create-workspace"' in html
         assert "Создать рабочее пространство" in html or "Создать новое пространство" in html

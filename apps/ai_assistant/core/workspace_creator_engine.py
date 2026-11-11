@@ -28,7 +28,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:52:00
+# Updated: 2026-11-11 21:23:00
 # =============================================================================
 
 from __future__ import annotations
@@ -85,6 +85,54 @@ DEFAULT_GITIGNORE_LINES = [
     "*.db-wal",
     "*.db-shm",
 ]
+
+
+README_LOCALES: Dict[str, Dict[str, str]] = {
+    "ru": {
+        "desc_header": "Описание",
+        "source_header": "Локальный источник на диске",
+        "path_label": "Путь",
+        "host_label": "Компьютер",
+        "files_count_label": "Файлов обнаружено",
+        "sample_files_label": "Примеры файлов",
+        "tracking_mode_label": "Режим отслеживания",
+        "mode_in_place": "На месте (Git in-place без перемещения)",
+        "mode_copy": "Копирование в assets/",
+    },
+    "he": {
+        "desc_header": "תיאור",
+        "source_header": "מקור מקומי בדיסק",
+        "path_label": "נתיב",
+        "host_label": "מחשב",
+        "files_count_label": "קבצים שנמצאו",
+        "sample_files_label": "דוגמאות קבצים",
+        "tracking_mode_label": "מצב מעקב",
+        "mode_in_place": "במקום (Git in-place ללא העברה)",
+        "mode_copy": "העתקה ל-assets/",
+    },
+    "en": {
+        "desc_header": "Description",
+        "source_header": "Local Disk Source",
+        "path_label": "Path",
+        "host_label": "Host",
+        "files_count_label": "Files detected",
+        "sample_files_label": "Sample files",
+        "tracking_mode_label": "Tracking mode",
+        "mode_in_place": "In-place (Git without moving files)",
+        "mode_copy": "Copy to assets/",
+    },
+    "ua": {
+        "desc_header": "Опис",
+        "source_header": "Локальне джерело на диску",
+        "path_label": "Шлях",
+        "host_label": "Комп'ютер",
+        "files_count_label": "Файлів виявлено",
+        "sample_files_label": "Приклади файлів",
+        "tracking_mode_label": "Режим відстеження",
+        "mode_in_place": "На місці (Git in-place без переміщення)",
+        "mode_copy": "Копіювання в assets/",
+    },
+}
 
 
 class WorkspaceCreatorEngine:
@@ -254,18 +302,20 @@ class WorkspaceCreatorEngine:
 
         # 5. Генерация обогащенного README.md с описанием подключенной папки
         readme_file = ws_path / "README.md"
+        readme_loc = README_LOCALES.get(ws_lang, README_LOCALES["en"])
         files_sample_str = ", ".join(audit["sample_files"][:8]) if audit["sample_files"] else "—"
+        tracking_mode = readme_loc["mode_in_place"] if in_place else readme_loc["mode_copy"]
         readme_body = (
-            f"<!-- lang={ws_lang} -->\n"
+            f"lang={ws_lang}\n\n"
             f"# {ws_name}\n\n"
-            f"## Описание\n"
+            f"## {readme_loc['desc_header']}\n"
             f"{ws_desc}\n\n"
-            f"## Локальный источник на диске\n"
-            f"- **Путь:** `{audit['qualified_path']}`\n"
-            f"- **Компьютер:** `{audit['host_name']}`\n"
-            f"- **Файлов обнаружено:** {audit['total_files']}\n"
-            f"- **Примеры файлов:** {files_sample_str}\n"
-            f"- **Режим отслеживания:** {'На месте (Git in-place без перемещения)' if in_place else 'Копирование в assets/'}\n"
+            f"## {readme_loc['source_header']}\n"
+            f"- **{readme_loc['path_label']}:** `{audit['qualified_path']}`\n"
+            f"- **{readme_loc['host_label']}:** `{audit['host_name']}`\n"
+            f"- **{readme_loc['files_count_label']}:** {audit['total_files']}\n"
+            f"- **{readme_loc['sample_files_label']}:** {files_sample_str}\n"
+            f"- **{readme_loc['tracking_mode_label']}:** {tracking_mode}\n"
         )
         readme_file.write_text(readme_body, encoding="utf-8")
 

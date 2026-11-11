@@ -4,7 +4,7 @@
 **Версия:** 2.5.0  
 **Пакет:** `apps.ai_assistant.core`  
 **Автор:** hypo69  
-**Updated:** 2026-10-26 00:26:00  
+**Updated:** 2026-11-11 23:43:30  
 
 ---
 
@@ -51,7 +51,10 @@ flowchart TD
 | [`wikillm_version_linker.py`](wikillm_version_linker.py) | `WikiLLMVersionLinker` | Двухэтапная верификация и привязка знаний WikiLLM к коммитам Git с защитой от prompt-injection и утечки секретов. |
 | [`query_orchestrator.py`](query_orchestrator.py) | `QueryOrchestrator` | Оркестратор параллельного поиска по истории версий Git, WikiLLM и RAG. |
 | [`ai_diff_summarizer.py`](ai_diff_summarizer.py) | `AIDiffSummarizer` | Семантическое резюмирование изменений кода и текстовых диффов. |
+| [`workspace_watchdog.py`](workspace_watchdog.py) | `WorkspaceWatchdogService`, `WatchTarget` | Фоновый наблюдатель файловой системы (`watchdog.Observer`) для автокоммитов Git, условной транскрибации медиа и маршрутизации PDF. |
+| [`watchdog_pdf_pipeline.py`](watchdog_pdf_pipeline.py) | `WatchdogPdfPipeline` | Конвейер обработки добавленных PDF: отправка в Paperless-ngx для OCR -> Markdown, анализ смысла и выбор папки через Gemini (`UnifiedChatModel`) и фиксация в Git с осмысленным сообщением коммита. |
 | [`obsidian_vault.py`](obsidian_vault.py) | `ObsidianVaultBuilder` | Формирование компактного Obsidian Vault прямо внутри рабочей области (`workspaces/<id>/`): синхронизация «на лету» (YAML frontmatter + факты + `[[wikilinks]]` + `_Knowledge_Base.md`) и целенаправленная сборка тематических конспектов (`_Topics/<Тема>.md`). |
+| [`obsidian_i18n.py`](obsidian_i18n.py) | `OBSIDIAN_I18N`, `get_obsidian_locale`, `normalize_obsidian_lang` | Словари локализации и функции интернационализации шаблонов Obsidian Vault (`ru`, `he`, `en`, `uk`/`ua`). |
 | [`engine_adapter.py`](engine_adapter.py) | `EngineRuntimeManager`, `ElectronEngineAdapter`, `WebView2EngineAdapter` | Единый контракт команд и событий для двух движков графической оболочки: **Electron** (основной: Chromium + Node.js + IPC) и **WebView2** (встроенный Windows GUI). |
 
 ---

@@ -1,0 +1,32 @@
+{
+  "scenario_id": "david_moshe_cow_deal",
+  "transcript": {
+    "dest_dir": "transcripts",
+    "obsidian": {
+      "tags": ["תמליל", "שיחת-טלפון", "עסקת-מקנה", "זינה"],
+      "wikilinks": {
+        "דּוֹד משה": "דוד משה",
+        "דוד משה": "דוד משה",
+        "שמוליק": "שמוליק",
+        "זינה": "זינה",
+        "מושב נהלל, משק מס' 42": "משק 42 נהלל"
+      },
+      "related": ["עסקת רכישת זינה", "זינה", "דוד משה", "שמוליק", "משק 42 נהלל"]
+    }
+  },
+  "paperless": {
+    "enabled": true,
+    "title": "תמליל שיחת טלפון: דוד משה ושמוליק — רכישת הפרה זינה",
+    "file_name": "david_moshe_shmulik_phone_call_zina.txt",
+    "correspondent": "שמוליק",
+    "document_type": "תמליל שיחה",
+    "extra_tags": ["זינה", "עסקת מקנה", "תמליל"]
+  },
+  "notes": [
+    {"src": "deal_zina.md", "dest": "deals/עסקת רכישת זינה.md"},
+    {"src": "zina.md", "dest": "entities/זינה.md"},
+    {"src": "david_moshe.md", "dest": "entities/דוד משה.md"},
+    {"src": "shmulik.md", "dest": "entities/שמוליק.md"},
+    {"src": "farm_nahalal.md", "dest": "entities/משק 42 נהלל.md"}
+  ]
+}

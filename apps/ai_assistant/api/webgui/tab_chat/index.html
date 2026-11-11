@@ -11,7 +11,7 @@ File: index.html
 Package: apps/ai_assistant/api/webgui/tab_chat
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-11-03 11:05:00
+Updated: 2026-11-11 20:52:00
 =============================================================================
 -->
 <div class="container-fluid p-3 d-flex flex-column h-100" id="tab-chat-container">
@@ -78,6 +78,10 @@ Updated: 2026-11-03 11:05:00
     <div class="card-footer bg-body-tertiary p-3 border-top border-secondary-subtle" id="panel-chat-footer">
       <div class="input-group mb-2" id="ws-chat-input-group">
         <textarea class="form-control bg-body text-body" data-i18n-placeholder="workspace.chatInputPlaceholder" id="ws-chat-input" placeholder="Введите сообщение... (Enter для отправки, Shift+Enter для новой строки)" rows="2"></textarea>
+        <button class="btn btn-outline-success px-3 fw-semibold d-flex align-items-center gap-1.5" data-i18n-title="workspace.chatAddFactTitle" id="chat-add-fact-btn" onclick="addFactFromChat()" title="Добавить текст как новый факт во внутренние файлы и базу знаний" type="button">
+          <i class="bi bi-plus-circle-fill" id="chat-add-fact-icon"></i>
+          <span data-i18n="workspace.chatAddFactBtn" id="chat-add-fact-btn-text">Добавить факт</span>
+        </button>
         <button class="btn btn-primary px-4 fw-semibold d-flex align-items-center gap-1.5" id="ws-chat-send-btn" onclick="sendChatMessage()" type="button">
           <i class="bi bi-send-fill"></i>
           <span data-i18n="workspace.chatSendBtn" id="ws-chat-send-btn-text">Отправить</span>

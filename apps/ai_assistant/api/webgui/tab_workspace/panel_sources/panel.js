@@ -12,7 +12,7 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace/panel_sources
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-26 00:22:00
+ * Updated: 2026-11-11 20:52:00
  * =============================================================================
  */
 
@@ -126,6 +126,39 @@ export async function loadSources(workspaceId = null, force = false) {
 
 export function initSourcesPanel(onSyncedCallback) {
   onSourcesSyncedCallback = onSyncedCallback;
+
+  const autoTranscribeToggle = document.getElementById('ws-sources-auto-transcribe-toggle');
+  async function syncWatchdogToggle() {
+    if (!autoTranscribeToggle) return;
+    try {
+      const wd = await fetchJson('/api/v1/watchdog/config');
+      const cfg = (wd && wd.config) || {};
+      autoTranscribeToggle.checked = cfg.auto_transcribe_media !== false;
+    } catch (_) {}
+  }
+  if (autoTranscribeToggle) {
+    syncWatchdogToggle();
+    autoTranscribeToggle.addEventListener('change', async () => {
+      try {
+        const updated = await fetchJson('/api/v1/watchdog/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ auto_transcribe_media: Boolean(autoTranscribeToggle.checked) }),
+        });
+        if (updated && updated.config) {
+          window.dispatchEvent(new CustomEvent('watchdog:configChanged', { detail: updated.config }));
+        }
+      } catch (err) {
+        alert(`Ошибка сохранения настройки авто-транскрибации: ${err.message}`);
+      }
+    });
+    window.addEventListener('watchdog:configChanged', (e) => {
+      const cfg = e.detail || {};
+      if (typeof cfg.auto_transcribe_media === 'boolean') {
+        autoTranscribeToggle.checked = cfg.auto_transcribe_media;
+      }
+    });
+  }
 
   const addBtn = document.getElementById('ws-source-add-btn');
   const syncBtn = document.getElementById('ws-sources-sync-btn');

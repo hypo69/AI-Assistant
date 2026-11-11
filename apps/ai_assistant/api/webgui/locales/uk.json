@@ -126,7 +126,11 @@
     "modelPingResponseLabel": "Відповідь моделі:",
     "activeModelBadgeTitle": "Активна модель: натисніть для переходу до каталогу та вибору моделі",
     "userDefault": "Користувач",
-    "close": "Закрити"
+    "close": "Закрити",
+    "watchdogSectionTitle": "Автозахоплення та Watchdog (Git + Транскрибація)",
+    "autoTranscribeLabel": "Автозахоплення транскрибації медіафайлів",
+    "autoTranscribeHint": "Автоматично витягувати аудіодоріжку та транскрибувати нові медіафайли (MP3, MP4, MKV, WAV тощо) через Watchdog",
+    "autoGitCommitLabel": "Авто-коміти Git при змінах у робочій області"
   },
   "cacheManager": {
     "title": "Керування кешем",
@@ -421,7 +425,15 @@
       "block-trackTitle": "Додавання файлів та папок до відстеження Git",
       "block-obsidianTitle": "База знань та нотатки Obsidian Vault",
       "block-sourcesTitle": "Зовнішні джерела даних та контексту"
-    }
+    },
+    "watchdogAutoTranscribeLabel": "Автозахоплення транскрибації медіафайлів (Watchdog)",
+    "watchdogAutoTranscribeHint": "Автоматично витягує аудіодоріжку та транскрибує нові медіафайли",
+    "chatAddFactBtn": "Додати факт",
+    "chatAddFactTitle": "Додати текст як новий факт у внутрішні файли та базу знань",
+    "chatAddingFactStatus": "Збереження факту...",
+    "chatFactSavedMsg": "Факт збережено у внутрішній файл та базу знань",
+    "chatFactSavedStatus": "Факт додано",
+    "chatFactAddError": "Помилка додавання факту:"
   },
   "auth": {
     "googleSignIn": "Увійти через Google",
@@ -2084,7 +2096,7 @@
       "title_e3241394": "Згорнути навігатор (Ctrl+B)",
       "title_2df29703": "Обновить каталог плагинов",
       "title_17a110d9": "Свернуть панель (Ctrl+B)",
-      "title_c13990e0": "Открить меню разделов",
+      "title_c13990e0": "Відкрити меню розділів",
       "title_c21ce32d": "Главная страница — AI Assistant",
       "title_3987a67a": "Глобальний контекст Git-репозитория и рабочей области",
       "title_2231746c": "Створити новий простір",
@@ -2112,7 +2124,9 @@
       "tasks": "Розумні завдання та доручення",
       "instruments": "Інструменти ланцюжків міркувань CoT [Alt+0]",
       "expandSidebar": "Розгорнути / згорнути бічну панель",
-      "tooltipsEditor": "Редактор підказок інтерфейсу"
+      "tooltipsEditor": "Редактор підказок інтерфейсу",
+      "confirmRename": "Перейменувати об'єкт і зафіксувати зміну в Git",
+      "confirmCopy": "Створити копію файлу і зафіксувати в Git"
     },
     "cws": {
       "title_01c37831": "Повернутися до списку робочих просторів",
@@ -2200,7 +2214,9 @@
       "workspaceSearch": "Пошук робочого простору...",
       "createItemName": "наприклад: notes.md або script.py",
       "initialContent": "# Заголовок документа...",
-      "commitMsgOptional": "Повідомлення коміту Git (опціонально)..."
+      "commitMsgOptional": "Повідомлення коміту Git (опціонально)...",
+      "renameNewName": "наприклад: new_notes.md",
+      "copyTargetPath": "наприклад: notes_copy.md або folder/notes_copy.md"
     },
     "commits": {
       "ph_ef75ffc3": "Пошук по комітах..."
@@ -2614,8 +2630,37 @@
       "revealTitle": "Показати файл або папку у провіднику системи",
       "closeTab": "Закрити",
       "closeOtherTabs": "Закрити інші",
-      "closeAllTabs": "Закрити все"
+      "closeAllTabs": "Закрити все",
+      "copyFile": "Копіювати файл...",
+      "copyFileTitle": "Створити копію файлу у робочому просторі",
+      "copyFilename": "Копіювати ім'я файлу",
+      "copyFilenameTitle": "Копіювати ім'я файлу або папки у буфер обміну",
+      "filesOnlyTitle": "Дія доступна лише для файлів",
+      "summaryDisabledTitle": "Зведення доступне лише для файлів",
+      "wasmEditorDisabledTitle": "Редактор доступний лише для файлів",
+      "quickEditorDisabledTitle": "Редагування доступне лише для файлів",
+      "copyFilenameSuccess": "Ім'я скопійовано у буфер обміну:",
+      "copyFilenameError": "Не вдалося скопіювати ім'я файлу:",
+      "revealSuccess": "Відкрито у провіднику:",
+      "revealError": "Не вдалося відкрити у провіднику:",
+      "rootFolderLabel": "Корінь робочої області",
+      "folderWord": "Папка"
     },
+    "renameItemModalTitle": "Перейменування об'єкта",
+    "currentPathLabel": "Поточний шлях:",
+    "newNameLabel": "Нове ім'я:",
+    "commitMessageLabel": "Повідомлення коміту Git (необов'язково):",
+    "btnRenameSubmit": "Перейменувати",
+    "copyItemModalTitle": "Копіювання файлу",
+    "sourceFileLabel": "Вихідний файл:",
+    "copyTargetPathLabel": "Ім'я або шлях копії:",
+    "btnCopySubmit": "Створити копію",
+    "specifyNewNameAlert": "Вкажіть нове ім'я, відмінне від поточного.",
+    "specifyCopyTargetAlert": "Вкажіть ім'я або шлях для копії файлу.",
+    "renameSuccess": "Перейменовано на",
+    "renameError": "Помилка перейменування:",
+    "copySuccess": "Створено копію файлу:",
+    "copyError": "Помилка копіювання файлу:",
     "linesWord": "Рядків",
     "charsWord": "Символів",
     "rootFolder": "/ (корінь)",

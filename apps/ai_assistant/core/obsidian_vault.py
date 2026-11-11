@@ -27,7 +27,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:50:00
+# Updated: 2026-11-11 21:21:00
 # =============================================================================
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from urllib.parse import quote
 
 from logger import logger
+from apps.ai_assistant.core.obsidian_i18n import get_obsidian_locale
 from apps.ai_assistant.core.service_file_authenticator import ServiceFileAuthenticator
 
 if TYPE_CHECKING:
@@ -100,30 +101,46 @@ def _format_entity_wikilink(entity_dict: Optional[Dict[str, Any]]) -> str:
     return f"[[{canonical or surface}]]"
 
 
-def _format_fact_line(fact: Dict[str, Any], include_doc_link: bool = False) -> str:
+def _format_fact_line(
+    fact: Dict[str, Any],
+    include_doc_link: bool = False,
+    ui_language: Optional[str] = None,
+) -> str:
     """Форматирует структурированный факт в строку списка с [[wikilinks]]."""
     f_type = fact.get("fact_type", "action")
     lang = fact.get("language", "ru")
+    loc = get_obsidian_locale(ui_language or lang)
     is_neg = bool(fact.get("is_negated"))
     doc_id = fact.get("document_id") or fact.get("source", {}).get("document_id", "")
     doc_stem = Path(doc_id).stem if doc_id else ""
-    doc_ref = f" *(источник: [[{doc_stem}|{doc_id}]])*" if (include_doc_link and doc_id) else ""
+    doc_ref = loc["source_ref"].format(doc_stem=doc_stem, doc_id=doc_id) if (include_doc_link and doc_id) else ""
 
     if f_type == "possession":
         owner_link = _format_entity_wikilink(fact.get("owner"))
         poss_link = _format_entity_wikilink(fact.get("possessed_entity"))
-        rel_label = "не владеет (not has)" if is_neg else "владеет (`has`)"
-        return f"- 🏠 **Принадлежность ({lang}):** {owner_link} — *{rel_label}* → {poss_link}{doc_ref}"
+        rel_label = loc["poss_not_has"] if is_neg else loc["poss_has"]
+        return loc["fact_possession"].format(
+            lang=lang,
+            owner_link=owner_link,
+            rel_label=rel_label,
+            poss_link=poss_link,
+            doc_ref=doc_ref,
+        )
 
     subj_link = _format_entity_wikilink(fact.get("subject"))
     pred = fact.get("predicate") or {}
-    pred_text = pred.get("text") or pred.get("lemma") or fact.get("relation") or "действие"
+    pred_text = pred.get("text") or pred.get("lemma") or fact.get("relation") or loc["default_action_predicate"]
     pred_lemma = pred.get("lemma") or pred_text
-    neg_prefix = "НЕ " if is_neg else ""
+    neg_prefix = loc["neg_prefix"] if is_neg else ""
     obj_link = _format_entity_wikilink(fact.get("object"))
-    return (
-        f"- ⚡ **Действие ({lang}):** {subj_link} — *{neg_prefix}{pred_text}* "
-        f"(`{pred_lemma}`) → {obj_link}{doc_ref}"
+    return loc["fact_action"].format(
+        lang=lang,
+        subj_link=subj_link,
+        neg_prefix=neg_prefix,
+        pred_text=pred_text,
+        pred_lemma=pred_lemma,
+        obj_link=obj_link,
+        doc_ref=doc_ref,
     )
 
 
@@ -225,9 +242,12 @@ class ObsidianVaultBuilder:
         entities: List[Dict[str, Any]],
         version_num: int = 1,
         original_path: Optional[str] = None,
+        ui_language: Optional[str] = None,
     ) -> str:
         """Формирует компактный .md документ с YAML frontmatter, исходным текстом и блоком фактов."""
         now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        eff_ui_lang = ui_language or language or "ru"
+        loc = get_obsidian_locale(eff_ui_lang)
         entity_names = sorted({
             str(e.get("lemma") or e.get("normalized") or e.get("text") or "").strip()
             for e in entities
@@ -262,25 +282,26 @@ class ObsidianVaultBuilder:
                 frontmatter_lines.append(f"  - \"{safe_ent}\"")
         frontmatter_lines.append("---")
 
+        kb_stem = Path(KNOWLEDGE_BASE_FILENAME).stem
         section_lines = [
             OBSIDIAN_SECTION_START,
             "",
             "---",
-            f"### 🧠 Извлечённые знания (Obsidian · [[{Path(KNOWLEDGE_BASE_FILENAME).stem}|Сводная база знаний]])",
+            loc["doc_knowledge_header"].format(kb_stem=kb_stem, kb_label=loc["kb_link_label"]),
             "",
         ]
 
         if facts:
-            section_lines.append("#### 📌 Структурированные факты:")
+            section_lines.append(loc["doc_facts_header"])
             for f in facts:
-                section_lines.append(_format_fact_line(f, include_doc_link=False))
+                section_lines.append(_format_fact_line(f, include_doc_link=False, ui_language=eff_ui_lang))
             section_lines.append("")
         else:
-            section_lines.append("*Структурированных фактов (action / possession) в этой ревизии не выделено.*\n")
+            section_lines.append(loc["doc_no_facts"] + "\n")
 
         if entity_names:
             links_str = " · ".join(f"[[{name}]]" for name in entity_names[:30])
-            section_lines.append(f"**Связанные сущности:** {links_str}")
+            section_lines.append(loc["doc_related_entities"].format(links=links_str))
             section_lines.append("")
 
         section_lines.append(OBSIDIAN_SECTION_END)
@@ -313,7 +334,11 @@ class ObsidianVaultBuilder:
             self.rebuild_knowledge_base_index(workspace_id)
             return None
 
-        language = analysis.get("language", "ru")
+        ws_lang = ws.get("language") or ""
+        raw_doc_lang = analysis.get("language") or ""
+        language = ws_lang if (not raw_doc_lang or raw_doc_lang == "unknown") else raw_doc_lang
+        language = language or "ru"
+        ui_language = ws_lang or language
         facts = self.wm.store.get_facts(workspace_id=workspace_id, document_id=doc_id, include_stale=False)
         if not facts and analysis.get("facts"):
             facts = analysis.get("facts", [])
@@ -330,6 +355,7 @@ class ObsidianVaultBuilder:
             entities=entities,
             version_num=version_num,
             original_path=original_path,
+            ui_language=ui_language,
         )
         self._atomic_write_text(md_target, enriched_md)
         self.rebuild_knowledge_base_index(workspace_id)
@@ -348,13 +374,16 @@ class ObsidianVaultBuilder:
 
         now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         ws_name = ws.get("name") or workspace_id
+        ws_lang = ws.get("language") or "ru"
+        loc = get_obsidian_locale(ws_lang)
         git_head = (ws.get("git_head") or "HEAD")[:8]
 
         lines: List[str] = [
             "---",
             "generator: ai_assistant_obsidian",
-            f"title: \"Сводная база знаний — {ws_name}\"",
+            f"title: \"{loc['kb_title'].format(ws_name=ws_name)}\"",
             f"workspace_id: {workspace_id}",
+            f"language: {ws_lang}",
             f"git_head: {git_head}",
             f"documents_count: {len(docs)}",
             f"active_facts_count: {len(active_facts)}",
@@ -365,17 +394,22 @@ class ObsidianVaultBuilder:
             f"  - ws/{workspace_id}",
             "---",
             "",
-            f"# 🧠 Сводная база знаний: {ws_name}",
+            loc["kb_h1"].format(ws_name=ws_name),
             "",
-            f"> [!INFO] Компактный Obsidian Vault рабочего пространства `{workspace_id}`",
-            f"> Документов: **{len(docs)}** | Активных фактов: **{len(active_facts)}** | Сущностей: **{len(entities)}** | Git HEAD: `{git_head}`",
+            loc["kb_info_callout"].format(workspace_id=workspace_id),
+            loc["kb_stats_line"].format(
+                docs_count=len(docs),
+                facts_count=len(active_facts),
+                entities_count=len(entities),
+                git_head=git_head,
+            ),
             "",
-            "## 📄 Документы рабочей области",
+            loc["kb_docs_header"],
             "",
         ]
 
         if docs:
-            lines.append("| Документ | Язык | Версия | Активных фактов | Git ревизия |")
+            lines.append(loc["kb_docs_table_header"])
             lines.append("| --- | --- | --- | --- | --- |")
             for d in docs:
                 d_id = d["document_id"]
@@ -384,26 +418,29 @@ class ObsidianVaultBuilder:
                 md_name = self._resolve_doc_md_path(ws_path, d_id).relative_to(ws_path).as_posix()
                 link_target = md_name[:-3] if md_name.endswith(".md") else md_name
                 c_short = (d.get("commit_hash") or "HEAD")[:8]
+                d_lang = d.get("language")
+                if not d_lang or d_lang == "unknown":
+                    d_lang = ws_lang
                 lines.append(
-                    f"| [[{link_target}]] (`{d_id}`) | `{d.get('language', 'ru')}` | v{d.get('current_version', 1)} "
+                    f"| [[{link_target}]] (`{d_id}`) | `{d_lang}` | v{d.get('current_version', 1)} "
                     f"| {d.get('active_facts_count', 0)} | `{c_short}` |"
                 )
             lines.append("")
         else:
-            lines.append("*В рабочей области пока нет проиндексированных документов.*\n")
+            lines.append(loc["kb_no_docs"] + "\n")
 
         # Секция всех активных фактов, сгруппированных компактно
-        lines.append("## 📌 Извлечённые канонические факты")
+        lines.append(loc["kb_facts_header"])
         lines.append("")
         if active_facts:
             for f in active_facts:
-                lines.append(_format_fact_line(f, include_doc_link=True))
+                lines.append(_format_fact_line(f, include_doc_link=True, ui_language=ws_lang))
             lines.append("")
         else:
-            lines.append("*Факты ещё не извлечены.*\n")
+            lines.append(loc["kb_no_facts"] + "\n")
 
         # Mermaid-диаграмма связей знаний (для визуализации прямо в Obsidian)
-        lines.append("## 🕸 Семантический граф связей (Mermaid)")
+        lines.append(loc["kb_graph_header"])
         lines.append("")
         lines.append("```mermaid")
         lines.append("flowchart LR")
@@ -413,22 +450,22 @@ class ObsidianVaultBuilder:
                 if f_type == "possession":
                     src_txt = (f.get("owner") or {}).get("lemma") or (f.get("owner") or {}).get("text") or "Owner"
                     dst_txt = (f.get("possessed_entity") or {}).get("lemma") or (f.get("possessed_entity") or {}).get("text") or "Item"
-                    rel_txt = "владеет" if not f.get("is_negated") else "не владеет"
+                    rel_txt = loc["mermaid_has"] if not f.get("is_negated") else loc["mermaid_not_has"]
                 else:
                     src_txt = (f.get("subject") or {}).get("lemma") or (f.get("subject") or {}).get("text") or "Subject"
                     dst_txt = (f.get("object") or {}).get("lemma") or (f.get("object") or {}).get("text") or "Object"
-                    rel_txt = (f.get("predicate") or {}).get("lemma") or (f.get("predicate") or {}).get("text") or "action"
+                    rel_txt = (f.get("predicate") or {}).get("lemma") or (f.get("predicate") or {}).get("text") or loc["default_action_predicate"]
                 safe_src = re.sub(r'["\[\]\(\)]', "", str(src_txt))
                 safe_dst = re.sub(r'["\[\]\(\)]', "", str(dst_txt))
                 safe_rel = re.sub(r'["\[\]\(\)]', "", str(rel_txt))
                 lines.append(f'    N{idx}_S["{safe_src}"] -->|"{safe_rel}"| N{idx}_O["{safe_dst}"]')
         else:
-            lines.append('    Empty["Нет активных связей"]')
+            lines.append(f'    Empty["{loc["mermaid_empty"]}"]')
         lines.append("```")
         lines.append("")
 
         # Компактный индекс сущностей (без создания отдельных файлов под каждую сущность)
-        lines.append("## 🏷 Индекс сущностей и понятий")
+        lines.append(loc["kb_entities_header"])
         lines.append("")
         if entities:
             unique_ents: Dict[str, Dict[str, Any]] = {}
@@ -437,38 +474,38 @@ class ObsidianVaultBuilder:
                 if key and key not in unique_ents:
                     unique_ents[key] = e
             ent_badges = [
-                f"[[{k}]] (`{v.get('entity_type', 'entity')}`, {v.get('language', 'ru')})"
+                f"[[{k}]] (`{v.get('entity_type', 'entity')}`, {v.get('language') or ws_lang})"
                 for k, v in sorted(unique_ents.items())
             ]
             lines.append(" · ".join(ent_badges))
             lines.append("")
         else:
-            lines.append("*Сущности не найдены.*\n")
+            lines.append(loc["kb_no_entities"] + "\n")
 
         # Тематические конспекты (_Topics), если они были собраны
         topics_dir = ws_path / TOPICS_DIRNAME
         if topics_dir.exists() and topics_dir.is_dir():
             topic_files = sorted(topics_dir.glob("*.md"))
             if topic_files:
-                lines.append("## 🎯 Целенаправленно собранные тематические конспекты")
+                lines.append(loc["kb_topics_header"])
                 lines.append("")
                 for tf in topic_files:
                     lines.append(f"- [[{TOPICS_DIRNAME}/{tf.stem}|{tf.stem}]]")
                 lines.append("")
 
         # История проверенных вопросов и ответов QA («на лету»)
-        lines.append("## 💬 Ответы ИИ и проверенные знания (QA)")
+        lines.append(loc["kb_qa_header"])
         lines.append("")
         valid_queries = [q for q in recent_queries if q.get("status") == "success"]
         if valid_queries:
             for q_item in valid_queries[:15]:
                 q_str = q_item.get("question", "")
                 a_str = q_item.get("answer", "")
-                q_lang = q_item.get("language", "ru")
-                lines.append(f"- **В ({q_lang}):** *{q_str}* → **О:** **{a_str}**")
+                q_lang = q_item.get("language") or ws_lang
+                lines.append(f"- **{loc['qa_q_label']} ({q_lang}):** *{q_str}* → **{loc['qa_a_label']}:** **{a_str}**")
             lines.append("")
         else:
-            lines.append("*Задайте вопрос во вкладке «Вопрос-Ответ (QA)» или «Чат», и ответы автоматически появятся здесь.*\n")
+            lines.append(loc["kb_no_qa"] + "\n")
 
         kb_path = ws_path / KNOWLEDGE_BASE_FILENAME
         self._atomic_write_text(kb_path, "\n".join(lines))
@@ -482,6 +519,7 @@ class ObsidianVaultBuilder:
         """Целенаправленно пересобирает все компактные .md документы и `_Knowledge_Base.md` в рабочей области (без N+1 запросов)."""
         ws, ws_path = self.wm._get_or_create_workspace(workspace_id)
         self.ensure_vault_config(ws_path)
+        ws_lang = ws.get("language") or "ru"
 
         docs = self.wm.store.list_documents(workspace_id)
         all_facts = self.wm.store.get_facts(workspace_id=workspace_id, include_stale=False)
@@ -508,7 +546,9 @@ class ObsidianVaultBuilder:
             if not raw_content.strip() and Path(doc_id).suffix.lower() not in (".md", ".txt"):
                 continue
             commit_hash = d.get("commit_hash") or "HEAD"
-            lang = d.get("language") or "ru"
+            lang = d.get("language")
+            if not lang or lang == "unknown":
+                lang = ws_lang
             ver = int(d.get("current_version") or 1)
             facts = facts_by_doc.get(doc_id, [])
             doc_ents = ents_by_doc.get(doc_id, [])
@@ -524,6 +564,7 @@ class ObsidianVaultBuilder:
                 entities=doc_ents,
                 version_num=ver,
                 original_path=d.get("file_path"),
+                ui_language=ws_lang,
             )
             self._atomic_write_text(md_path, rendered)
             enriched_files.append(str(md_path.relative_to(ws_path.resolve())).replace("\\", "/"))
@@ -559,10 +600,13 @@ class ObsidianVaultBuilder:
         Отбирает все релевантные факты из SQLite, семантические совпадения из FAISS
         и связанные документы рабочей области, формируя компактный тематический конспект Obsidian.
         """
-        clean_topic = topic.strip() or "Тематический_срез"
-        search_q = (query or clean_topic).strip()
         ws, ws_path = self.wm._get_or_create_workspace(workspace_id)
         self.ensure_vault_config(ws_path)
+        ws_lang = ws.get("language") or "ru"
+        loc = get_obsidian_locale(ws_lang)
+
+        clean_topic = topic.strip() or loc["topic_default_name"]
+        search_q = (query or clean_topic).strip()
 
         topics_dir = ws_path / TOPICS_DIRNAME
         topics_dir.mkdir(parents=True, exist_ok=True)
@@ -598,13 +642,15 @@ class ObsidianVaultBuilder:
             if (f.get("document_id") or f.get("source", {}).get("document_id", ""))
         })
 
+        kb_stem = Path(KNOWLEDGE_BASE_FILENAME).stem
         lines: List[str] = [
             "---",
             "generator: ai_assistant_obsidian",
-            f"title: \"Тема: {clean_topic}\"",
+            f"title: \"{loc['topic_title_prefix']}: {clean_topic}\"",
             f"topic: \"{clean_topic}\"",
             f"query: \"{search_q}\"",
             f"workspace_id: {workspace_id}",
+            f"language: {ws_lang}",
             f"facts_matched: {len(matched_facts)}",
             f"created_at: \"{now_iso}\"",
             "tags:",
@@ -613,40 +659,43 @@ class ObsidianVaultBuilder:
             f"  - ws/{workspace_id}",
             "---",
             "",
-            f"# 🎯 Тематический конспект: {clean_topic}",
+            f"# 🎯 {loc['topic_h1_prefix']}: {clean_topic}",
             "",
-            f"← Вернуться в [[{Path(KNOWLEDGE_BASE_FILENAME).stem}|Сводную базу знаний ({KNOWLEDGE_BASE_FILENAME})]]",
+            f"← {loc['topic_back_to']} [[{kb_stem}|{loc['topic_back_label']} ({KNOWLEDGE_BASE_FILENAME})]]",
             "",
-            f"> [!SUMMARY] Целенаправленная выборка знаний по запросу: `{search_q}`",
-            f"> Найдено фактов: **{len(matched_facts)}** | Семантических фрагментов (FAISS): **{len(faiss_hits)}**",
+            f"> [!SUMMARY] {loc['topic_summary_prefix']}: `{search_q}`",
+            f"> {loc['topic_facts_found']}: **{len(matched_facts)}** | {loc['topic_faiss_found']}: **{len(faiss_hits)}**",
             "",
-            "## 📌 Собранные факты по теме",
+            f"## 📌 {loc['topic_facts_header']}",
             "",
         ]
 
         if matched_facts:
             for f in matched_facts:
-                lines.append(_format_fact_line(f, include_doc_link=True))
+                lines.append(_format_fact_line(f, include_doc_link=True, ui_language=ws_lang))
             lines.append("")
         else:
-            lines.append("*Подходящих фактов не обнаружено.*\n")
+            lines.append(f"*{loc['topic_no_facts']}*\n")
 
-        lines.append("## 🔍 Контекстные фрагменты и цитаты (RAG / FAISS)")
+        lines.append(f"## 🔍 {loc['topic_rag_header']}")
         lines.append("")
         if faiss_hits:
             for h in faiss_hits:
                 meta = h.get("meta") or {}
-                d_id = meta.get("document_id", "документ")
+                d_id = meta.get("document_id", loc["topic_default_doc"])
                 d_stem = Path(d_id).stem
                 quote_txt = h.get("text", "").strip()
                 if quote_txt:
-                    lines.append(f"> «{quote_txt}» — из [[{d_stem}|{d_id}]] *(предложение #{meta.get('sentence_index', 0)})*")
+                    lines.append(
+                        f"> «{quote_txt}» — {loc['topic_from_doc']} [[{d_stem}|{d_id}]] "
+                        f"*({loc['topic_sentence_idx']} #{meta.get('sentence_index', 0)})*"
+                    )
                     lines.append("")
         else:
-            lines.append("*Семантических совпадений в FAISS не найдено.*\n")
+            lines.append(f"*{loc['topic_no_rag']}*\n")
 
         if referenced_docs:
-            lines.append("## 📂 Первоисточники")
+            lines.append(f"## 📂 {loc['topic_sources_header']}")
             lines.append("")
             for rd in referenced_docs:
                 lines.append(f"- [[{Path(rd).stem}|{rd}]]")

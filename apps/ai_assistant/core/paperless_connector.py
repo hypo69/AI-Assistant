@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-11 19:45:00
+# Updated: 2026-11-12 00:10:00
 # =============================================================================
 
 from __future__ import annotations
@@ -263,18 +263,31 @@ class PaperlessConnector:
         suffix = Path(path_or_name).suffix.lower()
         return suffix in cls.PAPERLESS_SUPPORTED_EXTENSIONS
 
-    def upload_document(self, file_path: Path, title: str, tag_ids: List[int]) -> str:
+    def upload_document(
+        self,
+        file_path: Path,
+        title: str,
+        tag_ids: List[int],
+        correspondent_id: Optional[int] = None,
+        document_type_id: Optional[int] = None,
+    ) -> str:
         """Загружает документ в Paperless (асинхронная обработка).
 
         Args:
             file_path: Путь к файлу.
             title: Заголовок документа.
             tag_ids: Идентификаторы тегов.
+            correspondent_id: Идентификатор корреспондента (необязательно).
+            document_type_id: Идентификатор типа документа (необязательно).
 
         Returns:
             str: UUID задачи для отслеживания через get_task_status().
         """
         data: List[tuple] = [("title", title)] + [("tags", str(t)) for t in tag_ids]
+        if correspondent_id is not None:
+            data.append(("correspondent", str(correspondent_id)))
+        if document_type_id is not None:
+            data.append(("document_type", str(document_type_id)))
         with open(file_path, "rb") as fh:
             resp = self._request(
                 "POST",
@@ -359,8 +372,13 @@ class PaperlessConnector:
         workspace_name: Optional[str] = None,
         title: Optional[str] = None,
         timeout: float = 60.0,
+        extra_tags: Optional[List[str]] = None,
+        correspondent: Optional[str] = None,
+        document_type: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Полный цикл импорта документа в Paperless: назначение тега с именем рабочей области, загрузка, ожидание OCR и возврат контента.
+
+        Дополнительные теги, корреспондент и тип документа (если заданы) создаются в Paperless при отсутствии.
 
         Args:
             file_path: Путь к файлу на диске.
@@ -379,7 +397,14 @@ class PaperlessConnector:
 
         doc_title = title or fpath.name
         ws_tag_id = self.ensure_workspace_tag(workspace_id, workspace_name=workspace_name)
-        task_id = self.upload_document(fpath, title=doc_title, tag_ids=[ws_tag_id])
+        tag_ids = [ws_tag_id] + [self.ensure_tag(t) for t in (extra_tags or [])]
+        task_id = self.upload_document(
+            fpath,
+            title=doc_title,
+            tag_ids=tag_ids,
+            correspondent_id=self.ensure_correspondent(correspondent) if correspondent else None,
+            document_type_id=self.ensure_document_type(document_type) if document_type else None,
+        )
         paperless_id = self.wait_for_task(task_id, timeout=timeout)
         if paperless_id is None:
             return None
@@ -438,10 +463,22 @@ class PaperlessConnector:
         Returns:
             int: Идентификатор тега.
         """
-        found = self._request("GET", "/api/tags/", params={"name__iexact": name}).json().get("results", [])
+        return self._ensure_named("/api/tags/", name)
+
+    def _ensure_named(self, endpoint: str, name: str) -> int:
+        """Возвращает id сущности Paperless (тег, корреспондент, тип документа) по имени, создавая её при отсутствии."""
+        found = self._request("GET", endpoint, params={"name__iexact": name}).json().get("results", [])
         if found:
             return int(found[0]["id"])
-        return int(self._request("POST", "/api/tags/", json={"name": name}).json()["id"])
+        return int(self._request("POST", endpoint, json={"name": name}).json()["id"])
+
+    def ensure_correspondent(self, name: str) -> int:
+        """Возвращает id корреспондента по имени, создавая его при отсутствии."""
+        return self._ensure_named("/api/correspondents/", name)
+
+    def ensure_document_type(self, name: str) -> int:
+        """Возвращает id типа документа по имени, создавая его при отсутствии."""
+        return self._ensure_named("/api/document_types/", name)
 
     def ensure_workspace_tag(self, workspace_id: str, workspace_name: Optional[str] = None) -> int:
         """Возвращает id тега рабочей области (по её имени, например, 'דוד משה'), создавая его при необходимости."""

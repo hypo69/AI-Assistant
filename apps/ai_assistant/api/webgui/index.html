@@ -26,7 +26,7 @@ Author: hypo69
 
 Copyright: © 2026 hypo69
 
-Updated: 2026-11-10 20:10:00
+Updated: 2026-11-11 23:50:00
 
 =============================================================================
 
@@ -113,7 +113,7 @@ Updated: 2026-11-10 20:10:00
 <link href="/html/assets/favicon.ico?v=20261022_v1" rel="icon" type="image/x-icon"/>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet"/>
-<link href="/html/css/main.css?v=20261103_v2" rel="stylesheet"/>
+<link href="/html/css/main.css?v=20261111_v1" rel="stylesheet"/>
 <link href="/html/css/themes.css?v=20261103_v1" rel="stylesheet"/>
 <link href="/html/css/context-menu.css?v=20261026_v1" rel="stylesheet"/>
 <link href="/html/components/system_tour/system_tour.css?v=20261017_v1" rel="stylesheet"/>
@@ -131,8 +131,8 @@ Updated: 2026-11-10 20:10:00
 <nav aria-label="Панель навигации IDE" data-i18n-aria-label="ide.activityBarAria" class="ide-activity-bar" id="ide-activity-bar">
 <!-- Верхняя группа: ключевые инструменты IDE -->
 <div class="ide-activity-top">
-<!-- Переключение бокового меню (Side Bar Toggle) -->
-<button class="ide-activity-item" data-i18n-title="titles.ide.title_b8b77740" id="ide-nav-toggle-sidebar" title="Переключить боковое меню (Side Bar) [Ctrl+B]" type="button">
+<!-- Переключение бокового меню разделов (Offcanvas Side Bar Toggle) -->
+<button aria-controls="leftSideNavOffcanvas" class="ide-activity-item" data-ai-tooltip="true" data-bs-target="#leftSideNavOffcanvas" data-bs-toggle="offcanvas" data-i18n-title="titles.ide.title_c13990e0" data-term="workspace" id="ide-nav-toggle-sidebar" title="Открыть меню разделов" type="button">
 <i class="bi bi-layout-sidebar-inset fs-5"></i>
 </button>
 <div class="ide-activity-divider"></div>
@@ -337,49 +337,12 @@ Updated: 2026-11-10 20:10:00
 <div class="container-fluid ide-main-viewport mt-1">
 <!-- Верхняя навигационная панель -->
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1 main-nav-container rounded px-2 py-1">
-<!-- Левая часть: кнопка меню, брендинг и быстрые вкладки -->
+<!-- Левая часть: брендинг приложения -->
 <div class="d-flex flex-wrap align-items-center gap-2">
-<button aria-controls="leftSideNavOffcanvas" class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 px-2 py-1 rounded shadow-sm" data-ai-tooltip="true" data-bs-target="#leftSideNavOffcanvas" data-bs-toggle="offcanvas" data-i18n-title="titles.ide.title_c13990e0" data-term="workspace" id="left-drawer-toggle-btn" title="Открыть меню разделов" type="button">
-<i class="bi bi-list fs-6"></i>
-<span class="d-none d-md-inline" data-i18n="nav.menu" id="top-nav-menu-label">Меню</span>
-</button>
 <a class="fw-bold d-flex align-items-center gap-1.5 text-primary text-decoration-none fs-6 me-2" data-i18n-title="titles.ide.title_c21ce32d" href="/" id="app-brand-link" title="Главная страница — AI Assistant">
-<i class="bi bi-cpu-fill fs-5" id="app-brand-icon"></i>
+<!-- <i class="bi bi-cpu-fill fs-5" id="app-brand-icon"></i> -->
 <span class="d-none d-sm-inline" data-i18n="app.title" id="app-title">AI Assistant — Умное Версионирование</span>
 </a>
-</div>
-<!-- Центр: Раскрывающееся окно выбора рабочего пространства как в Command Center VS Code -->
-<div class="ide-command-center d-none d-md-flex align-items-center gap-2" id="ide-command-center">
-<button class="ide-command-center-btn shadow-sm" data-i18n-title="titles.ide.title_d7853526" id="ide-workspace-picker-btn" title="Выбрать рабочее пространство Git (Ctrl+O / Клик для раскрытия окна)" type="button">
-<i class="bi bi-folder2-open text-primary me-2"></i>
-<span class="ide-ws-title fw-bold" data-i18n="ui.ide.txt_fe01ce2a" id="ide-command-center-ws-name">demo</span>
-<span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-2 font-size-75" data-i18n="ui.ide.txt_eb0a1917" id="ide-command-center-branch">master</span>
-<i class="bi bi-chevron-down ms-2 text-muted small"></i>
-</button>
-<div class="ide-search-box-wrapper w-100 position-relative" id="ide-search-box-wrapper">
-  <div class="input-group input-group-sm ide-command-search-group shadow-sm" id="ide-workspace-search-group">
-    <span class="input-group-text bg-body-tertiary border-end-0 py-1 text-muted" id="ide-search-icon-addon">
-      <i class="bi bi-search"></i>
-    </span>
-    <input autocomplete="off" class="form-control ide-command-search-input border-start-0 border-end-0 py-1" data-i18n-placeholder="placeholders.ide.workspaceSearch" data-i18n-title="titles.ide.workspaceSearchTitle" id="ide-workspace-search-input" placeholder="Поиск по рабочей области (Ctrl+P)..." title="Поиск по рабочей области (Ctrl+P)" type="text"/>
-    <button class="btn btn-sm btn-link text-muted p-0 px-2 d-none ide-search-clear-btn" data-i18n-title="ui.ide.clearSearch" id="ide-search-clear-btn" title="Очистить поиск" type="button">
-      <i class="bi bi-x-circle-fill"></i>
-    </button>
-    <span class="input-group-text bg-body-tertiary border-start-0 py-1 text-muted font-size-75 font-monospace d-none d-lg-inline" id="ide-search-kbd-addon">
-      <kbd class="bg-body-secondary text-body border px-1">Ctrl+P</kbd>
-    </span>
-  </div>
-  <!-- Выпадающее окно быстрых результатов поиска по рабочей области (VS Code Quick Open) -->
-  <div class="ide-search-results-dropdown shadow-lg d-none" id="ide-search-results-dropdown">
-    <div class="ide-search-results-header px-3 py-1.5 border-bottom border-secondary-subtle d-flex justify-content-between align-items-center font-size-75 text-muted bg-body-tertiary">
-      <span data-i18n="ui.ide.searchResults" id="ide-search-results-count">Результаты поиска</span>
-      <span class="font-monospace" data-i18n="ui.ide.escToClose" id="ide-search-esc-hint">Esc для закрытия</span>
-    </div>
-    <div class="ide-search-results-list list-group list-group-flush" id="ide-search-results-list">
-      <!-- Результаты генерируются динамически через ide_file_explorer.js -->
-    </div>
-  </div>
-</div>
 </div>
 <!-- Правая часть: бейджи, кеш, справка, настройки профиля -->
 <div class="d-flex align-items-center gap-1.5 flex-shrink-0 ms-auto nav-actions-right">
@@ -737,6 +700,24 @@ Updated: 2026-11-10 20:10:00
 <option data-i18n="userSettings.themeLightEnterprise" id="opt-theme-light-enterprise" value="theme-light-enterprise">🏢 Light Enterprise (Светлый корпоративный)</option>
 </optgroup>
 </select>
+</div>
+<!-- Секция настроек наблюдателя Watchdog и авто-транскрибации медиа -->
+<div class="pt-2 border-top border-secondary-subtle mt-3" id="modal-watchdog-section">
+<div class="d-flex align-items-center justify-content-between mb-2" id="user-settings-watchdog-header">
+<span class="fw-semibold small d-flex align-items-center gap-2 text-body" id="user-settings-watchdog-title-wrap">
+<i class="bi bi-eye-fill text-primary" id="user-settings-watchdog-icon"></i>
+<span data-i18n="userSettings.watchdogSectionTitle" id="user-settings-watchdog-title">Автозахват и Watchdog (Git + Транскрибация)</span>
+</span>
+</div>
+<div class="form-check form-switch mb-2" id="user-settings-auto-transcribe-wrap">
+<input class="form-check-input" id="user-settings-auto-transcribe-toggle" role="switch" type="checkbox"/>
+<label class="form-check-label small fw-semibold" data-i18n="userSettings.autoTranscribeLabel" for="user-settings-auto-transcribe-toggle" id="user-settings-auto-transcribe-label">Автозахват транскрибации медиафайлов</label>
+<div class="form-text small text-muted" data-i18n="userSettings.autoTranscribeHint" id="user-settings-auto-transcribe-hint">Автоматически извлекать звуковую дорожку и транскрибировать новые медиафайлы (MP3, MP4, MKV, WAV и др.) через Watchdog</div>
+</div>
+<div class="form-check form-switch mb-1" id="user-settings-auto-git-commit-wrap">
+<input class="form-check-input" id="user-settings-auto-git-commit-toggle" role="switch" type="checkbox"/>
+<label class="form-check-label small" data-i18n="userSettings.autoGitCommitLabel" for="user-settings-auto-git-commit-toggle" id="user-settings-auto-git-commit-label">Авто-коммиты Git при изменениях в рабочей области</label>
+</div>
 </div>
 <!-- Секция быстрой проверки доступности активной AI-модели -->
 <div class="pt-2 border-top border-secondary-subtle mt-3" id="modal-model-ping-section">
@@ -1398,32 +1379,6 @@ Updated: 2026-11-10 20:10:00
 </div>
 </div>
 </div>
-<!-- Раскрывающееся окно выбора рабочего пространства как в Command Center VS Code -->
-<div aria-hidden="true" aria-labelledby="ideWorkspacePickerModalLabel" class="modal fade" id="ideWorkspacePickerModal" tabindex="-1">
-<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-<div class="modal-content shadow border-secondary-subtle">
-<div class="modal-header border-secondary-subtle py-2 px-3 bg-body-tertiary">
-<div class="input-group input-group-sm w-100">
-<span class="input-group-text bg-transparent border-end-0 text-muted">
-<i class="bi bi-search"></i>
-</span>
-<input autocomplete="off" class="form-control border-start-0" data-i18n-placeholder="placeholders.ide.ph_76a117ba" id="ide-ws-quick-search" placeholder="Поиск рабочих пространств с Git (введите имя)..." type="text"/>
-</div>
-</div>
-<div class="modal-body p-0">
-<div class="list-group list-group-flush" id="ide-ws-picker-list">
-<!-- Динамический список из ide_file_explorer.js -->
-</div>
-</div>
-<div class="modal-footer border-secondary-subtle py-2 px-3 justify-content-between">
-<button class="btn btn-sm btn-outline-primary" data-bs-dismiss="modal" data-tab="tab-create-workspace" id="ide-button-f2795b10" type="button">
-<i class="bi bi-folder-plus me-1"></i><span id="ide-span-ui-ide-txt_f2795b10" data-i18n="ui.ide.txt_f2795b10">+ Создать пространство</span>
-</button>
-<button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="ui.ide.txt_dd9463bd" id="ide-button-dd9463bd-2" type="button">Закрыть</button>
-</div>
-</div>
-</div>
-</div>
 <!-- Модальные окна контекстного меню проводника: Добавить, Редактировать, Версии, Удалить -->
 <!-- 1. Модальное окно создания файла или папки -->
 <div aria-hidden="true" aria-labelledby="ideCreateItemModalLabel" class="modal fade" id="modal-ide-create-item" tabindex="-1">
@@ -1617,15 +1572,139 @@ Updated: 2026-11-10 20:10:00
   </div>
 </div>
 
+<!-- Контекстное меню (ПКМ) для интерактивного дерева файлов и папок (Tree View) -->
+<div class="custom-context-menu d-none" id="ide-tree-context-menu">
+  <div class="custom-context-menu-header" data-i18n="ide.contextMenu.targetHeader" id="cm-tree-target-header">{{ide.contextMenu.targetHeader}}</div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.summaryTitle" data-tree-action="summary" id="cm-tree-item-summary" title="{{ide.contextMenu.summaryTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-info-circle text-info"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.summary" id="cm-tree-lbl-summary">{{ide.contextMenu.summary}}</span>
+  </div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.wasmEditorTitle" data-tree-action="wasm-editor" id="cm-tree-item-wasm-editor" title="{{ide.contextMenu.wasmEditorTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-code-square text-warning"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.wasmEditor" id="cm-tree-lbl-wasm-editor">{{ide.contextMenu.wasmEditor}}</span>
+    <span class="badge bg-warning-subtle text-warning custom-context-menu-badge">Wasm</span>
+  </div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.createNewTitle" data-tree-action="add" id="cm-tree-item-add" title="{{ide.contextMenu.createNewTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-plus-circle text-success"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.createNew" id="cm-tree-lbl-add">{{ide.contextMenu.createNew}}</span>
+    <span class="text-muted font-size-80" data-i18n="ide.contextMenu.fileFolder" id="cm-tree-badge-add">{{ide.contextMenu.fileFolder}}</span>
+  </div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.quickEditorTitle" data-tree-action="edit" id="cm-tree-item-edit" title="{{ide.contextMenu.quickEditorTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-pencil text-primary"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.quickEditor" id="cm-tree-lbl-edit">{{ide.contextMenu.quickEditor}}</span>
+  </div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.versionsTitle" data-tree-action="versions" id="cm-tree-item-versions" title="{{ide.contextMenu.versionsTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-clock-history text-info"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.versions" id="cm-tree-lbl-versions">{{ide.contextMenu.versions}}</span>
+    <span class="badge bg-secondary-subtle text-secondary custom-context-menu-badge">Git</span>
+  </div>
+  <div class="custom-context-menu-divider"></div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.copyFileTitle" data-tree-action="copy-file" id="cm-tree-item-copy-file" title="{{ide.contextMenu.copyFileTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-files text-primary"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.copyFile" id="cm-tree-lbl-copy-file">{{ide.contextMenu.copyFile}}</span>
+  </div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.copyFilenameTitle" data-tree-action="copy-filename" id="cm-tree-item-copy-filename" title="{{ide.contextMenu.copyFilenameTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-clipboard text-secondary"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.copyFilename" id="cm-tree-lbl-copy-filename">{{ide.contextMenu.copyFilename}}</span>
+  </div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.renameTitle" data-tree-action="rename" id="cm-tree-item-rename" title="{{ide.contextMenu.renameTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-input-cursor-text text-warning"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.rename" id="cm-tree-lbl-rename">{{ide.contextMenu.rename}}</span>
+    <span class="text-muted font-size-80">F2</span>
+  </div>
+  <div class="custom-context-menu-item" data-i18n-title="ide.contextMenu.revealTitle" data-tree-action="reveal" id="cm-tree-item-reveal" title="{{ide.contextMenu.revealTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-folder2-open text-info"></i></span>
+    <span class="custom-context-menu-label" data-i18n="ide.contextMenu.reveal" id="cm-tree-lbl-reveal">{{ide.contextMenu.reveal}}</span>
+  </div>
+  <div class="custom-context-menu-divider"></div>
+  <div class="custom-context-menu-item text-danger" data-i18n-title="ide.contextMenu.deleteTitle" data-tree-action="delete" id="cm-tree-item-delete" title="{{ide.contextMenu.deleteTitle}}">
+    <span class="custom-context-menu-icon"><i class="bi bi-trash text-danger"></i></span>
+    <span class="custom-context-menu-label text-danger" data-i18n="common.delete" id="cm-tree-lbl-delete">{{common.delete}}</span>
+    <span class="text-muted font-size-80">Del</span>
+  </div>
+</div>
+
+<!-- 5. Модальное окно переименования файла или папки -->
+<div aria-hidden="true" aria-labelledby="ideRenameItemModalLabel" class="modal fade" id="modal-ide-rename-item" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow border-secondary-subtle">
+      <div class="modal-header border-secondary-subtle py-2 px-3 bg-body-tertiary">
+        <h5 class="modal-title fs-6 fw-bold mb-0 d-flex align-items-center gap-2" id="ideRenameItemModalLabel">
+          <i class="bi bi-input-cursor-text text-warning"></i>
+          <span data-i18n="ide.renameItemModalTitle" id="ide-span-renameModalTitle">{{ide.renameItemModalTitle}}</span>
+        </h5>
+        <button aria-label="Close" class="btn-close" data-bs-dismiss="modal" id="ide-btn-rename-close-x" type="button"></button>
+      </div>
+      <div class="modal-body p-3">
+        <div class="mb-2 text-muted small">
+          <span data-i18n="ide.currentPathLabel" id="ide-span-renameCurrentLabel">{{ide.currentPathLabel}}</span>
+          <span class="fw-semibold text-body ms-1 font-monospace" id="ide-rename-current-path"></span>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" data-i18n="ide.newNameLabel" for="ide-rename-new-name" id="ide-label-renameNewName">{{ide.newNameLabel}}</label>
+          <input autocomplete="off" class="form-control form-control-sm font-monospace" data-i18n-placeholder="placeholders.ide.renameNewName" dir="ltr" id="ide-rename-new-name" placeholder="{{placeholders.ide.renameNewName}}" required type="text"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold" data-i18n="ide.commitMessageLabel" for="ide-rename-commit-msg" id="ide-label-renameCommitMsg">{{ide.commitMessageLabel}}</label>
+          <input autocomplete="off" class="form-control form-control-sm" data-i18n-placeholder="placeholders.ide.commitMsgOptional" id="ide-rename-commit-msg" placeholder="{{placeholders.ide.commitMsgOptional}}" type="text"/>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary-subtle py-2 px-3 justify-content-between">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel" id="ide-btn-rename-cancel" type="button">{{common.cancel}}</button>
+        <button class="btn btn-sm btn-warning d-flex align-items-center gap-1" data-i18n-title="titles.ide.confirmRename" id="ide-btn-submit-rename" title="{{titles.ide.confirmRename}}" type="button">
+          <i class="bi bi-check2"></i>
+          <span data-i18n="ide.btnRenameSubmit" id="ide-span-btnRenameSubmit">{{ide.btnRenameSubmit}}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. Модальное окно копирования (дублирования) файла -->
+<div aria-hidden="true" aria-labelledby="ideCopyItemModalLabel" class="modal fade" id="modal-ide-copy-item" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow border-secondary-subtle">
+      <div class="modal-header border-secondary-subtle py-2 px-3 bg-body-tertiary">
+        <h5 class="modal-title fs-6 fw-bold mb-0 d-flex align-items-center gap-2" id="ideCopyItemModalLabel">
+          <i class="bi bi-files text-primary"></i>
+          <span data-i18n="ide.copyItemModalTitle" id="ide-span-copyModalTitle">{{ide.copyItemModalTitle}}</span>
+        </h5>
+        <button aria-label="Close" class="btn-close" data-bs-dismiss="modal" id="ide-btn-copy-close-x" type="button"></button>
+      </div>
+      <div class="modal-body p-3">
+        <div class="mb-2 text-muted small">
+          <span data-i18n="ide.sourceFileLabel" id="ide-span-copySourceLabel">{{ide.sourceFileLabel}}</span>
+          <span class="fw-semibold text-body ms-1 font-monospace" id="ide-copy-source-path"></span>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" data-i18n="ide.copyTargetPathLabel" for="ide-copy-target-path" id="ide-label-copyTargetPath">{{ide.copyTargetPathLabel}}</label>
+          <input autocomplete="off" class="form-control form-control-sm font-monospace" data-i18n-placeholder="placeholders.ide.copyTargetPath" dir="ltr" id="ide-copy-target-path" placeholder="{{placeholders.ide.copyTargetPath}}" required type="text"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold" data-i18n="ide.commitMessageLabel" for="ide-copy-commit-msg" id="ide-label-copyCommitMsg">{{ide.commitMessageLabel}}</label>
+          <input autocomplete="off" class="form-control form-control-sm" data-i18n-placeholder="placeholders.ide.commitMsgOptional" id="ide-copy-commit-msg" placeholder="{{placeholders.ide.commitMsgOptional}}" type="text"/>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary-subtle py-2 px-3 justify-content-between">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel" id="ide-btn-copy-cancel" type="button">{{common.cancel}}</button>
+        <button class="btn btn-sm btn-primary d-flex align-items-center gap-1" data-i18n-title="titles.ide.confirmCopy" id="ide-btn-submit-copy" title="{{titles.ide.confirmCopy}}" type="button">
+          <i class="bi bi-check2"></i>
+          <span data-i18n="ide.btnCopySubmit" id="ide-span-btnCopySubmit">{{ide.btnCopySubmit}}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Скрипты приложения -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/html/ai_modal_dialog/main.js?v=20261020_v1"></script>
 <script src="/html/components/system_tour/system_tour.js?v=20261020_v1"></script>
 <script src="/html/js/workspace_wizard.js?v=20261020_v1" type="module"></script>
-<script src="/html/js/ide_file_explorer.js?v=20261110_v3" type="module"></script>
+<script src="/html/js/ide_file_explorer.js?v=20261111_v3" type="module"></script>
 <script src="/html/js/table-resizer.js?v=20261103_v1"></script>
 <script src="/html/js/table-template.js?v=20261103_v1"></script>
-<script src="/html/js/main.js?v=20261110_v2" type="module"></script>
+<script src="/html/js/main.js?v=20261111_v4" type="module"></script>
 <script>
 
     function switchToApp(appName, event) {

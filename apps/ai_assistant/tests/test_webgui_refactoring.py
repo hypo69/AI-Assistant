@@ -13,7 +13,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-30 16:44:00
+# Updated: 2026-11-11 21:03:00
 # =============================================================================
 
 from __future__ import annotations
@@ -77,8 +77,6 @@ async def test_navigation_and_drawer_elements_have_unique_ids() -> None:
             "app-brand-link",
             "app-brand-icon",
             "app-title",
-            "ide-command-center",
-            "ide-workspace-search-input",
             "top-nav-help-btn",
             "user-menu-item-settings",
             "user-menu-item-logout",
@@ -93,9 +91,26 @@ async def test_navigation_and_drawer_elements_have_unique_ids() -> None:
             elem = soup.find(id=elem_id)
             assert elem is not None, f"Элемент с id='{elem_id}' не найден в index.html"
 
-        assert soup.find(id="top-workspace-control-container") is None, (
-            "Устаревший контейнер #top-workspace-control-container должен быть удалён из index.html"
-        )
+        for removed_id in (
+            "top-workspace-control-container",
+            "ide-command-center",
+            "ide-workspace-picker-btn",
+            "ide-workspace-search-input",
+            "left-drawer-toggle-btn",
+            "top-nav-menu-label",
+        ):
+            assert soup.find(id=removed_id) is None, (
+                f"Удалённый элемент #{removed_id} должен отсутствовать в index.html"
+            )
+
+        sidebar_toggle = soup.find(id="ide-nav-toggle-sidebar")
+        assert sidebar_toggle is not None, "Кнопка #ide-nav-toggle-sidebar не найдена"
+        assert sidebar_toggle.get("data-bs-toggle") == "offcanvas"
+        assert sidebar_toggle.get("data-bs-target") == "#leftSideNavOffcanvas"
+        assert sidebar_toggle.get("aria-controls") == "leftSideNavOffcanvas"
+        assert sidebar_toggle.get("data-i18n-title") == "titles.ide.title_c13990e0"
+        assert sidebar_toggle.get("data-ai-tooltip") == "true"
+        assert sidebar_toggle.get("data-term") == "workspace"
 
 
 def test_duplicate_elements_removed_from_drawer_menu() -> None:

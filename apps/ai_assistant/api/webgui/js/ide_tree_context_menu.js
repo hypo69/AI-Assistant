@@ -43,30 +43,16 @@
 
 
  *   - Версии: просмотр истории версий Git для файла с просмотром ревизии и diff
-
-
-
+ *   - Копировать файл: создание копии файла в рабочей области с фиксацией в Git
+ *   - Копировать имя файла: копирование имени файла/папки в буфер обмена
+ *   - Переименовать: переименование файла или папки с коммитом в Git
+ *   - Показать в проводнике: открытие окна проводника ОС для файла или папки
  *
-
-
-
  * File: ide_tree_context_menu.js
-
-
-
  * Package: apps/ai_assistant/api/webgui/js
-
-
-
  * Author: hypo69
-
-
-
  * Copyright: © 2026 hypo69
-
-
-
- * Updated: 2026-11-10 20:30:00
+ * Updated: 2026-11-11 23:50:00
 
 
 
@@ -111,221 +97,143 @@ let currentTarget = {
 
 
 /**
-
-
-
- * Создает DOM-структуру контекстного меню проводника, если она еще не создана.
-
-
-
+ * Возвращает локализованную строку по ключу i18n.
+ * @param {string} key
+ * @param {string} [fallback='']
+ * @returns {string}
  */
+function t(key, fallback = '') {
+  if (typeof window !== 'undefined' && window.i18n && typeof window.i18n.t === 'function') {
+    const val = window.i18n.t(key, fallback);
+    if (val && val !== key) return val;
+  }
+  return fallback || key;
+}
 
+/**
+ * Копирует текст в буфер обмена с fallback для HTTP-контекста.
+ * @param {string} text
+ * @returns {Promise<void>}
+ */
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) {
+    throw new Error('Clipboard unavailable');
+  }
+}
 
+/**
+ * Формирует относительный путь по умолчанию для копии файла (например, dir/note_copy.md).
+ * @param {string} relPath
+ * @returns {string}
+ */
+function buildDefaultCopyPath(relPath) {
+  const clean = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  const parts = clean.split('/');
+  const fileName = parts.pop() || 'file';
+  const dotIdx = fileName.lastIndexOf('.');
+  const copyName = dotIdx > 0
+    ? `${fileName.slice(0, dotIdx)}_copy${fileName.slice(dotIdx)}`
+    : `${fileName}_copy`;
+  parts.push(copyName);
+  return parts.join('/');
+}
 
+/**
+ * Подключает или создаёт DOM-структуру контекстного меню проводника.
+ */
 function ensureTreeContextMenuDOM() {
-
-
-
-  if (menuElement) return;
-
-
-
-  const menu = document.createElement('div');
-
-
-
-  menu.id = 'ide-tree-context-menu';
-
-
-
-  menu.className = 'custom-context-menu d-none';
-
-
-
-  menu.innerHTML = `
-
-
-
-    <div class="custom-context-menu-header" id="cm-tree-target-header" data-i18n="ide.contextMenu.targetHeader">Проводник</div>
-
-
-
-    <div class="custom-context-menu-item" data-tree-action="summary" id="cm-tree-item-summary" title="Кратко о файле (аналитическая сводка)" data-i18n-title="ide.contextMenu.summaryTitle">
-
-
-
-      <span class="custom-context-menu-icon"><i class="bi bi-info-circle text-info"></i></span>
-
-
-
-      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.summary">Кратко о файле</span>
-
-
-
-    </div>
-
-
-
-    <div class="custom-context-menu-item" data-tree-action="wasm-editor" id="cm-tree-item-wasm-editor" title="Открыть в универсальном редакторе Rust + WebAssembly (все типы файлов VS Code)" data-i18n-title="ide.contextMenu.wasmEditorTitle">
-
-
-
-      <span class="custom-context-menu-icon"><i class="bi bi-code-square text-warning"></i></span>
-
-
-
-      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.wasmEditor">Редактор (Rust + Wasm)</span>
-
-
-
-      <span class="badge bg-warning-subtle text-warning custom-context-menu-badge">Wasm</span>
-
-
-
-    </div>
-
-
-
-    <div class="custom-context-menu-item" data-tree-action="add" id="cm-tree-item-add" title="Создать новый файл или папку в этой директории" data-i18n-title="ide.contextMenu.createNewTitle">
-
-
-
-      <span class="custom-context-menu-icon"><i class="bi bi-plus-circle text-success"></i></span>
-
-
-
-      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.createNew">Создать новый...</span>
-
-
-
-      <span class="text-muted font-size-80" data-i18n="ide.contextMenu.fileFolder">Файл/Папка</span>
-
-
-
-    </div>
-
-
-
-    <div class="custom-context-menu-item" data-tree-action="edit" id="cm-tree-item-edit" title="Редактировать текстовый файл в модальном окне" data-i18n-title="ide.contextMenu.quickEditorTitle">
-
-
-
-      <span class="custom-context-menu-icon"><i class="bi bi-pencil text-primary"></i></span>
-
-
-
-      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.quickEditor">Быстрый редактор</span>
-
-
-
-    </div>
-
-
-
-    <div class="custom-context-menu-item" data-tree-action="versions" id="cm-tree-item-versions" title="Посмотреть историю версий Git" data-i18n-title="ide.contextMenu.versionsTitle">
-
-
-
-      <span class="custom-context-menu-icon"><i class="bi bi-clock-history text-info"></i></span>
-
-
-
-      <span class="custom-context-menu-label" data-i18n="ide.contextMenu.versions">Версии</span>
-
-
-
-      <span class="badge bg-secondary-subtle text-secondary custom-context-menu-badge">Git</span>
-
-
-
-    </div>
-
-
-
-    <div class="custom-context-menu-divider"></div>
-
-
-
-    <div class="custom-context-menu-item text-danger" data-tree-action="delete" id="cm-tree-item-delete" title="Удалить файл или папку" data-i18n-title="ide.contextMenu.deleteTitle">
-
-
-
-      <span class="custom-context-menu-icon"><i class="bi bi-trash text-danger"></i></span>
-
-
-
-      <span class="custom-context-menu-label text-danger" data-i18n="common.delete">Удалить</span>
-
-
-
-      <span class="text-muted font-size-80">Del</span>
-
-
-
-    </div>
-
-
-
-  `;
-
-
-
-  document.body.appendChild(menu);
-
-
-
-  menuElement = menu;
-
-
-
-  if (window.i18n && typeof window.i18n.applyTranslations === 'function') {
-
-
-
-    window.i18n.applyTranslations(menuElement);
-
-
-
+  if (!menuElement) {
+    const existing = document.getElementById('ide-tree-context-menu');
+    if (existing) {
+      menuElement = existing;
+    } else {
+      const menu = document.createElement('div');
+      menu.id = 'ide-tree-context-menu';
+      menu.className = 'custom-context-menu d-none';
+      menu.innerHTML = `
+        <div class="custom-context-menu-header" id="cm-tree-target-header" data-i18n="ide.contextMenu.targetHeader">${t('ide.contextMenu.targetHeader')}</div>
+        <div class="custom-context-menu-item" data-tree-action="summary" id="cm-tree-item-summary" title="${t('ide.contextMenu.summaryTitle')}" data-i18n-title="ide.contextMenu.summaryTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-info-circle text-info"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-summary" data-i18n="ide.contextMenu.summary">${t('ide.contextMenu.summary')}</span>
+        </div>
+        <div class="custom-context-menu-item" data-tree-action="wasm-editor" id="cm-tree-item-wasm-editor" title="${t('ide.contextMenu.wasmEditorTitle')}" data-i18n-title="ide.contextMenu.wasmEditorTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-code-square text-warning"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-wasm-editor" data-i18n="ide.contextMenu.wasmEditor">${t('ide.contextMenu.wasmEditor')}</span>
+          <span class="badge bg-warning-subtle text-warning custom-context-menu-badge">Wasm</span>
+        </div>
+        <div class="custom-context-menu-item" data-tree-action="add" id="cm-tree-item-add" title="${t('ide.contextMenu.createNewTitle')}" data-i18n-title="ide.contextMenu.createNewTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-plus-circle text-success"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-add" data-i18n="ide.contextMenu.createNew">${t('ide.contextMenu.createNew')}</span>
+          <span class="text-muted font-size-80" id="cm-tree-badge-add" data-i18n="ide.contextMenu.fileFolder">${t('ide.contextMenu.fileFolder')}</span>
+        </div>
+        <div class="custom-context-menu-item" data-tree-action="edit" id="cm-tree-item-edit" title="${t('ide.contextMenu.quickEditorTitle')}" data-i18n-title="ide.contextMenu.quickEditorTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-pencil text-primary"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-edit" data-i18n="ide.contextMenu.quickEditor">${t('ide.contextMenu.quickEditor')}</span>
+        </div>
+        <div class="custom-context-menu-item" data-tree-action="versions" id="cm-tree-item-versions" title="${t('ide.contextMenu.versionsTitle')}" data-i18n-title="ide.contextMenu.versionsTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-clock-history text-info"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-versions" data-i18n="ide.contextMenu.versions">${t('ide.contextMenu.versions')}</span>
+          <span class="badge bg-secondary-subtle text-secondary custom-context-menu-badge">Git</span>
+        </div>
+        <div class="custom-context-menu-divider"></div>
+        <div class="custom-context-menu-item" data-tree-action="copy-file" id="cm-tree-item-copy-file" title="${t('ide.contextMenu.copyFileTitle')}" data-i18n-title="ide.contextMenu.copyFileTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-files text-primary"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-copy-file" data-i18n="ide.contextMenu.copyFile">${t('ide.contextMenu.copyFile')}</span>
+        </div>
+        <div class="custom-context-menu-item" data-tree-action="copy-filename" id="cm-tree-item-copy-filename" title="${t('ide.contextMenu.copyFilenameTitle')}" data-i18n-title="ide.contextMenu.copyFilenameTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-clipboard text-secondary"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-copy-filename" data-i18n="ide.contextMenu.copyFilename">${t('ide.contextMenu.copyFilename')}</span>
+        </div>
+        <div class="custom-context-menu-item" data-tree-action="rename" id="cm-tree-item-rename" title="${t('ide.contextMenu.renameTitle')}" data-i18n-title="ide.contextMenu.renameTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-input-cursor-text text-warning"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-rename" data-i18n="ide.contextMenu.rename">${t('ide.contextMenu.rename')}</span>
+          <span class="text-muted font-size-80">F2</span>
+        </div>
+        <div class="custom-context-menu-item" data-tree-action="reveal" id="cm-tree-item-reveal" title="${t('ide.contextMenu.revealTitle')}" data-i18n-title="ide.contextMenu.revealTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-folder2-open text-info"></i></span>
+          <span class="custom-context-menu-label" id="cm-tree-lbl-reveal" data-i18n="ide.contextMenu.reveal">${t('ide.contextMenu.reveal')}</span>
+        </div>
+        <div class="custom-context-menu-divider"></div>
+        <div class="custom-context-menu-item text-danger" data-tree-action="delete" id="cm-tree-item-delete" title="${t('ide.contextMenu.deleteTitle')}" data-i18n-title="ide.contextMenu.deleteTitle">
+          <span class="custom-context-menu-icon"><i class="bi bi-trash text-danger"></i></span>
+          <span class="custom-context-menu-label text-danger" id="cm-tree-lbl-delete" data-i18n="common.delete">${t('common.delete')}</span>
+          <span class="text-muted font-size-80">Del</span>
+        </div>
+      `;
+      document.body.appendChild(menu);
+      menuElement = menu;
+    }
   }
 
-
+  if (window.i18n && typeof window.i18n.applyTranslations === 'function') {
+    window.i18n.applyTranslations(menuElement);
+  }
 
   // Слушатель кликов по пунктам меню
-
-
-
-  menuElement.addEventListener('click', (e) => {
-
-
-
-    const item = e.target.closest('.custom-context-menu-item');
-
-
-
-    if (!item) return;
-
-
-
-    const action = item.getAttribute('data-tree-action');
-
-
-
-    if (action) {
-
-
-
-      handleTreeAction(action);
-
-
-
-    }
-
-
-
-  });
-
-
-
+  if (!menuElement._treeClickBound) {
+    menuElement._treeClickBound = true;
+    menuElement.addEventListener('click', (e) => {
+      const item = e.target.closest('.custom-context-menu-item');
+      if (!item || item.classList.contains('disabled')) return;
+      const action = item.getAttribute('data-tree-action');
+      if (action) {
+        handleTreeAction(action);
+      }
+    });
+  }
 }
 
 
@@ -519,89 +427,289 @@ async function handleTreeAction(action) {
 
 
     case 'versions':
-
-
-
       openVersionsModal(currentTarget, wsId);
-
-
-
       break;
 
+    case 'copy-file':
+      if (currentTarget.isDir || !currentTarget.relPath) {
+        showToast(t('ide.contextMenu.filesOnlyToast', 'ℹ️ Действие доступно только для файлов'), 'secondary');
+        return;
+      }
+      openCopyModal(currentTarget, wsId);
+      break;
 
+    case 'copy-filename':
+      if (!currentTarget.relPath) return;
+      await copyFilenameToClipboard(currentTarget);
+      break;
+
+    case 'rename':
+      if (!currentTarget.relPath) return;
+      openRenameModal(currentTarget, wsId);
+      break;
+
+    case 'reveal':
+      await revealInOsExplorer(currentTarget, wsId);
+      break;
 
     case 'delete':
-
-
-
       openDeleteModal(currentTarget, wsId);
-
-
-
       break;
-
-
-
   }
-
-
-
 }
 
-
-
 /**
-
-
-
- * Открывает модальное окно добавления файла или папки.
-
-
-
- * @param {{isDir: boolean, relPath: string, name: string}} target 
-
-
-
+ * Открывает системный проводник ОС на выбранном файле, папке или корне пространства.
+ * @param {{isDir: boolean, relPath: string, name: string}} target
+ * @param {string} wsId
  */
-
-
-
-
-/**
- * Обрабатывает запрос на переименование файла или каталога через POST /api/v1/workspaces/{id}/items/move.
- */
-async function handleRenameItemPrompt(target, wsId) {
-  const currentName = target.name || target.relPath.split('/').pop();
-  const newName = prompt(`Переименовать "${currentName}" в:`, currentName);
-  if (!newName || !newName.trim() || newName.trim() === currentName) return;
-
-  const parts = target.relPath.split('/');
-  parts.pop();
-  parts.push(newName.trim());
-  const newRelPath = parts.join('/');
-
+export async function revealInOsExplorer(target, wsId) {
+  const targetWs = wsId || getActiveWorkspaceId() || 'default';
+  const relPath = target?.relPath || '';
   try {
-    const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(wsId)}/items/move`, {
+    const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(targetWs)}/reveal-item`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        old_rel_path: target.relPath,
-        new_rel_path: newRelPath,
-        commit_message: `Переименование ${target.relPath} -> ${newRelPath}`,
-      }),
+      body: JSON.stringify({ rel_path: relPath }),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-    showToast(`Переименовано в "${newName.trim()}"`, 'success');
-    if (typeof refreshFileTree === 'function') {
-      await refreshFileTree(wsId);
-    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    showToast(`📂 ${t('ide.contextMenu.revealSuccess')} ${target?.name || targetWs}`, 'success');
   } catch (err) {
-    showToast(`Ошибка переименования: ${err.message}`, 'danger');
+    showToast(`❌ ${t('ide.contextMenu.revealError')} ${err.message}`, 'danger');
   }
 }
+
+/**
+ * Копирует имя выбранного файла или папки в буфер обмена.
+ * @param {{isDir: boolean, relPath: string, name: string}} target
+ */
+export async function copyFilenameToClipboard(target) {
+  const fileName = target.name || String(target.relPath || '').split('/').pop() || '';
+  if (!fileName) return;
+  try {
+    await copyTextToClipboard(fileName);
+    showToast(`📋 ${t('ide.contextMenu.copyFilenameSuccess')} ${fileName}`, 'success');
+  } catch (err) {
+    showToast(`❌ ${t('ide.contextMenu.copyFilenameError')} ${err.message}`, 'danger');
+  }
+}
+
+/**
+ * Открывает модальное окно переименования файла или папки.
+ * @param {{isDir: boolean, relPath: string, name: string}} target
+ * @param {string} wsId
+ */
+export function openRenameModal(target, wsId) {
+  const modalEl = document.getElementById('modal-ide-rename-item');
+  if (!modalEl || !window.bootstrap) return;
+
+  const currentPathEl = document.getElementById('ide-rename-current-path');
+  const newNameInput = document.getElementById('ide-rename-new-name');
+  const commitMsgInput = document.getElementById('ide-rename-commit-msg');
+
+  const currentName = target.name || String(target.relPath || '').split('/').pop() || '';
+  if (currentPathEl) {
+    currentPathEl.textContent = target.relPath;
+    currentPathEl.dataset.oldRelPath = target.relPath;
+    currentPathEl.dataset.oldName = currentName;
+    currentPathEl.dataset.wsId = wsId || getActiveWorkspaceId() || 'default';
+  }
+
+  if (newNameInput) {
+    newNameInput.value = currentName;
+    setTimeout(() => {
+      newNameInput.focus();
+      const dotIdx = !target.isDir ? currentName.lastIndexOf('.') : -1;
+      if (dotIdx > 0) {
+        newNameInput.setSelectionRange(0, dotIdx);
+      } else {
+        newNameInput.select();
+      }
+    }, 250);
+  }
+  if (commitMsgInput) commitMsgInput.value = '';
+
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+/**
+ * Инициализирует обработчик подтверждения переименования в модальном окне.
+ */
+function initRenameModalSubmit() {
+  const submitBtn = document.getElementById('ide-btn-submit-rename');
+  const newNameInput = document.getElementById('ide-rename-new-name');
+
+  const performRename = async () => {
+    const modalEl = document.getElementById('modal-ide-rename-item');
+    const currentPathEl = document.getElementById('ide-rename-current-path');
+    const commitMsgInput = document.getElementById('ide-rename-commit-msg');
+    if (!submitBtn || !currentPathEl) return;
+
+    const oldRelPath = currentPathEl.dataset.oldRelPath || '';
+    const oldName = currentPathEl.dataset.oldName || '';
+    const wsId = currentPathEl.dataset.wsId || getActiveWorkspaceId() || 'default';
+    const newName = (newNameInput?.value || '').trim().replace(/^\/+|\/+$/g, '');
+
+    if (!oldRelPath || !newName || newName === oldName || newName.includes('/') || newName.includes('\\')) {
+      showToast(t('ide.specifyNewNameAlert'), 'warning');
+      newNameInput?.focus();
+      return;
+    }
+
+    const parts = oldRelPath.split('/');
+    parts.pop();
+    parts.push(newName);
+    const newRelPath = parts.join('/');
+    const commitMessage = (commitMsgInput?.value || '').trim() || `Переименование ${oldRelPath} -> ${newRelPath}`;
+
+    submitBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(wsId)}/items/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          old_rel_path: oldRelPath,
+          new_rel_path: newRelPath,
+          commit_message: commitMessage,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+      if (modalEl && window.bootstrap) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+      showToast(`✅ ${t('ide.renameSuccess')} "${newName}"`, 'success');
+      await refreshFileTree(wsId);
+    } catch (err) {
+      showToast(`❌ ${t('ide.renameError')} ${err.message}`, 'danger');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  };
+
+  if (submitBtn && !submitBtn._renameBound) {
+    submitBtn._renameBound = true;
+    submitBtn.addEventListener('click', performRename);
+  }
+  if (newNameInput && !newNameInput._renameEnterBound) {
+    newNameInput._renameEnterBound = true;
+    newNameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        performRename();
+      }
+    });
+  }
+}
+
+/**
+ * Открывает модальное окно копирования (дублирования) файла.
+ * @param {{isDir: boolean, relPath: string, name: string}} target
+ * @param {string} wsId
+ */
+export function openCopyModal(target, wsId) {
+  const modalEl = document.getElementById('modal-ide-copy-item');
+  if (!modalEl || !window.bootstrap) return;
+
+  const sourcePathEl = document.getElementById('ide-copy-source-path');
+  const targetPathInput = document.getElementById('ide-copy-target-path');
+  const commitMsgInput = document.getElementById('ide-copy-commit-msg');
+
+  if (sourcePathEl) {
+    sourcePathEl.textContent = target.relPath;
+    sourcePathEl.dataset.sourcePath = target.relPath;
+    sourcePathEl.dataset.wsId = wsId || getActiveWorkspaceId() || 'default';
+  }
+
+  const defaultCopyPath = buildDefaultCopyPath(target.relPath);
+  if (targetPathInput) {
+    targetPathInput.value = defaultCopyPath;
+    setTimeout(() => {
+      targetPathInput.focus();
+      const slashIdx = defaultCopyPath.lastIndexOf('/');
+      const dotIdx = defaultCopyPath.lastIndexOf('.');
+      const start = slashIdx >= 0 ? slashIdx + 1 : 0;
+      const end = dotIdx > start ? dotIdx : defaultCopyPath.length;
+      targetPathInput.setSelectionRange(start, end);
+    }, 250);
+  }
+  if (commitMsgInput) commitMsgInput.value = '';
+
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+/**
+ * Инициализирует обработчик подтверждения копирования файла в модальном окне.
+ */
+function initCopyModalSubmit() {
+  const submitBtn = document.getElementById('ide-btn-submit-copy');
+  const targetPathInput = document.getElementById('ide-copy-target-path');
+
+  const performCopy = async () => {
+    const modalEl = document.getElementById('modal-ide-copy-item');
+    const sourcePathEl = document.getElementById('ide-copy-source-path');
+    const commitMsgInput = document.getElementById('ide-copy-commit-msg');
+    if (!submitBtn || !sourcePathEl) return;
+
+    const sourceRelPath = sourcePathEl.dataset.sourcePath || '';
+    const wsId = sourcePathEl.dataset.wsId || getActiveWorkspaceId() || 'default';
+    const targetRelPath = (targetPathInput?.value || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+
+    if (!sourceRelPath || !targetRelPath || targetRelPath === sourceRelPath) {
+      showToast(t('ide.specifyCopyTargetAlert'), 'warning');
+      targetPathInput?.focus();
+      return;
+    }
+
+    const commitMessage = (commitMsgInput?.value || '').trim() || `Копия файла: ${sourceRelPath} -> ${targetRelPath}`;
+
+    submitBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/v1/workspaces/${encodeURIComponent(wsId)}/items/copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_rel_path: sourceRelPath,
+          target_rel_path: targetRelPath,
+          commit_message: commitMessage,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+      if (modalEl && window.bootstrap) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+      showToast(`✅ ${t('ide.copySuccess')} "${data.target_rel_path || targetRelPath}"`, 'success');
+      await refreshFileTree(wsId);
+    } catch (err) {
+      showToast(`❌ ${t('ide.copyError')} ${err.message}`, 'danger');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  };
+
+  if (submitBtn && !submitBtn._copyBound) {
+    submitBtn._copyBound = true;
+    submitBtn.addEventListener('click', performCopy);
+  }
+  if (targetPathInput && !targetPathInput._copyEnterBound) {
+    targetPathInput._copyEnterBound = true;
+    targetPathInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        performCopy();
+      }
+    });
+  }
+}
+
+/**
+ * Открывает модальное окно добавления файла или папки.
+ * @param {{isDir: boolean, relPath: string, name: string}} target
+ */
 
 function openCreateModal(target, initialType = 'file') {
 
@@ -2626,421 +2734,162 @@ function showTreeContextMenu(e) {
 
 
       relPath: folderEl.dataset.folderPath || '',
-
-
-
-      name: (folderEl.dataset.folderPath || '').split('/').pop() || 'Папка',
-
-
-
+      name: (folderEl.dataset.folderPath || '').split('/').pop() || t('ide.contextMenu.folderWord', 'Папка'),
     };
-
-
-
   } else {
-
-
-
     currentTarget = {
-
-
-
       isDir: true,
-
-
-
       relPath: '',
-
-
-
-      name: 'Корень рабочей области',
-
-
-
+      name: t('ide.contextMenu.rootFolderLabel', 'Корень рабочей области'),
     };
-
-
-
   }
-
-
 
   // Обновляем визуальный заголовок контекстного меню
-
-
-
   const headerEl = document.getElementById('cm-tree-target-header');
-
-
-
   const editItem = document.getElementById('cm-tree-item-edit');
-
-
-
   const deleteItem = document.getElementById('cm-tree-item-delete');
-
-
+  const copyFileItem = document.getElementById('cm-tree-item-copy-file');
+  const copyFilenameItem = document.getElementById('cm-tree-item-copy-filename');
+  const renameItem = document.getElementById('cm-tree-item-rename');
 
   if (headerEl) {
-
-
-
     const icon = currentTarget.isDir ? '📁' : '📄';
-
-
-
     headerEl.textContent = `${icon} ${currentTarget.name}`;
-
-
-
   }
 
-
-
-  // Редактирование и сводка доступны только для файлов
-
-
-
+  // Редактирование, сводка и копирование файла доступны только для файлов
   const summaryItem = document.getElementById('cm-tree-item-summary');
-
-
-
   const wasmEditorItem = document.getElementById('cm-tree-item-wasm-editor');
 
-
-
   if (summaryItem) {
-
-
-
     if (currentTarget.isDir) {
-
-
-
       summaryItem.classList.add('disabled');
-
-
-
-      summaryItem.title = 'Сводка доступна только для файлов';
-
-
-
+      summaryItem.title = t('ide.contextMenu.summaryDisabledTitle');
     } else {
-
-
-
       summaryItem.classList.remove('disabled');
-
-
-
-      summaryItem.title = 'Кратко о файле (аналитическая сводка)';
-
-
-
+      summaryItem.title = t('ide.contextMenu.summaryTitle');
     }
-
-
-
   }
-
-
 
   if (wasmEditorItem) {
-
-
-
     if (currentTarget.isDir) {
-
-
-
       wasmEditorItem.classList.add('disabled');
-
-
-
-      wasmEditorItem.title = 'Редактор доступен только для файлов';
-
-
-
+      wasmEditorItem.title = t('ide.contextMenu.wasmEditorDisabledTitle');
     } else {
-
-
-
       wasmEditorItem.classList.remove('disabled');
-
-
-
-      wasmEditorItem.title = 'Открыть в универсальном редакторе Rust + WebAssembly';
-
-
-
+      wasmEditorItem.title = t('ide.contextMenu.wasmEditorTitle');
     }
-
-
-
   }
-
-
 
   if (editItem) {
-
-
-
     if (currentTarget.isDir) {
-
-
-
       editItem.classList.add('disabled');
-
-
-
-      editItem.title = 'Редактирование доступно только для файлов';
-
-
-
+      editItem.title = t('ide.contextMenu.quickEditorDisabledTitle');
     } else {
-
-
-
       editItem.classList.remove('disabled');
-
-
-
-      editItem.title = 'Редактировать текстовый файл';
-
-
-
+      editItem.title = t('ide.contextMenu.quickEditorTitle');
     }
-
-
-
   }
 
-
-
-  // Удаление недоступно только для пустого корня
-
-
-
-  if (deleteItem) {
-
-
-
-    if (!currentTarget.relPath) {
-
-
-
-      deleteItem.classList.add('disabled');
-
-
-
+  if (copyFileItem) {
+    if (currentTarget.isDir || !currentTarget.relPath) {
+      copyFileItem.classList.add('disabled');
+      copyFileItem.title = t('ide.contextMenu.filesOnlyTitle');
     } else {
-
-
-
-      deleteItem.classList.remove('disabled');
-
-
-
+      copyFileItem.classList.remove('disabled');
+      copyFileItem.title = t('ide.contextMenu.copyFileTitle');
     }
-
-
-
   }
 
+  // Копирование имени, переименование и удаление недоступны для пустого корня
+  [copyFilenameItem, renameItem, deleteItem].forEach((menuItem) => {
+    if (!menuItem) return;
+    if (!currentTarget.relPath) {
+      menuItem.classList.add('disabled');
+    } else {
+      menuItem.classList.remove('disabled');
+    }
+  });
 
-
-  // Позиционирование с проверкой границ окна
-
-
-
-  const menuWidth = 240;
-
-
-
-  const menuHeight = 210;
-
-
-
-  let x = e.clientX;
-
-
-
-  let y = e.clientY;
-
-
-
-  if (x + menuWidth > window.innerWidth) {
-
-
-
-    x = Math.max(10, window.innerWidth - menuWidth - 10);
-
-
-
-  }
-
-
-
-  if (y + menuHeight > window.innerHeight) {
-
-
-
-    y = Math.max(10, window.innerHeight - menuHeight - 10);
-
-
-
-  }
-
-
-
-  menuElement.style.left = `${x}px`;
-
-
-
-  menuElement.style.top = `${y}px`;
-
-
-
+  // Показываем и позиционируем меню с проверкой границ окна
+  menuElement.style.left = `${e.clientX}px`;
+  menuElement.style.top = `${e.clientY}px`;
   menuElement.classList.remove('d-none');
 
+  const menuWidth = menuElement.offsetWidth || 260;
+  const menuHeight = menuElement.offsetHeight || 340;
+  let x = e.clientX;
+  let y = e.clientY;
 
+  if (x + menuWidth > window.innerWidth) {
+    x = Math.max(10, window.innerWidth - menuWidth - 10);
+  }
+  if (y + menuHeight > window.innerHeight) {
+    y = Math.max(10, window.innerHeight - menuHeight - 10);
+  }
 
+  menuElement.style.left = `${x}px`;
+  menuElement.style.top = `${y}px`;
 }
 
-
-
 /**
-
-
-
  * Инициализирует контекстное меню дерева проводника.
-
-
-
  */
-
-
-
 export function initIdeTreeContextMenu() {
-
-
-
   ensureTreeContextMenuDOM();
-
-
-
   initCreateModalSubmit();
-
-
+  initRenameModalSubmit();
+  initCopyModalSubmit();
 
   const treeContainer = document.getElementById('ide-file-tree-container');
-
-
-
   const navigatorSidebar = document.getElementById('ide-file-navigator');
 
-
-
   // Слушатель контекстного меню на контейнере дерева файлов
-
-
-
   treeContainer?.addEventListener('contextmenu', (e) => {
-
-
-
     showTreeContextMenu(e);
-
-
-
   });
-
-
 
   // Также перехватываем ПКМ на свободной области навигатора
-
-
-
   navigatorSidebar?.addEventListener('contextmenu', (e) => {
-
-
-
     // Если клик не в других интерактивных блоках
-
-
-
     if (!e.target.closest('.ide-explorer-header, .ide-explorer-section-title')) {
-
-
-
       showTreeContextMenu(e);
-
-
-
     }
-
-
-
   });
-
-
 
   // Закрытие меню при клике в любом месте
-
-
-
   document.addEventListener('click', (e) => {
-
-
-
     if (menuElement && !menuElement.contains(e.target)) {
-
-
-
       hideTreeContextMenu();
-
-
-
     }
-
-
-
   });
 
-
-
-  // Закрытие по клавише Escape
-
-
-
+  // Закрытие по клавише Escape и быстрое переименование по F2
   document.addEventListener('keydown', (e) => {
-
-
-
     if (e.key === 'Escape') {
-
-
-
       hideTreeContextMenu();
-
-
-
+      return;
     }
-
-
-
+    if (e.key === 'F2') {
+      const tag = (e.target?.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) {
+        return;
+      }
+      const activeItem = treeContainer?.querySelector('.ide-tree-item.active');
+      if (!activeItem) return;
+      const isDir = activeItem.classList.contains('ide-tree-folder');
+      const relPath = isDir ? (activeItem.dataset.folderPath || '') : (activeItem.dataset.relPath || '');
+      if (!relPath) return;
+      e.preventDefault();
+      const name = isDir
+        ? (relPath.split('/').pop() || '')
+        : (activeItem.dataset.name || relPath.split('/').pop() || '');
+      openRenameModal({ isDir, relPath, name }, getActiveWorkspaceId() || 'default');
+    }
   });
-
-
 
   // Закрытие при прокрутке
-
-
-
   window.addEventListener('scroll', hideTreeContextMenu, true);
-
-
-
 }
 
 

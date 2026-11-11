@@ -17,7 +17,7 @@
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-10 12:58:00
+ * Updated: 2026-11-11 21:02:00
  * =============================================================================
  */
 
@@ -322,13 +322,25 @@ export function initIdeNavigation() {
     });
   }
 
-  // 2. Обработка клика по верхней кнопке Side Bar в Activity Bar
+  // 2. Обработка и синхронизация состояния кнопки открытия меню разделов (#leftSideNavOffcanvas) в Activity Bar
   const toggleBtn = document.getElementById('ide-nav-toggle-sidebar');
+  const drawerEl = document.getElementById('leftSideNavOffcanvas');
   if (toggleBtn) {
-    toggleBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      toggleFileExplorerSidebar();
-    });
+    // Резервный обработчик, если кнопка не управляется атрибутом data-bs-toggle="offcanvas"
+    if (!toggleBtn.hasAttribute('data-bs-toggle')) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleSideBar();
+      });
+    }
+    if (drawerEl) {
+      drawerEl.addEventListener('shown.bs.offcanvas', () => {
+        toggleBtn.classList.add('active');
+      });
+      drawerEl.addEventListener('hidden.bs.offcanvas', () => {
+        toggleBtn.classList.remove('active');
+      });
+    }
   }
 
   // 3. Обработка кликов по элементам инструментов Activity Bar:

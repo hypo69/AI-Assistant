@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 18:55:00
+# Updated: 2026-11-11 23:50:00
 # =============================================================================
 
 from __future__ import annotations
@@ -36,16 +36,21 @@ from pathlib import Path
 import re
 import subprocess
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from logger import logger
 from src.ai.rag.text_rag import TextRAG
 from src.utils.convertors.excel import excel2text
 from src.utils.pdf import extract_pdf_text
-from apps.ai_assistant.core.content_extractor import ContentExtractor
+from apps.ai_assistant.core.content_extractor import (
+    IMAGE_EXTENSIONS,
+    MEDIA_WITH_AUDIO_EXTENSIONS,
+    SUPPORTED_EXTENSIONS as EXTRACTOR_SUPPORTED_EXTENSIONS,
+    ContentExtractor,
+)
 from apps.ai_assistant.core.git_history_engine import GitHistoryEngine
 from apps.ai_assistant.core.knowledge_store import KnowledgeStore
-from apps.ai_assistant.core.nlp_analyzers import AnalyzerRegistry
+from apps.ai_assistant.core.nlp_analyzers import AnalyzerRegistry, detect_language
 from apps.ai_assistant.core.obsidian_vault import ObsidianVaultBuilder, strip_obsidian_enrichment
 from apps.ai_assistant.core.temporal_code_graph import TemporalCodeGraph
 from apps.ai_assistant.core.wikillm_version_linker import WikiLLMVersionLinker
@@ -62,10 +67,7 @@ from apps.ai_assistant.core.workspace_registry import (
     resolve_workspaces_dir,
 )
 
-SUPPORTED_EXTENSIONS = {
-    ".txt", ".md", ".json", ".csv", ".tsv", ".log", ".py", ".yaml", ".yml",
-    ".pdf", ".xlsx", ".xls", ".docx", ".wav", ".mp3", ".ogg", ".m4a", ".flac",
-}
+SUPPORTED_EXTENSIONS = EXTRACTOR_SUPPORTED_EXTENSIONS
 
 
 class WorkspaceManager:
@@ -117,6 +119,7 @@ class WorkspaceManager:
         )
         self.extractor = content_extractor or ContentExtractor()
         self.obsidian = ObsidianVaultBuilder(self)
+        self._on_watches_changed: Optional[Callable[[], None]] = None
 
         # Автоматическая миграция существующих глобальных БД в локальные директории пространств
         try:
@@ -444,7 +447,14 @@ class WorkspaceManager:
             "*.mp4\n"
             "*.avi\n"
             "*.mkv\n"
-            "*.mov\n\n"
+            "*.mov\n"
+            "*.webm\n"
+            "*.wmv\n"
+            "*.flv\n"
+            "*.m4v\n"
+            "*.3gp\n"
+            "*.opus\n"
+            "*.wma\n\n"
             "# Исключения: сохранять конвертированные companion .md и текстовые файлы\n"
             "!*.md\n"
             "!*.txt\n"
@@ -550,6 +560,7 @@ class WorkspaceManager:
                     pass
 
         logger.info(f"[WorkspaceManager] Рабочее пространство '{clean_id}' удалено, активное теперь '{next_active_id}'")
+        self._notify_watches_changed()
         return {
             "status": "ok",
             "deleted_workspace_id": clean_id,
@@ -581,9 +592,22 @@ class WorkspaceManager:
             })
         return workspaces
 
+    def _notify_watches_changed(self) -> None:
+        """Уведомляет наблюдатель watchdog об изменении списка папок рабочих областей и источников."""
+        cb = getattr(self, "_on_watches_changed", None)
+        if callable(cb):
+            try:
+                cb()
+            except Exception as exc:
+                logger.debug(f"[WorkspaceManager] Ошибка обновления watchdog: {exc}")
+
     def _get_or_create_workspace(self, workspace_id: str) -> Tuple[Dict[str, Any], Path]:
         """Возвращает описание и путь рабочей области, создавая её при отсутствии."""
-        ws = self.registry.get_workspace(workspace_id) or self.create_or_select_workspace(workspace_id, name=workspace_id)
+        existing = self.registry.get_workspace(workspace_id)
+        if existing:
+            return existing, Path(existing["path"])
+        ws = self.create_or_select_workspace(workspace_id, name=workspace_id)
+        self._notify_watches_changed()
         return ws, Path(ws["path"])
 
     def _update_faiss_and_graph_for_doc(
@@ -791,11 +815,11 @@ class WorkspaceManager:
         file_full_path = ws_path / safe_doc_id
         file_full_path.parent.mkdir(parents=True, exist_ok=True)
 
-        binary_exts = {
-            ".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac",
-            ".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff", ".gif",
-            ".xlsx", ".xls", ".docx",
-        }
+        binary_exts = (
+            MEDIA_WITH_AUDIO_EXTENSIONS
+            | IMAGE_EXTENSIONS
+            | {".pdf", ".xlsx", ".xls", ".docx"}
+        )
         if file_full_path.suffix.lower() not in binary_exts:
             file_full_path.write_text(content, encoding="utf-8")
         else:
@@ -847,8 +871,8 @@ class WorkspaceManager:
                     return f"# Изображение: {fpath.name}\n\n- **Формат:** {img.format}\n- **Разрешение:** {img.size[0]}x{img.size[1]} px\n- **Цветовая модель:** {img.mode}"
             except Exception:
                 return f"# Изображение: {fpath.name}"
-        if suffix in (".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac"):
-            return f"# Аудиозапись: {fpath.name}\n\n*(Файл аудио в рабочей области Git)*"
+        if suffix in MEDIA_WITH_AUDIO_EXTENSIONS:
+            return f"# Медиазапись: {fpath.name}\n\n*(Медиафайл в рабочей области Git)*"
         return self.extractor._extract_plain_text(fpath)
 
     def scan_and_index_workspace(self, workspace_id: str) -> Dict[str, Any]:
@@ -1038,7 +1062,7 @@ class WorkspaceManager:
                 source_type = "file" if p.suffix else "directory"
             disp_name = name or p.name or clean_local_path
 
-        return self.registry.add_source(
+        res = self.registry.add_source(
             workspace_id=workspace_id,
             source_type=source_type,
             source_path=clean_local_path,
@@ -1046,6 +1070,8 @@ class WorkspaceManager:
             auto_watch=auto_watch,
             host_name=resolved_host,
         )
+        self._notify_watches_changed()
+        return res
 
     def list_sources(self, workspace_id: str) -> List[Dict[str, Any]]:
         """Возвращает список всех привязанных источников для рабочей области."""
@@ -1053,7 +1079,10 @@ class WorkspaceManager:
 
     def unlink_source(self, workspace_id: str, source_id: str) -> bool:
         """Удаляет привязку источника из рабочей области."""
-        return self.registry.delete_source(workspace_id, source_id)
+        deleted = self.registry.delete_source(workspace_id, source_id)
+        if deleted:
+            self._notify_watches_changed()
+        return deleted
 
     def detect_changed_linked_sources(self, workspace_id: str) -> Dict[str, Any]:
         """Инкрементально проверяет изменения во всех привязанных файлах и папках по mtime и размеру без повторного парсинга."""
@@ -1489,6 +1518,10 @@ class WorkspaceManager:
         """Открывает файл рабочей области в ассоциированном приложении / редакторе по умолчанию."""
         return self.items_tracker.open_workspace_file(workspace_id, rel_path)
 
+    def reveal_workspace_item(self, workspace_id: str, rel_path: str = "") -> Dict[str, Any]:
+        """Открывает системный проводник ОС с выделением выбранного файла или открытием папки."""
+        return self.items_tracker.reveal_workspace_item(workspace_id, rel_path)
+
     def create_workspace_item(
         self,
         workspace_id: str,
@@ -1555,6 +1588,23 @@ class WorkspaceManager:
             commit_message=commit_message,
         )
 
+    def copy_workspace_item(
+        self,
+        workspace_id: str,
+        source_rel_path: str,
+        target_rel_path: str,
+        commit_message: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Создаёт копию (дубликат) файла в рабочей области с фиксацией в Git."""
+        from apps.ai_assistant.core.workspace_file_ops import WorkspaceFileOps
+        return WorkspaceFileOps.copy_item(
+            wm=self,
+            workspace_id=workspace_id,
+            source_rel_path=source_rel_path,
+            target_rel_path=target_rel_path,
+            commit_message=commit_message,
+        )
+
     @property
     def virtual_tree_engine(self) -> Any:
         """Возвращает экземпляр движка виртуального дерева категорий по содержимому."""
@@ -1585,6 +1635,160 @@ class WorkspaceManager:
             provider=provider,
             model_name=model_name,
         )
+
+    def add_fact_from_chat(
+        self,
+        workspace_id: str,
+        fact_text: str,
+        document_id: str = "chat_facts.md",
+        language: Optional[str] = None,
+        subject: Optional[str] = None,
+        predicate: Optional[str] = None,
+        obj: Optional[str] = None,
+        fact_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Добавляет факт из чата во внутренний файл рабочей области, Git, SQLite, FAISS и Obsidian."""
+        clean_fact = re.sub(r"\s+", " ", (fact_text or "").strip())
+        if not clean_fact:
+            raise ValueError("Текст факта не может быть пустым")
+        if clean_fact[-1] not in ".!?":
+            clean_fact = f"{clean_fact}."
+
+        _, ws_path = self._get_or_create_workspace(workspace_id)
+        safe_doc_id = str(document_id or "chat_facts.md").strip().replace("\\", "/").lstrip("/") or "chat_facts.md"
+        internal_file = ws_path / safe_doc_id
+        existing_clean = ""
+        if internal_file.exists() and internal_file.is_file():
+            existing_clean = strip_obsidian_enrichment(
+                internal_file.read_text(encoding="utf-8", errors="replace")
+            ).strip()
+
+        if existing_clean:
+            existing_lines = [ln.strip() for ln in existing_clean.splitlines() if ln.strip()]
+            if clean_fact in existing_lines:
+                updated_content = existing_clean
+            else:
+                updated_content = f"{existing_clean}\n{clean_fact}"
+        else:
+            updated_content = f"# Факты из чата\n\n{clean_fact}"
+
+        eff_lang = language or detect_language(clean_fact)
+        if eff_lang == "unknown":
+            eff_lang = "ru"
+
+        import_res = self.import_document(
+            workspace_id=workspace_id,
+            document_id=safe_doc_id,
+            content=updated_content,
+            commit_message=f"Добавлен факт из чата: {clean_fact[:60]}",
+            language=eff_lang,
+            force_reanalyze=True,
+        )
+
+        # Гарантируем сохранение структурированных фактов для всех строк-утверждений (если regex-NLP не распознал фразу)
+        full_analysis = import_res.get("analysis") or {}
+        covered_sent_indices = {
+            int((f.get("source") or {}).get("sentence_index", -1))
+            for f in (full_analysis.get("facts") or [])
+        }
+        commit_hash = str(import_res.get("commit_hash") or self._run_git(ws_path, ["rev-parse", "HEAD"]) or "HEAD")
+        ver_num = int(import_res.get("version") or 1)
+        added_fallback = False
+
+        for sent in (full_analysis.get("sentences") or []):
+            s_idx = int(sent.get("sentence_index", 0))
+            s_text = str(sent.get("text") or "").strip()
+            is_latest = s_text == clean_fact
+            has_explicit_for_line = bool(is_latest and subject and (predicate or obj))
+            if not s_text or s_text.startswith("#") or (s_idx in covered_sent_indices and not has_explicit_for_line):
+                continue
+
+            s_lang = detect_language(s_text)
+            if s_lang == "unknown":
+                s_lang = eff_lang
+            tokens = [t.strip(".,!?:;\"'()«»") for t in s_text.split() if t.strip(".,!?:;\"'()«»")]
+            eff_type = (
+                (fact_type if is_latest and fact_type else None)
+                or (
+                    "possession"
+                    if any(w.lower() in {"есть", "имеет", "владеет", "has", "have", "יש", "היה", "הייתה", "היתה"} for w in tokens)
+                    else "action"
+                )
+            )
+            eff_subj = ((subject if is_latest and subject else None) or (tokens[0] if tokens else s_text)).strip()
+            eff_pred = (
+                (predicate if is_latest and predicate else None)
+                or ("владеет" if eff_type == "possession" else (tokens[1] if len(tokens) > 2 else "утверждает"))
+            ).strip()
+            eff_obj = (
+                (obj if is_latest and obj else None)
+                or (" ".join(tokens[2:]) if len(tokens) > 2 else (tokens[1] if len(tokens) == 2 else s_text))
+            ).strip()
+
+            if eff_type == "possession":
+                fallback_fact: Dict[str, Any] = {
+                    "fact_type": "possession",
+                    "relation": "has",
+                    "language": s_lang,
+                    "owner": {"text": eff_subj, "normalized": eff_subj.lower(), "lemma": eff_subj.lower()},
+                    "possessed_entity": {"text": eff_obj, "normalized": eff_obj.lower(), "lemma": eff_obj.lower()},
+                    "is_negated": False,
+                    "confidence": 1.0,
+                    "source": {"document_id": safe_doc_id, "sentence_index": s_idx, "quote": s_text},
+                }
+            else:
+                fallback_fact = {
+                    "fact_type": "action",
+                    "relation": eff_pred.lower(),
+                    "language": s_lang,
+                    "subject": {"text": eff_subj, "normalized": eff_subj.lower(), "lemma": eff_subj.lower()},
+                    "predicate": {"text": eff_pred, "lemma": eff_pred.lower(), "voice": "active"},
+                    "object": {"text": eff_obj, "normalized": eff_obj.lower(), "lemma": eff_obj.lower()},
+                    "is_negated": False,
+                    "confidence": 1.0,
+                    "source": {"document_id": safe_doc_id, "sentence_index": s_idx, "quote": s_text},
+                }
+
+            self.store.add_manual_fact(
+                workspace_id=workspace_id,
+                document_id=safe_doc_id,
+                fact=fallback_fact,
+                version_num=ver_num,
+                commit_hash=commit_hash,
+                status="validated",
+            )
+            added_fallback = True
+
+        if added_fallback:
+            try:
+                self.obsidian.sync_document_on_the_fly(
+                    workspace_id=workspace_id,
+                    doc_id=safe_doc_id,
+                    clean_content=updated_content,
+                    commit_hash=commit_hash,
+                    analysis=full_analysis,
+                    version_num=ver_num,
+                    original_path=str(internal_file),
+                )
+                self._run_git(ws_path, ["add", "."])
+                if self._run_git(ws_path, ["status", "--porcelain"]):
+                    self._run_git(ws_path, ["commit", "-m", f"Obsidian sync факта из чата: {clean_fact[:50]}"])
+            except Exception as obs_err:
+                logger.warning(f"[WorkspaceManager] Ошибка синхронизации Obsidian для факта из чата: {obs_err}")
+
+        all_doc_facts = self.store.get_facts(workspace_id=workspace_id, document_id=safe_doc_id, include_stale=False)
+        head_hash = self._run_git(ws_path, ["rev-parse", "HEAD"])
+        return {
+            "status": "ok",
+            "workspace_id": workspace_id,
+            "document_id": safe_doc_id,
+            "internal_file_path": str(internal_file),
+            "knowledge_base_file": str(ws_path / "_Knowledge_Base.md"),
+            "commit_hash": head_hash if head_hash and not head_hash.startswith("fatal") else "HEAD",
+            "fact_text": clean_fact,
+            "facts_count": len(all_doc_facts),
+            "facts": all_doc_facts,
+        }
 
 
 

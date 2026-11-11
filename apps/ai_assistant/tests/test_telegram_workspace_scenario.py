@@ -13,7 +13,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 17:55:00
+# Updated: 2026-11-12 00:20:00
 # =============================================================================
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def test_david_moshe_audio_trigger_matching() -> None:
 
 @pytest.mark.asyncio
 async def test_david_moshe_audio_upload_copies_transcript(tmp_path: Path) -> None:
-    """Проверяет, что при загрузке аудиофайла דוד משה файл транскрипта копируется в ту же папку (assets/)."""
+    """Проверяет, что при загрузке аудиофайла דוד משה файл транскрипта размещается в transcripts/ с Obsidian-разметкой и заметками сущностей."""
     # Создаем фиктивный файл транскрипта
     fake_transcript_src = tmp_path / "02_transcript_david_moshe_shmulik_v3.md"
     fake_transcript_text = "# Стенограмма беседы דוד משה и שמוליק\n\nדוד משה: שלום שמוליק.\nשמוליק: שלום דוד משה."
@@ -135,23 +135,26 @@ async def test_david_moshe_audio_upload_copies_transcript(tmp_path: Path) -> Non
 
     ws_path = wm.registry.workspace_path(ws_id)
     dest_audio = ws_path / "assets" / audio_filename
-    dest_transcript = ws_path / "assets" / "02_transcript_david_moshe_shmulik_v3.md"
+    dest_transcript = ws_path / "transcripts" / "02_transcript_david_moshe_shmulik_v3.md"
     companion_md = ws_path / "assets" / f"{audio_filename}.md"
 
     # 1. Проверяем, что аудиофайл сохранен в assets/
     assert dest_audio.exists()
     assert dest_audio.read_bytes() == fake_audio_bytes
 
-    # 2. Проверяем, что файл транскрипта скопирован ТУДА ЖЕ, куда сохранился аудиофайл (в assets/)
+    # 2. Транскрипт размещён в transcripts/ в Obsidian-формате (frontmatter + вложение аудио + wikilinks)
     assert dest_transcript.exists()
-    assert dest_transcript.parent == dest_audio.parent
-    assert dest_transcript.read_text(encoding="utf-8") == fake_transcript_text
+    transcript_md = dest_transcript.read_text(encoding="utf-8")
+    assert transcript_md.startswith("---")
+    assert f"![[assets/{audio_filename}]]" in transcript_md
+    assert "[[שמוליק]]" in transcript_md
 
     # 3. Проверяем, что companion markdown для аудиофайла содержит стенограмму
     assert companion_md.exists()
     assert "דוד משה" in companion_md.read_text(encoding="utf-8")
 
-    # 4. Проверяем, что транскрипт зарегистрирован в KnowledgeStore
-    docs = wm.store.list_documents(ws_id)
-    doc_ids = [d.get("document_id") for d in docs]
-    assert "assets/02_transcript_david_moshe_shmulik_v3.md" in doc_ids
+    # 4. Транскрипт и заметки сущностей зарегистрированы в KnowledgeStore
+    doc_ids = [d.get("document_id") for d in wm.store.list_documents(ws_id)]
+    assert "transcripts/02_transcript_david_moshe_shmulik_v3.md" in doc_ids
+    assert "entities/זינה.md" in doc_ids
+    assert "deals/עסקת רכישת זינה.md" in doc_ids

@@ -23,7 +23,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 17:22:00
+# Updated: 2026-11-11 21:22:00
 # =============================================================================
 
 from __future__ import annotations
@@ -138,16 +138,17 @@ def parse_workspace_readme(readme_path: Path) -> Dict[str, str]:
     Returns:
         Dict[str, str]: Словарь с ключами 'language', 'name', 'description'.
     """
-    result = {"language": "ru", "name": "", "description": ""}
+    result = {"language": "", "name": "", "description": ""}
     if not readme_path.is_file():
         return result
     try:
         content = readme_path.read_text(encoding="utf-8")
         lines = [line.strip() for line in content.splitlines()]
-        # Первая строка: lang=...
+        # Первая строка: lang=... или <!-- lang=... -->
         for line in lines:
-            if line.lower().startswith("lang="):
-                result["language"] = normalize_workspace_language(line.split("=", 1)[1].strip())
+            lang_match = re.match(r"^(?:<!--\s*)?lang\s*=\s*([A-Za-z\-_]+)(?:\s*-->)?$", line, re.IGNORECASE)
+            if lang_match:
+                result["language"] = normalize_workspace_language(lang_match.group(1).strip())
                 break
         # Заголовок первого уровня '# ...'
         for line in lines:

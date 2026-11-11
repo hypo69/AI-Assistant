@@ -126,7 +126,11 @@
     "modelPingResponseLabel": "Model response:",
     "activeModelBadgeTitle": "Active model: click to open model catalog and select model",
     "userDefault": "User",
-    "close": "Close"
+    "close": "Close",
+    "watchdogSectionTitle": "Auto-Capture & Watchdog (Git + Transcription)",
+    "autoTranscribeLabel": "Auto-capture media transcription",
+    "autoTranscribeHint": "Automatically extract audio tracks and transcribe new media files (MP3, MP4, MKV, WAV, etc.) via Watchdog",
+    "autoGitCommitLabel": "Auto-commit Git changes inside workspace"
   },
   "cacheManager": {
     "title": "Cache Management",
@@ -421,7 +425,15 @@
       "block-trackTitle": "Add Files & Folders to Git Tracking",
       "block-obsidianTitle": "Knowledge Base & Notes (Obsidian Vault)",
       "block-sourcesTitle": "External Data & Context Sources"
-    }
+    },
+    "watchdogAutoTranscribeLabel": "Auto-capture media transcription (Watchdog)",
+    "watchdogAutoTranscribeHint": "Automatically extracts audio track and transcribes new media files",
+    "chatAddFactBtn": "Add fact",
+    "chatAddFactTitle": "Save text as a new fact into internal files and knowledge base",
+    "chatAddingFactStatus": "Saving fact...",
+    "chatFactSavedMsg": "Fact saved to internal file and knowledge base",
+    "chatFactSavedStatus": "Fact added",
+    "chatFactAddError": "Error adding fact:"
   },
   "auth": {
     "googleSignIn": "Sign in with Google",
@@ -2084,7 +2096,7 @@
       "title_e3241394": "Collapse Navigator (Ctrl+B)",
       "title_2df29703": "Refresh каталог плагинов",
       "title_17a110d9": "Свернуть панель (Ctrl+B)",
-      "title_c13990e0": "Открыть меню разделов",
+      "title_c13990e0": "Open sections menu",
       "title_c21ce32d": "Главная страница — AI Assistant",
       "title_3987a67a": "Глобальный контекст Git-репозитория и рабочей области",
       "title_2231746c": "Create New Workspace",
@@ -2112,7 +2124,9 @@
       "tasks": "Smart Tasks & Workflows",
       "instruments": "CoT Reasoning Instruments [Alt+0]",
       "expandSidebar": "Expand / collapse sidebar",
-      "tooltipsEditor": "Interface Tooltips Editor"
+      "tooltipsEditor": "Interface Tooltips Editor",
+      "confirmRename": "Rename object and commit change to Git",
+      "confirmCopy": "Create file copy and commit to Git"
     },
     "cws": {
       "title_01c37831": "Back to workspaces list",
@@ -2200,7 +2214,9 @@
       "workspaceSearch": "Search workspace...",
       "createItemName": "e.g.: notes.md or script.py",
       "initialContent": "# Document heading...",
-      "commitMsgOptional": "Git commit message (optional)..."
+      "commitMsgOptional": "Git commit message (optional)...",
+      "renameNewName": "e.g.: new_notes.md",
+      "copyTargetPath": "e.g.: notes_copy.md or folder/notes_copy.md"
     },
     "commits": {
       "ph_ef75ffc3": "Search commits..."
@@ -2614,8 +2630,37 @@
       "revealTitle": "Show file or folder in system file explorer",
       "closeTab": "Close",
       "closeOtherTabs": "Close Others",
-      "closeAllTabs": "Close All"
+      "closeAllTabs": "Close All",
+      "copyFile": "Copy file...",
+      "copyFileTitle": "Create a copy of the file in the workspace",
+      "copyFilename": "Copy filename",
+      "copyFilenameTitle": "Copy file or folder name to clipboard",
+      "filesOnlyTitle": "Action is only available for files",
+      "summaryDisabledTitle": "Summary is only available for files",
+      "wasmEditorDisabledTitle": "Editor is only available for files",
+      "quickEditorDisabledTitle": "Editing is only available for files",
+      "copyFilenameSuccess": "Filename copied to clipboard:",
+      "copyFilenameError": "Failed to copy filename:",
+      "revealSuccess": "Revealed in File Explorer:",
+      "revealError": "Failed to reveal in File Explorer:",
+      "rootFolderLabel": "Workspace root",
+      "folderWord": "Folder"
     },
+    "renameItemModalTitle": "Rename Object",
+    "currentPathLabel": "Current path:",
+    "newNameLabel": "New name:",
+    "commitMessageLabel": "Git commit message (optional):",
+    "btnRenameSubmit": "Rename",
+    "copyItemModalTitle": "Copy File",
+    "sourceFileLabel": "Source file:",
+    "copyTargetPathLabel": "Copy name or path:",
+    "btnCopySubmit": "Create Copy",
+    "specifyNewNameAlert": "Specify a new name different from the current one.",
+    "specifyCopyTargetAlert": "Specify a name or path for the file copy.",
+    "renameSuccess": "Renamed to",
+    "renameError": "Rename error:",
+    "copySuccess": "File copy created:",
+    "copyError": "File copy error:",
     "linesWord": "Lines",
     "charsWord": "Chars",
     "rootFolder": "/ (root)",

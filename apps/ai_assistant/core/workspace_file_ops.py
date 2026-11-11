@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 20:25:00
+# Updated: 2026-11-11 21:30:00
 # =============================================================================
 
 from __future__ import annotations
@@ -744,5 +744,81 @@ class WorkspaceFileOps:
             "commit_message": msg,
             "message": msg,
             "relocated_in_store": bool(relocated_info),
+        }
+
+    @classmethod
+    def copy_item(
+        cls,
+        wm: WorkspaceManager,
+        workspace_id: str,
+        source_rel_path: str,
+        target_rel_path: str,
+        commit_message: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Создаёт копию (дубликат) файла в рабочей области с фиксацией в Git и индексацией текста.
+
+        Args:
+            wm: Экземпляр WorkspaceManager.
+            workspace_id: Идентификатор рабочего пространства.
+            source_rel_path: Относительный путь к исходному файлу.
+            target_rel_path: Относительный путь для создаваемой копии файла.
+            commit_message: Пользовательское сообщение коммита (опционально).
+
+        Returns:
+            Словарь со статусом, путями и хешем коммита Git.
+
+        Raises:
+            FileNotFoundError: Если исходный файл не найден.
+            ValueError: Если исходный объект является директорией или путь невалиден.
+            FileExistsError: Если целевой файл уже существует.
+        """
+        _, ws_path = wm._get_or_create_workspace(workspace_id)
+        wm._ensure_git_repo(ws_path)
+        clean_src, src_target, _ = cls.resolve_item(
+            wm=wm, workspace_id=workspace_id, rel_path=source_rel_path, must_exist=True
+        )
+        if src_target.is_dir():
+            raise ValueError(f"Копирование директории '{clean_src}' не поддерживается; выберите файл.")
+
+        clean_dest, dest_target = cls._normalize_and_resolve(ws_path, target_rel_path)
+        if dest_target.exists():
+            raise FileExistsError(f"Целевой файл '{clean_dest}' уже существует.")
+
+        dest_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(src_target), str(dest_target))
+
+        msg = (
+            commit_message.strip()
+            if commit_message and commit_message.strip()
+            else f"Копия файла: {clean_src} -> {clean_dest}"
+        )
+        wm._run_git(ws_path, ["add", clean_dest])
+        wm._run_git(ws_path, ["commit", "-m", msg])
+        commit_hash = wm._run_git(ws_path, ["rev-parse", "HEAD"])
+        if commit_hash.startswith("fatal"):
+            commit_hash = "HEAD"
+
+        # Если копия является текстовым файлом — индексируем её в базе знаний
+        try:
+            text_content = dest_target.read_text(encoding="utf-8")
+            wm.import_document(
+                workspace_id=workspace_id,
+                document_id=clean_dest,
+                content=text_content,
+                commit_message=msg,
+            )
+        except UnicodeDecodeError:
+            pass
+        except Exception as exc:
+            logger.warning(f"[WorkspaceFileOps] Ошибка индексации копии файла {clean_dest}: {exc}")
+
+        logger.info(f"[WorkspaceFileOps] Скопирован файл: {clean_src} -> {clean_dest} в {workspace_id}")
+        return {
+            "status": "ok",
+            "workspace_id": workspace_id,
+            "source_rel_path": clean_src,
+            "target_rel_path": clean_dest,
+            "commit_hash": commit_hash,
+            "commit_message": msg,
         }
 
