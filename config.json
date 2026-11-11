@@ -21,8 +21,8 @@
         "enable_narrator": false,
         "preload_silero": false,
         "realtime_streaming": true,
-        "default_provider": "gemini",
-        "default_model": "gemini-3.5-flash",
+        "default_provider": "agy",
+        "default_model": "agy-gemini-3.1-flash-lite",
         "providers": {
             "gemini": {
                 "enabled": true,
@@ -36,6 +36,7 @@
                     "gemini-1.5-pro",
                     "gemini-2.0-flash",
                     "gemini-2.5-flash",
+                    "gemini-2.5-flash-lite",
                     "gemini-2.5-pro",
                     "gemini-old"
                 ],
@@ -51,13 +52,14 @@
             },
             "agy": {
                 "enabled": true,
-                "default_model": "agy-gemini-3.8-flash",
+                "default_model": "agy-gemini-3.1-flash-lite",
                 "effort": "medium",
                 "unsupported_models": [
                     "gemini-1.5-flash",
-                    "gemini-2.0-flash"
+                    "gemini-2.0-flash",
+                    "gemini-2.5-flash-lite"
                 ],
-                "model": "agy-gemini-3.8-flash"
+                "model": "agy-gemini-3.1-flash-lite"
             },
             "foundry": {
                 "enabled": false,
@@ -202,7 +204,7 @@
         "read_timeout_sec": 30,
         "upload_timeout_sec": 120,
         "retries": 3,
-        "workspace_tag_prefix": "ws-",
+        "workspace_tag_prefix": "",
         "runtime_dir": "paperless-ngx/runtime",
         "autostart": true,
         "startup_timeout_sec": 180,

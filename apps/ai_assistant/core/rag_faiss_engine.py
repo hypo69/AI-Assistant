@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:50:00
+# Updated: 2026-11-10 19:28:00
 # =============================================================================
 
 from __future__ import annotations
@@ -31,6 +31,8 @@ import json
 import os
 import re
 import threading
+import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -87,18 +89,36 @@ class RagFaissEngine:
     def _save(self) -> None:
         """Потокобезопасно и атомарно сохраняет метаданные чанков."""
         with self._lock:
+            tmp_file: Optional[Path] = None
             try:
                 self.index_dir.mkdir(parents=True, exist_ok=True)
-                tmp_file = self.chunks_file.with_suffix(".json.tmp")
+                tmp_file = self.chunks_file.parent / f".{self.chunks_file.name}.{uuid.uuid4().hex[:8]}.tmp"
                 serializable_chunks = [
                     {k: v for k, v in c.items() if not k.startswith("_")}
                     for c in self.chunks
                 ]
                 with open(tmp_file, "w", encoding="utf-8") as f:
                     json.dump(serializable_chunks, f, ensure_ascii=False, indent=2)
-                os.replace(tmp_file, self.chunks_file)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+                for attempt in range(5):
+                    try:
+                        os.replace(tmp_file, self.chunks_file)
+                        tmp_file = None
+                        break
+                    except (PermissionError, OSError):
+                        if attempt == 4:
+                            raise
+                        time.sleep(0.05 * (attempt + 1))
             except Exception as exc:
                 logger.error(f"[RagFaissEngine] Ошибка сохранения {self.chunks_file}: {exc}")
+            finally:
+                if tmp_file and tmp_file.exists():
+                    try:
+                        tmp_file.unlink()
+                    except OSError:
+                        pass
 
     def index_commit(self, commit: CommitSummary, hunks: List[DiffHunkItem], file_path: Optional[str] = None) -> int:
         """Инкрементально индексирует коммит и связанные diff hunks.

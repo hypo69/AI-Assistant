@@ -23,7 +23,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:50:00
+# Updated: 2026-11-10 17:22:00
 # =============================================================================
 
 from __future__ import annotations
@@ -389,8 +389,18 @@ class WorkspaceRegistry:
             cfg_file = self._config_file(ws_path)
             cfg_file.parent.mkdir(parents=True, exist_ok=True)
             tmp_file = cfg_file.with_suffix(".json.tmp")
-            tmp_file.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
-            os.replace(tmp_file, cfg_file)
+            content_str = json.dumps(cfg, indent=2, ensure_ascii=False)
+            tmp_file.write_text(content_str, encoding="utf-8")
+            try:
+                os.replace(tmp_file, cfg_file)
+            except OSError:
+                import time
+                time.sleep(0.05)
+                try:
+                    os.replace(tmp_file, cfg_file)
+                except OSError:
+                    cfg_file.write_text(content_str, encoding="utf-8")
+                    tmp_file.unlink(missing_ok=True)
             self._exclude_meta_from_git(ws_path)
 
     def _load_config(self, ws_path: Path) -> Dict[str, Any]:

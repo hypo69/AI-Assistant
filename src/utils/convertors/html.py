@@ -3,146 +3,130 @@
 # Process Name: AI-Windows-Admin UTILS - Html Module
 # =============================================================================
 # Description:
-#   HTML conversion utilities.
+#   Утилиты конвертации и парсинга HTML: экранирование, unescape,
+#   преобразование в словари/SimpleNamespace и опциональный экспорт в PDF.
 #
 # Usage Examples:
 #   Python API:
-#     from src.utils.convertors.html import html2escape
+#     from src.utils.convertors.html import html2escape, escape2html, html2dict
 #
-#     res = html2escape()
-#     print(res)
+#     escaped = html2escape("<p>Hello</p>")
+#     data = html2dict("<h1>Заголовок</h1>")
 #
 # File: html.py
 # Project: ai-windows-admin
 # Package: src.utils.convertors
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 22:22:30
+# Updated: 2026-11-10 19:00:00
 # =============================================================================
 
-"""HTML conversion utilities.
+"""Утилиты конвертации и парсинга HTML."""
 
-Functions:
-    - `html2escape`: Convert HTML to escape sequences.
-    - `escape2html`: Convert escape sequences to HTML.
-    - `html2dict`: Convert HTML to dictionaries.
-    - `html2ns`: Convert HTML to SimpleNamespace objects."""
+from __future__ import annotations
 
-import re
 import html
-from typing import Dict
-from pathlib import Path
-from logger import logger
-from types import SimpleNamespace
 from html.parser import HTMLParser
-try:
-    from xhtml2pdf import pisa
-except Exception as ex:
-    logger.error(ex)
-try:
-    from weasyprint import HTML
-except Exception as ex:
-    logger.error(ex)
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Dict, Optional, Union
+
+from logger import logger
+
 
 def html2escape(input_str: str) -> str:
-    """
-    Convert HTML to escape sequences.
+    """Преобразует HTML-символы в escape-последовательности.
 
     Args:
-        input_str (str): The HTML code.
+        input_str: Исходная строка HTML.
 
     Returns:
-        str: HTML converted into escape sequences.
-
-    Example:
-        >>> html = "<p>Hello, world!</p>"
-        >>> result = html2escape(html)
-        >>> print(result)
-        &lt;p&gt;Hello, world!&lt;/p&gt;
+        str: Строка с экранированными символами.
     """
     return html.escape(input_str)
 
+
 def escape2html(input_str: str) -> str:
-    """
-    Convert escape sequences to HTML.
+    """Преобразует escape-последовательности обратно в HTML.
 
     Args:
-        input_str (str): The string with escape sequences.
+        input_str: Строка с escape-последовательностями.
 
     Returns:
-        str: The escape sequences converted back into HTML.
-
-    Example:
-        >>> escaped = "&lt;p&gt;Hello, world!&lt;/p&gt;"
-        >>> result = escape2html(escaped)
-        >>> print(result)
-        <p>Hello, world!</p>
+        str: Восстановленная HTML-строка.
     """
     return html.unescape(input_str)
 
+
 def html2dict(html_str: str) -> Dict[str, str]:
-    """
-    Convert HTML to a dictionary where tags are keys and content are values.
+    """Преобразует HTML в словарь тег -> текстовое содержимое.
 
     Args:
-        html_str (str): The HTML string to convert.
+        html_str: HTML-разметка.
 
     Returns:
-        dict: A dictionary with HTML tags as keys and their content as values.
-
-    Example:
-        >>> html = "<p>Hello</p><a href='link'>World</a>"
-        >>> result = html2dict(html)
-        >>> print(result)
-        {'p': 'Hello', 'a': 'World'}
+        Dict[str, str]: Словарь тегов и их значений.
     """
 
     class HTMLToDictParser(HTMLParser):
 
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
-            self.result = {}
-            self.current_tag = None
+            self.result: Dict[str, str] = {}
+            self.current_tag: Optional[str] = None
 
-        def handle_starttag(self, tag, attrs):
+        def handle_starttag(self, tag: str, attrs: list) -> None:
             self.current_tag = tag
 
-        def handle_endtag(self, tag):
+        def handle_endtag(self, tag: str) -> None:
             self.current_tag = None
 
-        def handle_data(self, data):
+        def handle_data(self, data: str) -> None:
             if self.current_tag:
                 self.result[self.current_tag] = data.strip()
+
     parser = HTMLToDictParser()
     parser.feed(html_str)
     return parser.result
 
+
 def html2ns(html_str: str) -> SimpleNamespace:
-    """
-    Convert HTML to a SimpleNamespace object where tags are attributes and content are values.
+    """Преобразует HTML в объект SimpleNamespace.
 
     Args:
-        html_str (str): The HTML string to convert.
+        html_str: HTML-разметка.
 
     Returns:
-        SimpleNamespace: A SimpleNamespace object with HTML tags as attributes and their content as values.
-
-    Example:
-        >>> html = "<p>Hello</p><a href='link'>World</a>"
-        >>> result = html2ns(html)
-        >>> print(result.p)
-        Hello
-        >>> print(result.a)
-        World
+        SimpleNamespace: Объект с атрибутами тегов.
     """
     html_dict = html2dict(html_str)
     return SimpleNamespace(**html_dict)
 
-def html2pdf(html_str: str, pdf_file: str | Path) -> bool | None:
-    """Converts HTML content to a PDF file using WeasyPrint."""
+
+def html2pdf(html_str: str, pdf_file: Union[str, Path]) -> Optional[bool]:
+    """Конвертирует HTML-контент в PDF-файл с использованием WeasyPrint или xhtml2pdf.
+
+    Args:
+        html_str: Исходная HTML-разметка.
+        pdf_file: Путь к целевому файлу PDF.
+
+    Returns:
+        Optional[bool]: True при успешной генерации, None при ошибке.
+    """
+    # 1. Попытка через WeasyPrint
     try:
-        HTML(string=html_str).write_pdf(pdf_file)
+        from weasyprint import HTML
+        HTML(string=html_str).write_pdf(str(pdf_file))
         return True
-    except Exception as e:
-        logger.console(f'Error during PDF generation: {e}')
-        return
+    except (ImportError, Exception):
+        pass
+
+    # 2. Попытка через xhtml2pdf (pisa)
+    try:
+        from xhtml2pdf import pisa
+        with open(pdf_file, "wb") as f:
+            pisa_status = pisa.CreatePDF(html_str, dest=f)
+        return not pisa_status.err
+    except Exception as exc:
+        logger.error(f"Ошибка при генерации PDF через xhtml2pdf/weasyprint: {exc}")
+        return None

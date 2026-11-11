@@ -16,7 +16,7 @@
 # Package: apps.ai_assistant
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:50:00
+# Updated: 2026-11-11 19:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -41,6 +41,10 @@ from fastapi.staticfiles import StaticFiles
 from logger import logger
 from apps.ai_assistant.api.middleware import ConsoleStatusLogMiddleware
 from apps.common.webgui import SmartMultiDirStaticFiles, COMMON_WEBGUI_DIR
+from apps.common.webgui.i18n_renderer import (
+    detect_language_from_scope,
+    render_i18n_placeholders,
+)
 from apps.ai_assistant.api.routers.router_file_history import router as history_router
 from apps.ai_assistant.api.routers.router_git_wikillm import router as wikillm_router
 from apps.ai_assistant.api.routers.router_git_maintenance import router as git_maintenance_router
@@ -57,11 +61,13 @@ from apps.ai_assistant.api.routers.router_contacts import router as contacts_rou
 from apps.ai_assistant.api.routers.router_keys import router as keys_router
 from apps.ai_assistant.api.routers.router_plugins import router as plugins_router
 from apps.common.file_editor import file_editor_router
+from apps.common.file_tree import file_tree_router
 from apps.ai_assistant.api.routers.router_tooltips import router as tooltips_router
 from apps.ai_assistant.api.routers.router_ai_instruments import router as ai_instruments_router
 from apps.ai_assistant.api.routers.router_connections import router as connections_router
 from apps.ai_assistant.api.routers.router_tasks import router as tasks_router
 from apps.ai_assistant.api.routers.router_menu_config import router as menu_config_router
+from apps.ai_assistant.api.routers.router_doc_categorizer import router as doc_categorizer_router
 
 from header import __root__
 BASE_DIR:Path = __root__  / "apps" / "ai_assistant" 
@@ -245,28 +251,51 @@ app.include_router(drive_router)
 app.include_router(contacts_router)
 app.include_router(plugins_router)
 app.include_router(file_editor_router)
+app.include_router(file_tree_router)
 app.include_router(tooltips_router)
 app.include_router(ai_instruments_router)
 app.include_router(connections_router)
 app.include_router(tasks_router)
 app.include_router(menu_config_router)
+app.include_router(doc_categorizer_router)
 
 # ----------------------------------------------------------------------
 #  Основные маршруты UI
 # ----------------------------------------------------------------------
 
+def _render_index_response(request: Request) -> Response:
+    """Рендерит главную страницу index.html с SSR-подстановкой i18n-плейсхолдеров."""
+    index_file = WEBGUI_DIR / "index.html"
+    if not index_file.exists():
+        return FileResponse(str(index_file))
+    lang = detect_language_from_scope(request.scope)
+    rendered = render_i18n_placeholders(
+        index_file.read_text(encoding="utf-8"),
+        lang,
+        (WEBGUI_DIR, COMMON_WEBGUI_DIR),
+    )
+    return HTMLResponse(
+        content=rendered,
+        status_code=200,
+        headers={
+            "Cache-Control": "no-cache",
+            "Vary": "Cookie, Accept-Language",
+            "Content-Language": lang,
+        },
+    )
+
+
 @app.get("/", include_in_schema=False)
-async def root() -> FileResponse:
+async def root(request: Request) -> Response:
     """Главная страница WebGUI (по умолчанию) без редиректа."""
     logger.console("[INFO] Обслуживание корневого URL - отдаём index.html")
-    index_file = WEBGUI_DIR / "index.html"
-    return FileResponse(str(index_file))
+    return _render_index_response(request)
+
 
 @app.get("/ai_assistant", summary="Главная страница WebGUI (по умолчанию)")
-async def serve_index() -> FileResponse:
+async def serve_index(request: Request) -> Response:
     """Отдаёт index.html, используемый в WebGUI AI Assistant."""
-    index_file = WEBGUI_DIR / "index.html"
-    return FileResponse(str(index_file))
+    return _render_index_response(request)
 
 
 # Обслуживание статических файлов WebGUI

@@ -24,7 +24,7 @@
 
  * Copyright: © 2026 hypo69
 
- * Updated: 2026-10-27 21:26:00
+ * Updated: 2026-11-10 20:01:00
 
  * =============================================================================
 
@@ -838,19 +838,12 @@ export async function viewMessage(messageId) {
 
 
     if (data.is_unread) {
-
       await fetch(`/api/v1/gmail/messages/${encodeURIComponent(messageId)}/modify`, {
-
         method: 'POST',
-
         headers: { 'Content-Type': 'application/json' },
-
         body: JSON.stringify({ remove_labels: ['UNREAD'] }),
-
       });
-
-      loadLabels();
-
+      await loadLabels();
     }
 
   } catch (err) {
@@ -874,79 +867,42 @@ export async function viewMessage(messageId) {
  */
 
 async function modifyLabels(messageId, payload, errorKey) {
-
   try {
-
     await fetch(`/api/v1/gmail/messages/${encodeURIComponent(messageId)}/modify`, {
-
       method: 'POST',
-
       headers: { 'Content-Type': 'application/json' },
-
       body: JSON.stringify(payload),
-
     });
-
-    loadMessages(false);
-
-    loadLabels();
-
+    await loadMessages(false);
+    await loadLabels();
   } catch (err) {
-
     const errTmpl = t(errorKey, 'Ошибка изменения меток: {error}');
-
     notify(errTmpl.replace('{error}', err.message), 'error');
-
   }
-
 }
-
-
 
 async function toggleStar(messageId, isStarred) {
-
   await modifyLabels(messageId, isStarred ? { remove_labels: ['STARRED'] } : { add_labels: ['STARRED'] }, 'ui.gmail.star_error');
-
 }
-
-
 
 async function toggleReadStatus(messageId, isUnread) {
-
   await modifyLabels(messageId, isUnread ? { remove_labels: ['UNREAD'] } : { add_labels: ['UNREAD'] }, 'ui.gmail.status_error');
-
 }
 
-
-
 /**
-
  * Перемещает письмо в корзину.
-
  */
-
 async function trashMessage(messageId) {
-
   try {
-
     const res = await fetch(`/api/v1/gmail/messages/${encodeURIComponent(messageId)}/trash`, { method: 'POST' });
-
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
     notify(t('ui.gmail.trash_success', 'Письмо перемещено в корзину'), 'success');
-
-    loadMessages(false);
-
-    loadLabels();
-
+    await loadMessages(false);
+    await loadLabels();
   } catch (err) {
-
     const errTmpl = t('ui.gmail.trash_error', 'Ошибка удаления: {error}');
-
     notify(errTmpl.replace('{error}', err.message), 'error');
-
   }
-
 }
 
 
@@ -1149,14 +1105,16 @@ export function initGmailTab() {
 
 
 
-  document.getElementById('btn-gmail-refresh')?.addEventListener('click', () => {
-
-    loadProfile();
-
-    loadLabels();
-
-    loadMessages(true);
-
+  document.getElementById('btn-gmail-refresh')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-gmail-refresh');
+    if (btn) btn.disabled = true;
+    try {
+      await loadProfile();
+      await loadLabels();
+      await loadMessages(true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
 
 
@@ -1385,11 +1343,8 @@ export function initGmailTab() {
     }
 
     if (successNotice) notify(successNotice, 'info');
-
-    loadMessages(false);
-
-    loadLabels();
-
+    await loadMessages(false);
+    await loadLabels();
   };
 
 
@@ -1502,11 +1457,12 @@ export function initGmailTab() {
 
 
 
-  loadProfile();
-
-  loadLabels();
-
-  loadMessages(true);
+  // Инициализация данных вкладки строго последовательно для предотвращения HTTP 429
+  (async () => {
+    await loadProfile();
+    await loadLabels();
+    await loadMessages(true);
+  })();
 
 }
 

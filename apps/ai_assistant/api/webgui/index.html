@@ -26,7 +26,7 @@ Author: hypo69
 
 Copyright: © 2026 hypo69
 
-Updated: 2026-11-10 12:58:00
+Updated: 2026-11-10 20:10:00
 
 =============================================================================
 
@@ -118,12 +118,13 @@ Updated: 2026-11-10 12:58:00
 <link href="/html/css/context-menu.css?v=20261026_v1" rel="stylesheet"/>
 <link href="/html/components/system_tour/system_tour.css?v=20261017_v1" rel="stylesheet"/>
 <link href="/html/ai_modal_dialog/style.css?v=20261017_v1" rel="stylesheet"/>
+<link href="/html/tab_file_editor/style.css?v=20261110_v3" rel="stylesheet"/>
 <script src="/html/js/toast.js?v=20261017_v1"></script>
 <script src="/html/js/panel-loader.js?v=20261025_v4" type="module"></script>
 <script src="https://cdn.jsdelivr.net/npm/i18next@23.11.5/i18next.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="/html/js/marked.min.js?v=20261110_v3"></script>
 <script src="/html/js/global-i18n.js?v=20261107_v1"></script>
-<script src="/html/js/global-tooltips-i18n.js?v=20261107_v1"></script>
+<script src="/html/js/global-tooltips-i18n.js?v=20261110_v3"></script>
 </head>
 <body>
 <!-- Вертикальная панель навигации в стиле стандартных IDE (Activity Bar: VS Code / JetBrains / Cursor) -->
@@ -176,8 +177,9 @@ Updated: 2026-11-10 12:58:00
 <i class="bi bi-puzzle"></i>
 </button>
 <!-- 11. Почта Gmail -->
-<button class="ide-activity-item" data-i18n-title="titles.ide.title_5a463f93" data-tab="tab-gmail" id="ide-nav-gmail" title="Управление почтой Gmail" type="button">
+<button class="ide-activity-item position-relative" data-i18n-title="titles.ide.title_5a463f93" data-tab="tab-gmail" id="ide-nav-gmail" title="Управление почтой Gmail" type="button">
 <i class="bi bi-envelope"></i>
+<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none font-size-75" id="top-nav-gmail-badge">0</span>
 </button>
 <!-- 12. Google Календарь -->
 <button class="ide-activity-item" data-i18n-title="titles.ide.calendar" data-tab="tab-calendar" id="ide-nav-calendar" title="Google Календарь и расписание" type="button">
@@ -191,10 +193,13 @@ Updated: 2026-11-10 12:58:00
 <button class="ide-activity-item" data-i18n-title="titles.ide.contacts" data-tab="tab-contacts" id="ide-nav-contacts" title="Телефонная книга и контакты" type="button">
 <i class="bi bi-person-lines-fill"></i>
 </button>
+ 
 <!-- 15. Универсальный редактор файлов (Rust + WebAssembly) -->
+ <!--
 <button class="ide-activity-item" data-i18n-title="titles.ide.fileEditor" data-tab="tab-workspace" data-panel="panel-file-editor" id="ide-nav-file-editor" title="Универсальный редактор файлов (Rust + Wasm)" type="button">
 <i class="bi bi-code-square"></i>
 </button>
+-->
 <!-- 16. Дерево файлов и директорий -->
 <button class="ide-activity-item" data-i18n-title="titles.ide.fileTree" data-tab="tab-file-tree" id="ide-nav-file-tree" title="Дерево файлов и директорий" type="button">
 <i class="bi bi-folder-symlink"></i>
@@ -1486,11 +1491,14 @@ Updated: 2026-11-10 12:58:00
         </div>
         <div class="d-flex align-items-center gap-1.5 ms-auto me-2" id="ide-editor-header-actions">
           <div class="btn-group btn-group-sm d-none" id="ide-editor-view-mode-group" role="group" aria-label="Режимы отображения" data-i18n-aria-label="ide.viewModesAria">
-            <button type="button" class="btn btn-sm btn-outline-primary active py-0.5 px-2" id="ide-editor-tab-code">
+            <button type="button" class="btn btn-sm btn-outline-primary active py-0.5 px-2" id="ide-editor-tab-code" data-i18n-title="ide.editorTabCodeTitle" title="Редактор">
               <i class="bi bi-pencil me-1"></i><span id="ide-span-ide-editorTabCode" data-i18n="ide.editorTabCode">Редактор</span>
             </button>
-            <button type="button" class="btn btn-sm btn-outline-primary py-0.5 px-2" id="ide-editor-tab-preview">
-              <i class="bi bi-eye me-1"></i><span id="ide-span-ide-editorTabPreview" data-i18n="ide.editorTabPreview">Предпросмотр</span>
+            <button type="button" class="btn btn-sm btn-outline-primary py-0.5 px-2" id="ide-editor-tab-split" data-i18n-title="ide.editorTabSplitTitle" title="Вид/Редактор">
+              <i class="bi bi-layout-split me-1"></i><span id="ide-span-ide-editorTabSplit" data-i18n="ide.editorTabSplit">Вид/Редактор</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-primary py-0.5 px-2" id="ide-editor-tab-preview" data-i18n-title="ide.editorTabViewTitle" title="Вид">
+              <i class="bi bi-eye me-1"></i><span id="ide-span-ide-editorTabView" data-i18n="ide.editorTabView">Вид</span>
             </button>
           </div>
           <button class="btn btn-xs btn-outline-secondary" id="ide-editor-btn-system-open" title="Открыть в системном редакторе" data-i18n-title="titles.ide.openInSystemEditor" type="button">
@@ -1511,8 +1519,10 @@ Updated: 2026-11-10 12:58:00
             <span id="ide-editor-stats" data-i18n="ide.editorStatsDefault">Строк: 0 | Символов: 0</span>
             <span id="ide-editor-shortcut-hint"><span id="ide-span-ide-shortcutLabel" data-i18n="ide.shortcutLabel">Горячая клавиша:</span> <kbd class="px-1">Ctrl+S</kbd> <span id="ide-span-ide-shortcutToSave" data-i18n="ide.shortcutToSave">для сохранения</span></span>
           </div>
-          <textarea class="form-control font-monospace flex-grow-1 border-secondary-subtle" id="ide-editor-textarea" style="resize: none; font-size: 13px; line-height: 1.5; min-height: 400px; tab-size: 2;" spellcheck="false"></textarea>
-          <div id="ide-editor-markdown-preview" class="border rounded p-3 bg-body overflow-auto flex-grow-1 d-none" style="min-height: 400px; font-size: 14px; line-height: 1.6;"></div>
+          <div class="d-flex flex-grow-1 gap-2 overflow-hidden" id="ide-editor-stage" style="min-height: 440px;">
+            <textarea class="form-control font-monospace flex-grow-1 border-secondary-subtle" id="ide-editor-textarea" style="resize: none; font-size: 13px; line-height: 1.5; min-height: 440px; tab-size: 2;" spellcheck="false"></textarea>
+            <div id="ide-editor-markdown-preview" class="border rounded p-3 bg-body overflow-auto flex-grow-1 d-none" style="min-height: 440px; font-size: 14px; line-height: 1.6;"></div>
+          </div>
           <div class="mt-2">
             <input type="text" class="form-control form-control-sm" id="ide-editor-commit-msg" placeholder="Сообщение коммита Git (опционально)..." data-i18n-placeholder="placeholders.ide.commitMsgOptional" autocomplete="off">
           </div>
@@ -1612,7 +1622,7 @@ Updated: 2026-11-10 12:58:00
 <script src="/html/ai_modal_dialog/main.js?v=20261020_v1"></script>
 <script src="/html/components/system_tour/system_tour.js?v=20261020_v1"></script>
 <script src="/html/js/workspace_wizard.js?v=20261020_v1" type="module"></script>
-<script src="/html/js/ide_file_explorer.js?v=20261106_v2" type="module"></script>
+<script src="/html/js/ide_file_explorer.js?v=20261110_v3" type="module"></script>
 <script src="/html/js/table-resizer.js?v=20261103_v1"></script>
 <script src="/html/js/table-template.js?v=20261103_v1"></script>
 <script src="/html/js/main.js?v=20261110_v2" type="module"></script>

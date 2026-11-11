@@ -16,7 +16,7 @@
 # Package: src.ai.wikillm
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:56:00
+# Updated: 2026-11-10 17:29:00
 # =============================================================================
 
 from __future__ import annotations
@@ -29,6 +29,15 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
 from logger import logger
+try:
+    from apps.windows.db.paths import resolve_system_knowledge_db_path
+except ImportError:
+    def resolve_system_knowledge_db_path(custom_path: Optional[str | Path] = None) -> Path:
+        """Резервное определение пути к базе знаний WikiLLM при отсутствии пакета apps.windows."""
+        if custom_path:
+            return Path(custom_path).resolve()
+        from src.config import get_app_paths
+        return (get_app_paths()["db"] / "system_knowledge.db").resolve()
 from .models import (
     ArtifactType,
     Claim,
@@ -46,25 +55,37 @@ from .models import (
 class WikiStorage:
     """SQLite-хранилище сущностей, фактов, наблюдений и полнотекстового индекса."""
 
-    def __init__(self, db_path: str | Path = "data/windows_wikillm/knowledge.db") -> None:
+    def __init__(self, db_path: Optional[str | Path] = None) -> None:
         """Инициализирует подключение к SQLite базе данных.
 
         Args:
-            db_path: Путь к файлу базы данных или ':memory:'.
+            db_path: Путь к файлу базы данных, ':memory:' или None (путь берется строго из конфигурации).
         """
-        self.db_path = Path(db_path) if str(db_path) != ":memory:" else ":memory:"
-        self._mem_conn: Optional[sqlite3.Connection] = None
-        if self.db_path == ":memory:":
-            self._mem_conn = sqlite3.connect(":memory:", check_same_thread=False)
+        if str(db_path) == ":memory:":
+            self.db_path = ":memory:"
+            self._mem_conn: Optional[sqlite3.Connection] = sqlite3.connect(":memory:", check_same_thread=False)
             self._mem_conn.row_factory = sqlite3.Row
             self._mem_conn.execute("PRAGMA foreign_keys = ON")
-        elif isinstance(self.db_path, Path):
+        else:
+            self.db_path = resolve_system_knowledge_db_path(db_path)
+            self._mem_conn = None
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
+    def ping(self) -> bool:
+        """Проверяет доступность и целостность соединения с SQLite."""
+        try:
+            with self._connect() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT 1")
+                res = cur.fetchone()
+                return res is not None and res[0] == 1
+        except Exception:
+            return False
+
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
-        """Контекстный менеджер соединения с базой данных SQLite с режимом WAL и защитой от блокировок."""
+        """Контекстный менеджер соединения с базой данных SQLite."""
         if self._mem_conn is not None:
             try:
                 yield self._mem_conn
@@ -171,8 +192,43 @@ class WikiStorage:
                     tags,
                     details
                 );
+
+                CREATE TABLE IF NOT EXISTS wiki_llm_profiles (
+                    profile_name TEXT PRIMARY KEY,
+                    score_threshold REAL NOT NULL DEFAULT 0.7,
+                    top_k INTEGER NOT NULL DEFAULT 5,
+                    fetch_k INTEGER NOT NULL DEFAULT 20,
+                    reranker_enabled INTEGER NOT NULL DEFAULT 1,
+                    rerank_top_n INTEGER NOT NULL DEFAULT 5,
+                    max_context_tokens INTEGER NOT NULL DEFAULT 4096,
+                    temperature REAL NOT NULL DEFAULT 0.1,
+                    grounding_required INTEGER NOT NULL DEFAULT 1,
+                    is_default INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
+
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM wiki_llm_profiles")
+            if cur.fetchone()[0] == 0:
+                now_str = utc_now_iso()
+                defaults = [
+                    ('fast', 0.6, 3, 10, 0, 3, 2048, 0.2, 1, 0, now_str, now_str),
+                    ('balanced', 0.7, 5, 20, 1, 5, 4096, 0.1, 1, 1, now_str, now_str),
+                    ('precise', 0.82, 10, 50, 1, 8, 8192, 0.0, 1, 0, now_str, now_str),
+                ]
+                conn.executemany(
+                    """
+                    INSERT OR IGNORE INTO wiki_llm_profiles (
+                        profile_name, score_threshold, top_k, fetch_k, reranker_enabled,
+                        rerank_top_n, max_context_tokens, temperature, grounding_required,
+                        is_default, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    defaults,
+                )
 
     def save_entity(self, entity: KnowledgeEntity) -> None:
         """Сохраняет или обновляет сущность базы знаний со всеми связями и FTS-индексом.
@@ -228,70 +284,69 @@ class WikiStorage:
                 ),
             )
 
-            # 2. Пакетное обновление claims
+            # 2. Обновление claims (пакетная вставка executemany)
             conn.execute("DELETE FROM claims WHERE canonical_key = ?", (entity.canonical_key,))
             if entity.claims:
+                claim_rows = [
+                    (
+                        claim.claim_id or str(uuid.uuid4()),
+                        entity.canonical_key,
+                        claim.statement,
+                        claim.confidence,
+                        claim.source.value,
+                        1 if claim.verified else 0,
+                        claim.created_at or now,
+                    )
+                    for claim in entity.claims
+                ]
                 conn.executemany(
                     """
                     INSERT INTO claims (claim_id, canonical_key, statement, confidence, source, verified, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    [
-                        (
-                            claim.claim_id or str(uuid.uuid4()),
-                            entity.canonical_key,
-                            claim.statement,
-                            claim.confidence,
-                            claim.source.value,
-                            1 if claim.verified else 0,
-                            claim.created_at or now,
-                        )
-                        for claim in entity.claims
-                    ],
+                    claim_rows,
                 )
 
-            # 3. Пакетное обновление evidence
+            # 3. Обновление evidence (пакетная вставка executemany)
             conn.execute("DELETE FROM evidence WHERE canonical_key = ?", (entity.canonical_key,))
             if entity.evidence:
+                ev_rows = [
+                    (
+                        ev.evidence_id or str(uuid.uuid4()),
+                        entity.canonical_key,
+                        ev.description,
+                        ev.telemetry_metric,
+                        ev.sample_value,
+                        ev.observed_at or now,
+                    )
+                    for ev in entity.evidence
+                ]
                 conn.executemany(
                     """
                     INSERT INTO evidence (evidence_id, canonical_key, description, telemetry_metric, sample_value, observed_at)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    [
-                        (
-                            ev.evidence_id or str(uuid.uuid4()),
-                            entity.canonical_key,
-                            ev.description,
-                            ev.telemetry_metric,
-                            ev.sample_value,
-                            ev.observed_at or now,
-                        )
-                        for ev in entity.evidence
-                    ],
+                    ev_rows,
                 )
 
-            # 4. Пакетное обновление resolutions
+            # 4. Обновление resolutions
             conn.execute("DELETE FROM resolutions WHERE canonical_key = ?", (entity.canonical_key,))
             if entity.diagnostic_info:
                 actions = entity.diagnostic_info.remediation_steps + entity.diagnostic_info.diagnostic_actions
-                if actions:
-                    conn.executemany(
+                for act in actions:
+                    conn.execute(
                         """
                         INSERT INTO resolutions (canonical_key, title, description, command, risk_level, is_automated)
                         VALUES (?, ?, ?, ?, ?, ?)
                         """,
-                        [
-                            (
-                                entity.canonical_key,
-                                act.title,
-                                act.description,
-                                act.command,
-                                act.risk_level,
-                                1 if act.is_automated else 0,
-                            )
-                            for act in actions
-                        ],
+                        (
+                            entity.canonical_key,
+                            act.title,
+                            act.description,
+                            act.command,
+                            act.risk_level,
+                            1 if act.is_automated else 0,
+                        ),
                     )
 
             # 5. Обновление FTS5 индекса
@@ -629,3 +684,4 @@ class WikiStorage:
                     results.append(ent)
 
         return results
+

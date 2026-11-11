@@ -11,7 +11,7 @@
  * File: main.js
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
- * Updated: 2026-11-10 13:35:00
+ * Updated: 2026-11-10 20:30:00
  * =============================================================================
  */
 
@@ -45,7 +45,7 @@ window.sendModelPing = sendModelPing;
 // Карта соответствия вкладок: id -> [htmlUrl, jsUrl]
 const TABS = {
   'workspace':        ['/html/tab_workspace/index.html?v=20261107_v2', '/html/tab_workspace/main.js?v=20261107_v2'],
-  'create-workspace': ['/html/tab_create_workspace/index.html?v=20261110_v1', '/html/tab_create_workspace/main.js?v=20261110_v1'],
+  'create-workspace': ['/html/tab_create_workspace/index.html?v=20261110_v2', '/html/tab_create_workspace/main.js?v=20261110_v2'],
   'timeline':         ['/html/tab_timeline/index.html',         '/html/tab_timeline/main.js'],
   'commits':          ['/html/tab_commits/index.html',          '/html/tab_commits/main.js'],
   'diff':             ['/html/tab_diff/index.html',             '/html/tab_diff/main.js'],

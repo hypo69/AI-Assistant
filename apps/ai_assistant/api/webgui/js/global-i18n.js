@@ -13,7 +13,7 @@
  * Package: windows/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-07 00:25:00
+ * Updated: 2026-11-11 19:55:00
  * =============================================================================
  */
 
@@ -30,8 +30,15 @@
     isLoaded: false,
     observer: null,
 
+    syncCookieLanguage(langCode) {
+      try {
+        document.cookie = `app_language=${encodeURIComponent(langCode)}; path=/; max-age=31536000; SameSite=Lax`;
+      } catch (e) {}
+    },
+
     init() {
       this.detectLanguage();
+      this.syncCookieLanguage(this.lang);
       this.syncRtlDirection();
       this.loadTranslations(this.lang).then(() => {
         this.applyTranslations(document);
@@ -141,7 +148,26 @@
           break;
         }
       }
-      return val !== null && val !== undefined ? String(val) : (fallback !== null ? fallback : key);
+      if (val !== null && val !== undefined && val !== key) {
+        return String(val);
+      }
+      // Каскадный fallback на язык по умолчанию (ru), если в текущем языке ключ отсутствует
+      if (this.lang !== DEFAULT_LANG) {
+        const ruDict = this.translations[DEFAULT_LANG] || {};
+        let ruVal = ruDict;
+        for (const part of parts) {
+          if (ruVal && typeof ruVal === 'object' && part in ruVal) {
+            ruVal = ruVal[part];
+          } else {
+            ruVal = null;
+            break;
+          }
+        }
+        if (ruVal !== null && ruVal !== undefined && ruVal !== key) {
+          return String(ruVal);
+        }
+      }
+      return fallback !== null ? fallback : key;
     },
 
     async setLanguage(newLang) {
@@ -150,6 +176,7 @@
       try {
         localStorage.setItem('app_language', newLang);
       } catch (e) {}
+      this.syncCookieLanguage(newLang);
 
       this.syncRtlDirection();
       await this.loadTranslations(newLang);

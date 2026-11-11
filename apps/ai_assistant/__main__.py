@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:32:00
+# Updated: 2026-11-11 19:45:00
 # =============================================================================
 
 from __future__ import annotations
@@ -156,24 +156,17 @@ def main() -> None:
         run_index(limit=args.limit)
     elif args.command == "status":
         show_status()
-    elif args.command == "serve":
-        from apps.ai_assistant.main import run
-        from apps.ai_assistant.core.paperless_bootstrap import ensure_paperless_running
-        ensure_paperless_running()
-        selected_action = "restart" if getattr(args, "restart", False) else ("connect" if getattr(args, "connect", False) else getattr(args, "action", None))
-        run(
-            port=args.port,
-            host=args.host,
-            engine=args.engine,
-            no_gui=getattr(args, "no_gui", False),
-            action=selected_action,
-        )
     else:
-        # Если команда не передана, запускаем веб-сервер и предпочтительный движок (Electron)
+        # Запуск веб-сервера и графического движка (по умолчанию Electron) без блокировки стартом Paperless
         from apps.ai_assistant.main import run
-        from apps.ai_assistant.core.paperless_bootstrap import ensure_paperless_running
-        ensure_paperless_running()
-        selected_action = "restart" if getattr(args, "restart", False) else ("connect" if getattr(args, "connect", False) else getattr(args, "action", None))
+        from apps.ai_assistant.core.paperless_bootstrap import ensure_paperless_running_async
+
+        ensure_paperless_running_async()
+        selected_action = (
+            "restart"
+            if getattr(args, "restart", False)
+            else ("connect" if getattr(args, "connect", False) else getattr(args, "action", None))
+        )
         run(
             port=getattr(args, "port", None),
             host=getattr(args, "host", None),

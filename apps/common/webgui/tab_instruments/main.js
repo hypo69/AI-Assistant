@@ -12,7 +12,7 @@
  * Package: apps/common/webgui/tab_instruments
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-03 16:43:00
+ * Updated: 2026-11-10 19:57:00
  * =============================================================================
  */
 
@@ -390,6 +390,21 @@ async function deleteInstrument(toolId) {
     showToast(`Инструмент ${toolId} удален`);
   } catch (err) {
     alert('Ошибка удаления: ' + err.message);
+  }
+}
+
+/**
+ * Обработчик кнопки удаления в модальном окне редактора инструмента.
+ */
+async function handleDeleteInstrument() {
+  const id = document.getElementById('editor-inst-id')?.value.trim();
+  if (!id) return;
+  if (confirm(`Удалить инструмент "${id}"?`)) {
+    await deleteInstrument(id);
+    const modalEl = document.getElementById('modal-inst-editor');
+    if (modalEl && window.bootstrap && window.bootstrap.Modal) {
+      window.bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
   }
 }
 

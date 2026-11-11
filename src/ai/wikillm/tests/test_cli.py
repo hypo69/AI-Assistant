@@ -67,3 +67,4 @@ async def test_cli_index_code(tmp_path: Path, capsys: pytest.CaptureFixture) -> 
     captured = capsys.readouterr()
     assert "Успешно проиндексировано" in captured.out
 
+

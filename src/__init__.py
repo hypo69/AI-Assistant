@@ -3,7 +3,7 @@
 # Process Name: AI-Windows-Admin CORE -   Init   Module
 # =============================================================================
 # Description:
-#   AI-Assistant core package root.
+#   AI Windows Admin core package root.
 #
 # Usage Examples:
 #
@@ -13,11 +13,11 @@
 # Package: src
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-01 17:37:00
+# Updated: 2026-10-10 17:35:00
 # =============================================================================
 
 from __future__ import annotations
-"""AI-Assistant core package root.
+"""AI Windows Admin core package root.
 
 Contains modular AI providers, FastAPI endpoints, logging, RAG, and utilities."""
 

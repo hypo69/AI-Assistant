@@ -104,3 +104,4 @@ def test_fingerprint_generation() -> None:
     fp2 = CanonicalKeyNormalizer.compute_fingerprint(art2)
 
     assert fp1 == fp2, "Отпечатки с динамическими GUID и адресами должны совпадать!"
+

@@ -17,7 +17,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:55:00
+# Updated: 2026-11-11 19:45:00
 # =============================================================================
 
 from __future__ import annotations
@@ -57,6 +57,31 @@ def find_docker() -> Optional[str]:
         Optional[str]: Путь к docker или None, если Docker не установлен.
     """
     return shutil.which("docker") or shutil.which("docker", path=str(DOCKER_FALLBACK_DIR))
+
+
+def is_docker_running(timeout_sec: float = 5.0) -> bool:
+    """Проверяет доступность Docker daemon (Docker Desktop запущен).
+
+    Args:
+        timeout_sec: Таймаут выполнения `docker info`, сек.
+
+    Returns:
+        bool: True, если демон Docker отвечает; иначе False.
+    """
+    docker = find_docker()
+    if not docker:
+        return False
+    try:
+        res = subprocess.run(
+            [docker, "info", "--format", "{{.ServerVersion}}"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout_sec,
+            check=False,
+        )
+        return res.returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
 
 
 def compose(args: List[str], build: bool = False) -> int:
@@ -146,9 +171,15 @@ def ensure_paperless_running() -> bool:
         return False
     if _is_ready(connector, cfg):
         return True
-    logger.info("[PaperlessBootstrap] Paperless недоступен, запускаю Docker Compose в новом окне терминала")
-    if not launch_in_new_terminal():
+    if not is_docker_running():
+        logger.warning("[PaperlessBootstrap] Docker daemon не запущен — Paperless недоступен, ассистент продолжает работу без Paperless")
         return False
+    if os.environ.get("AI_ASSISTANT_PAPERLESS_WINDOW_LAUNCHED") == "1":
+        logger.info("[PaperlessBootstrap] Консоль Paperless уже запущена из assist.ps1, ожидаю готовности API...")
+    else:
+        logger.info("[PaperlessBootstrap] Paperless недоступен, запускаю Docker Compose в новом окне терминала")
+        if not launch_in_new_terminal():
+            return False
     deadline = time.monotonic() + float(cfg["startup_timeout_sec"])
     while time.monotonic() < deadline:
         if connector.ping():
@@ -157,6 +188,21 @@ def ensure_paperless_running() -> bool:
         time.sleep(float(cfg["startup_poll_sec"]))
     logger.warning("[PaperlessBootstrap] Paperless не ответил за отведённое время")
     return False
+
+
+def ensure_paperless_running_async() -> threading.Thread:
+    """Запускает проверку и автозапуск Paperless-ngx в фоновом daemon-потоке, не блокируя старт UI.
+
+    Returns:
+        threading.Thread: Запущенный фоновый поток.
+    """
+    thread = threading.Thread(
+        target=ensure_paperless_running,
+        name="paperless-bootstrap",
+        daemon=True,
+    )
+    thread.start()
+    return thread
 
 
 def _is_ready(connector, cfg: Dict) -> bool:

@@ -13,14 +13,14 @@
 # Package: apps.common.file_editor
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 14:31:00
+# Updated: 2026-11-10 20:20:00
 # =============================================================================
 
 from __future__ import annotations
 """Каталог всех типов файлов и режимов редактирования VS Code."""
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 from apps.common.file_editor.models import EditorMode, FileTypeDescriptor
 
 
@@ -299,16 +299,132 @@ class SupportedFileCatalog:
 
     _BY_EXT: Dict[str, FileTypeDescriptor] = {d.extension: d for d in _RAW_DESCRIPTORS}
     _SPECIAL_NAMES: frozenset[str] = frozenset(
-        {"dockerfile", "makefile", ".gitignore", ".gitattributes", ".env"}
+        {
+            "dockerfile",
+            "makefile",
+            ".gitignore",
+            ".gitattributes",
+            ".env",
+            "license",
+            "licence",
+            "readme",
+            "changelog",
+            "gemini",
+        }
     )
 
     @classmethod
-    def get_descriptor(cls, file_path_or_name: str, is_binary_detected: bool = False) -> FileTypeDescriptor:
-        """Определяет дескриптор типа файла по его имени, расширению и признаку бинарности.
+    def detect_type_from_content(
+        cls,
+        content: Union[str, bytes, None],
+        file_name: str = "",
+    ) -> Optional[str]:
+        """Определяет вероятный тип (расширение) файла по его содержимому, если у файла нет суффикса.
+
+        Args:
+            content: Текстовое или байтовое содержимое начала файла.
+            file_name: Имя файла (опционально, для особых имён вроде Dockerfile, Makefile, README).
+
+        Returns:
+            Расширение файла в нижнем регистре (например, 'md', 'json', 'py', 'sh', 'html', 'svg')
+            или None, если тип не удалось надёжно определить.
+        """
+        import json
+        import re
+
+        name = Path(file_name).name.lower() if file_name else ""
+        if name in {"license", "licence", "readme", "changelog", "gemini"}:
+            return "md"
+        if name in {"dockerfile"}:
+            return "dockerfile"
+        if name in {"makefile"}:
+            return "makefile"
+        if name in {".gitignore", ".gitattributes", ".editorconfig"}:
+            return "txt"
+        if name == ".env":
+            return "ini"
+
+        if not content:
+            return None
+
+        if isinstance(content, bytes):
+            text = content[:8192].decode("utf-8", errors="replace").strip()
+        else:
+            text = str(content)[:8192].strip()
+
+        if not text:
+            return None
+
+        # 1. Shebang (#!/...) в первой строке
+        if text.startswith("#!"):
+            first_line = text.split("\n", 1)[0].lower()
+            if "python" in first_line:
+                return "py"
+            if any(sh in first_line for sh in ("bash", "zsh", "/sh")):
+                return "sh"
+            if "node" in first_line:
+                return "js"
+            if "perl" in first_line:
+                return "pl"
+            if "php" in first_line:
+                return "php"
+            if "ruby" in first_line:
+                return "rb"
+
+        # 2. HTML, XML, SVG
+        if re.match(r"^<!doctype\s+html", text, re.IGNORECASE) or re.match(r"^<html[\s>]", text, re.IGNORECASE):
+            return "html"
+        if text.startswith("<?xml"):
+            return "svg" if "<svg" in text.lower() else "xml"
+        if re.match(r"^<svg[\s>]", text, re.IGNORECASE):
+            return "svg"
+
+        # 3. JSON
+        if (text.startswith("{") and text.endswith("}")) or (text.startswith("[") and text.endswith("]")):
+            try:
+                json.loads(text)
+                return "json"
+            except Exception:
+                pass
+
+        # 4. Markdown Frontmatter (Obsidian, Hugo, Jekyll)
+        if re.match(r"^---\r?\n[\s\S]*?\r?\n---\r?\n?", text):
+            return "md"
+
+        # 5. Markdown заголовки и синтаксис
+        if (
+            re.search(r"^#{1,6}\s+.+", text, re.MULTILINE)
+            or re.search(r"\[\[.+?\]\]", text)
+            or re.search(r"^>\s*\[!", text, re.MULTILINE)
+            or re.search(r"^\s*[-*+]\s+\[[ x]\]", text, re.MULTILINE | re.IGNORECASE)
+        ):
+            return "md"
+
+        # 6. CSV / TSV разделители
+        lines = [l for l in text.splitlines() if l.strip()][:10]
+        if len(lines) >= 2:
+            comma_counts = [len(l.split(",")) for l in lines]
+            if comma_counts[0] >= 2 and all(c == comma_counts[0] for c in comma_counts):
+                return "csv"
+            tab_counts = [len(l.split("\t")) for l in lines]
+            if tab_counts[0] >= 2 and all(c == tab_counts[0] for c in tab_counts):
+                return "tsv"
+
+        return None
+
+    @classmethod
+    def get_descriptor(
+        cls,
+        file_path_or_name: str,
+        is_binary_detected: bool = False,
+        content: Optional[Union[str, bytes]] = None,
+    ) -> FileTypeDescriptor:
+        """Определяет дескриптор типа файла по его имени, расширению, признаку бинарности и содержимому.
 
         Args:
             file_path_or_name: Имя файла или относительный путь.
             is_binary_detected: Обнаружены ли бинарные нулевые байты при чтении файла.
+            content: Содержимое файла для определения типа при отсутствии суффикса.
 
         Returns:
             Дескриптор `FileTypeDescriptor` с режимами редактирования VS Code.
@@ -318,8 +434,17 @@ class SupportedFileCatalog:
             special_key = name.lstrip(".")
             if special_key in cls._BY_EXT:
                 return cls._BY_EXT[special_key]
+            if special_key in {"license", "licence", "readme", "changelog", "gemini"}:
+                return cls._BY_EXT["md"]
 
         ext = Path(name).suffix.lstrip(".").lower()
+
+        # Если расширения нет — пытаемся определить тип по содержимому
+        if not ext and not is_binary_detected:
+            detected_ext = cls.detect_type_from_content(content, name)
+            if detected_ext and detected_ext in cls._BY_EXT:
+                return cls._BY_EXT[detected_ext]
+
         if ext in cls._BY_EXT:
             desc = cls._BY_EXT[ext]
             if is_binary_detected and not desc.is_binary_default and desc.default_mode == EditorMode.CODE:

@@ -10,7 +10,7 @@
  *   (Outline) для языков VS Code.
  *
  * File: wasm_bridge.js
- * Project: ai-windows-admin
+ * Project: ai-assistant
  * Package: apps/common/webgui/tab_file_editor
  * Author: hypo69
  * Copyright: © 2026 hypo69

@@ -66,7 +66,7 @@
 
 
 
- * Updated: 2026-11-07 00:45:00
+ * Updated: 2026-11-10 20:30:00
 
 
 
@@ -1069,28 +1069,267 @@ export async function openFileSummary(target, wsId) {
 
 }
 
+/**
+ * Определяет вероятный тип (расширение) файла по содержимому и имени, если у файла нет расширения.
+ * @param {string} content
+ * @param {string} fileName
+ * @returns {string|null}
+ */
+export function detectFileTypeFromContent(content, fileName = '') {
+  const name = (fileName || '').split('/').pop().split('\\').pop().toLowerCase();
+  if (['license', 'licence', 'readme', 'changelog', 'gemini'].includes(name)) return 'md';
+  if (name === 'dockerfile') return 'dockerfile';
+  if (name === 'makefile') return 'makefile';
+  if (['.gitignore', '.gitattributes', '.editorconfig'].includes(name)) return 'txt';
+  if (name === '.env') return 'ini';
 
+  if (!content || typeof content !== 'string') return null;
+  const text = content.slice(0, 8192).trim();
+  if (!text) return null;
+
+  // 1. Shebang (#!/...)
+  if (text.startsWith('#!')) {
+    const firstLine = text.split('\n')[0].toLowerCase();
+    if (firstLine.includes('python')) return 'py';
+    if (firstLine.includes('bash') || firstLine.includes('zsh') || firstLine.includes('/sh')) return 'sh';
+    if (firstLine.includes('node')) return 'js';
+    if (firstLine.includes('perl')) return 'pl';
+    if (firstLine.includes('php')) return 'php';
+    if (firstLine.includes('ruby')) return 'rb';
+  }
+
+  // 2. HTML, XML, SVG
+  if (/^<!doctype\s+html/i.test(text) || /^<html[\s>]/i.test(text)) return 'html';
+  if (text.startsWith('<?xml')) {
+    return text.toLowerCase().includes('<svg') ? 'svg' : 'xml';
+  }
+  if (/^<svg[\s>]/i.test(text)) return 'svg';
+
+  // 3. JSON
+  if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
+    try {
+      JSON.parse(text);
+      return 'json';
+    } catch (_) {}
+  }
+
+  // 4. Markdown Frontmatter (YAML --- ... ---)
+  if (/^---\r?\n[\s\S]*?\r?\n---\r?\n?/.test(text)) {
+    return 'md';
+  }
+
+  // 5. Markdown заголовки, Obsidian Wikilinks, списки задач, цитаты/callouts
+  if (
+    /^#{1,6}\s+.+/m.test(text) ||
+    /\[\[.+?\]\]/.test(text) ||
+    /^>\s*\[!/m.test(text) ||
+    /^\s*[-*+]\s+\[[ x]\]/im.test(text)
+  ) {
+    return 'md';
+  }
+
+  // 6. CSV / TSV разделители
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0).slice(0, 10);
+  if (lines.length >= 2) {
+    const commaCounts = lines.map(l => l.split(',').length);
+    if (commaCounts[0] >= 2 && commaCounts.every(c => c === commaCounts[0])) return 'csv';
+    const tabCounts = lines.map(l => l.split('\t').length);
+    if (tabCounts[0] >= 2 && tabCounts.every(c => c === tabCounts[0])) return 'tsv';
+  }
+
+  return null;
+}
 
 /**
-
-
-
- * Открывает модальное окно текстового редактора файла (встроенный редактор для txt, md и других форматов).
-
-
-
- * @param {{isDir: boolean, relPath: string, name: string}} target 
-
-
-
- * @param {string} wsId 
-
-
-
+ * Выполняет предобработку Markdown перед рендерингом:
+ * - Форматирует YAML Frontmatter (Obsidian Metadata) в аккуратную карточку
+ * - Преобразует ссылки Obsidian [[Target|Title]] и [[Target]] в интерактивные бейджи
+ * - Защищает строки перед '---' от ошибочного превращения в Setext-заголовки h2
+ * - Предотвращает склеивание элементов списков со следующим текстом при отсутствии пустой строки
+ * @param {string} src
+ * @returns {{frontmatterHtml: string, cleanMarkdown: string}}
  */
+export function preprocessMarkdownContent(src) {
+  if (!src) return { frontmatterHtml: '', cleanMarkdown: '' };
+  let text = String(src);
 
+  const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escapeAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+  // 1. Извлекаем YAML Frontmatter в начале документа (Obsidian Metadata)
+  let frontmatterHtml = '';
+  const fmMatch = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (fmMatch) {
+    const fmRaw = fmMatch[1];
+    text = text.slice(fmMatch[0].length);
 
+    const lines = fmRaw.split(/\r?\n/);
+    const rows = [];
+    let currentKey = '';
+    let currentList = [];
+
+    const flushList = () => {
+      if (currentKey && currentList.length > 0) {
+        const badges = currentList.map(item => `<span class="badge bg-secondary-subtle text-secondary me-1 mb-1 font-monospace">${escapeHtml(item)}</span>`).join('');
+        rows.push(`<tr><th class="text-muted small py-1 px-2" style="width: 140px;">${escapeHtml(currentKey)}</th><td class="py-1 px-2">${badges}</td></tr>`);
+        currentKey = '';
+        currentList = [];
+      }
+    };
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (trimmed.startsWith('- ')) {
+        const val = trimmed.slice(2).trim().replace(/^["']/, '').replace(/["']$/, '').trim();
+        currentList.push(val);
+      } else {
+        flushList();
+        const colonIdx = trimmed.indexOf(':');
+        if (colonIdx > 0) {
+          const k = trimmed.slice(0, colonIdx).trim();
+          const v = trimmed.slice(colonIdx + 1).trim().replace(/^["']/, '').replace(/["']$/, '').trim();
+          if (v) {
+            rows.push(`<tr><th class="text-muted small py-1 px-2" style="width: 140px;">${escapeHtml(k)}</th><td class="py-1 px-2 font-monospace small" dir="auto">${escapeHtml(v)}</td></tr>`);
+          } else {
+            currentKey = k;
+          }
+        }
+      }
+    }
+    flushList();
+
+    if (rows.length > 0) {
+      frontmatterHtml = `
+        <details class="card mb-3 border border-subtle shadow-xs" open>
+          <summary class="card-header py-1.5 px-3 bg-body-tertiary small text-muted fw-semibold user-select-none cursor-pointer d-flex align-items-center gap-1.5">
+            <i class="bi bi-file-earmark-code text-primary"></i>
+            <span>YAML Frontmatter (Obsidian Metadata)</span>
+          </summary>
+          <div class="card-body p-0 table-responsive">
+            <table class="table table-sm table-striped mb-0 small">
+              <tbody>${rows.join('')}</tbody>
+            </table>
+          </div>
+        </details>
+      `;
+    }
+  }
+
+  // 2. Обработка Obsidian Wikilinks: [[Target|Title]] и [[Target]]
+  text = text.replace(/\[\[([^|\]\n]+)\|([^\]\n]+)\]\]/g, (_, target, title) => {
+    const tClean = target.trim();
+    const lClean = title.trim();
+    return `<a href="#" class="obsidian-wikilink badge bg-primary-subtle text-primary border border-primary-subtle text-decoration-none px-1.5 py-0.5 rounded me-1 align-baseline" data-target="${escapeAttr(tClean)}" title="Obsidian ссылка: ${escapeAttr(tClean)}"><i class="bi bi-link-45deg me-0.5"></i>${escapeHtml(lClean)}</a>`;
+  });
+  text = text.replace(/\[\[([^\]\n]+)\]\]/g, (_, target) => {
+    const tClean = target.trim();
+    return `<a href="#" class="obsidian-wikilink badge bg-primary-subtle text-primary border border-primary-subtle text-decoration-none px-1.5 py-0.5 rounded me-1 align-baseline" data-target="${escapeAttr(tClean)}" title="Obsidian ссылка: ${escapeAttr(tClean)}"><i class="bi bi-link-45deg me-0.5"></i>${escapeHtml(tClean)}</a>`;
+  });
+
+  // 3. Защита от превращения строки перед --- в Setext Header <h2>
+  text = text.replace(/([^\r\n]+)\r?\n---(?:\r?\n|$)/g, '$1\n\n---\n');
+
+  // 4. Защита от слипания списков с последующим текстом
+  text = text.replace(/(^[\t ]*[-*+][\t ][^\r\n]+)\r?\n(?!\r?\n|[\t ]*[-*+][\t ]|[\t ]*\d+\.[\t ])([^\r\n]+)/gm, '$1\n\n$2');
+
+  return { frontmatterHtml, cleanMarkdown: text };
+}
+
+/**
+ * Автономный парсер Markdown (CommonMark + GFM) для модального редактора.
+ * @param {string} src
+ * @returns {string}
+ */
+export function parseMarkdownToHtmlFallback(src) {
+  if (!src) return '';
+
+  const { frontmatterHtml, cleanMarkdown } = preprocessMarkdownContent(src);
+
+  if (typeof window !== 'undefined') {
+    if (typeof window.marked?.parse === 'function') {
+      try {
+        if (typeof window.marked.setOptions === 'function' && !window._markedConfigured) {
+          window.marked.setOptions({ breaks: true, gfm: true });
+          window._markedConfigured = true;
+        }
+        return frontmatterHtml + window.marked.parse(cleanMarkdown);
+      } catch (_) {}
+    }
+  }
+
+  const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const codeBlocks = [];
+  let text = cleanMarkdown.replace(/```([a-zA-Z0-9_\-#+.]*)\r?\n([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    const safeLang = escapeHtml(lang.trim() || 'text');
+    const safeCode = escapeHtml(code);
+    codeBlocks.push(`
+      <div class="card my-2 border border-subtle shadow-xs">
+        <div class="card-header py-1 px-2.5 bg-body-tertiary d-flex align-items-center justify-content-between font-monospace small text-muted">
+          <span>${safeLang}</span>
+        </div>
+        <pre class="p-2.5 m-0 overflow-auto bg-body font-monospace small" style="line-height: 1.45;"><code>${safeCode}</code></pre>
+      </div>
+    `);
+    return `@@CODE_BLOCK_${idx}@@`;
+  });
+  text = escapeHtml(text);
+  text = text.replace(/((?:^\|.+?\|(?:\r?\n|$))+)/gm, (tableText) => {
+    const lines = tableText.trim().split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return tableText;
+    if (!/^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(lines[1])) return tableText;
+    const parseRow = (line) => line.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+    const headerCells = parseRow(lines[0]);
+    const bodyRows = lines.slice(2).map(parseRow);
+    const thead = `<tr>${headerCells.map((c) => `<th class="bg-body-tertiary px-2.5 py-1.5">${c}</th>`).join('')}</tr>`;
+    const tbody = bodyRows.map((r) => `<tr>${r.map((c) => `<td class="px-2.5 py-1.5">${c}</td>`).join('')}</tr>`).join('');
+    return `<div class="table-responsive my-2"><table class="table table-sm table-bordered table-hover mb-0"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+  });
+  text = text.replace(/^######\s+(.+)$/gm, '<h6 class="mt-3 mb-1.5 fw-bold" dir="auto">$1</h6>');
+  text = text.replace(/^#####\s+(.+)$/gm, '<h5 class="mt-3 mb-1.5 fw-bold" dir="auto">$1</h5>');
+  text = text.replace(/^####\s+(.+)$/gm, '<h4 class="mt-3.5 mb-2 fw-bold" dir="auto">$1</h4>');
+  text = text.replace(/^###\s+(.+)$/gm, '<h3 class="mt-3.5 mb-2 fw-bold" dir="auto">$1</h3>');
+  text = text.replace(/^##\s+(.+)$/gm, '<h2 class="mt-4 mb-2 fw-bold border-bottom pb-1 border-subtle" dir="auto">$1</h2>');
+  text = text.replace(/^#\s+(.+)$/gm, '<h1 class="mt-4 mb-2.5 fw-bold border-bottom pb-2 border-subtle" dir="auto">$1</h1>');
+  text = text.replace(/^(?:---|\*\*\*|___)\s*$/gm, '<hr class="my-3 border-subtle" />');
+  text = text.replace(/^\s*[-*+]\s+\[x\]\s+(.+)$/gim, '<div class="form-check my-1"><input class="form-check-input" type="checkbox" checked disabled><label class="form-check-label text-decoration-line-through text-muted small">$1</label></div>');
+  text = text.replace(/^\s*[-*+]\s+\[\s\]\s+(.+)$/gim, '<div class="form-check my-1"><input class="form-check-input" type="checkbox" disabled><label class="form-check-label small">$1</label></div>');
+  text = text.replace(/(?:^\s*[-*+]\s+(?:(?!<div class="form-check").)*$(?:\r?\n)?)+/gm, (listBlock) => {
+    const items = listBlock.trim().split(/\r?\n/).map((line) => line.replace(/^\s*[-*+]\s+/, '').trim()).filter(Boolean).map((it) => `<li dir="auto">${it}</li>`).join('');
+    return `<ul class="my-1.5 ps-3">${items}</ul>`;
+  });
+  text = text.replace(/(?:^\s*\d+\.\s+.+$(?:\r?\n)?)+/gm, (listBlock) => {
+    const items = listBlock.trim().split(/\r?\n/).map((line) => line.replace(/^\s*\d+\.\s+/, '').trim()).filter(Boolean).map((it) => `<li dir="auto">${it}</li>`).join('');
+    return `<ol class="my-1.5 ps-3">${items}</ol>`;
+  });
+  text = text.replace(/`([^`\n]+)`/g, '<code class="px-1 py-0.5 rounded bg-body-secondary text-body font-monospace font-size-85">$1</code>');
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  text = text.replace(/\*([^\s*][^*]*?)\*/g, '<em>$1</em>');
+  text = text.replace(/_([^\s_][^_]*?)_/g, '<em>$1</em>');
+  text = text.replace(/~~(.+?)~~/g, '<del>$1</del>');
+  text = text.replace(/!\[(.*?)\]\((.+?)\)/g, '<img src="$2" alt="$1" class="img-fluid rounded border border-subtle my-2 shadow-xs" style="max-height: 480px; object-fit: contain;" />');
+  text = text.replace(/\[(.*?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary text-decoration-underline">$1</a>');
+  text = text.split(/\r?\n\r?\n/).map((block) => {
+    const trimmed = block.trim();
+    if (!trimmed) return '';
+    if (/^<(?:h[1-6]|div|table|ul|ol|blockquote|hr|pre)/.test(trimmed)) return trimmed;
+    return `<p class="mb-2 leading-relaxed" dir="auto">${trimmed.replace(/\r?\n/g, '<br />')}</p>`;
+  }).join('\n');
+  text = text.replace(/@@CODE_BLOCK_(\d+)@@/g, (_, idx) => codeBlocks[parseInt(idx, 10)] || '');
+  return frontmatterHtml + text;
+}
+
+if (typeof window !== 'undefined') {
+  window.parseMarkdownToHtml = parseMarkdownToHtmlFallback;
+}
+
+/**
+ * Открывает модальное окно текстового редактора файла (встроенный редактор для txt, md и других форматов).
+ * @param {{isDir: boolean, relPath: string, name: string}} target 
+ * @param {string} wsId 
+ */
 export async function openEditorModal(target, wsId) {
 
   // Перенаправляем открытие в центральное окно редактора Studio Code с вкладками
@@ -1146,138 +1385,116 @@ export async function openEditorModal(target, wsId) {
 
 
   // Элементы переключения режима Редактор / Предпросмотр для Markdown
-
-
-
   const viewModeGroup = document.getElementById('ide-editor-view-mode-group');
-
-
-
   const btnCode = document.getElementById('ide-editor-tab-code');
-
-
-
+  const btnSplit = document.getElementById('ide-editor-tab-split');
   const btnPreview = document.getElementById('ide-editor-tab-preview');
-
-
-
   const mdPreview = document.getElementById('ide-editor-markdown-preview');
-
-
-
   const isDrive = Boolean(target.driveFileId || target.source === 'drive' || wsId === 'gdrive');
-
-
-
   const driveFileId = target.driveFileId || target.id;
-
-
-
   const fileName = target.name || target.relPath || 'file';
-
-
-
-  const ext = (fileName.split('.').pop() || '').toLowerCase();
-
-
-
-  const isMarkdown = ext === 'md' || ext === 'markdown';
-
-
+  let ext = (fileName.includes('.') ? fileName.split('.').pop() : '').toLowerCase();
+  let isMarkdown = ['md', 'markdown', 'mdown', 'mkd'].includes(ext);
 
   if (titleEl) {
-
-
-
     titleEl.textContent = isDrive ? `Google Drive: ${fileName}` : target.relPath;
-
-
-
   }
-
-
-
   if (statusEl) statusEl.textContent = '';
-
-
-
   if (commitMsgInput) {
-
-
-
     commitMsgInput.value = '';
-
-
-
     if (isDrive) {
-
-
-
       commitMsgInput.parentElement?.classList.add('d-none');
-
-
-
     } else {
-
-
-
       commitMsgInput.parentElement?.classList.remove('d-none');
-
-
-
     }
-
-
-
   }
 
+  // Режим просмотра: для Markdown по умолчанию открываем раздельный вид (Вид/Редактор)
+  let currentModalMode = isMarkdown ? 'split' : 'code';
 
+  const renderModalPreview = () => {
+    if (!mdPreview) return;
+    const raw = textarea?.value || '';
+    if (typeof window.marked !== 'undefined' && typeof window.marked.parse === 'function') {
+      try {
+        mdPreview.innerHTML = window.marked.parse(raw);
+        return;
+      } catch (err) {
+        console.warn('[IDE Modal Editor] marked parse error:', err);
+      }
+    }
+    if (typeof window.parseMarkdownToHtml === 'function') {
+      mdPreview.innerHTML = window.parseMarkdownToHtml(raw);
+      return;
+    }
+    mdPreview.innerHTML = parseMarkdownToHtmlFallback(raw);
+  };
 
-  // Сброс режима просмотра на вкладку редактора
+  const applyModalMode = (mode) => {
+    currentModalMode = mode;
+    btnCode?.classList.toggle('active', mode === 'code');
+    btnSplit?.classList.toggle('active', mode === 'split');
+    btnPreview?.classList.toggle('active', mode === 'preview');
 
-
+    if (mode === 'split') {
+      if (textarea) {
+        textarea.classList.remove('d-none');
+        textarea.style.display = 'block';
+        textarea.style.flex = '1 1 50%';
+        textarea.style.width = '50%';
+        textarea.style.maxWidth = '50%';
+        textarea.style.minWidth = '0';
+      }
+      if (mdPreview) {
+        mdPreview.classList.remove('d-none');
+        mdPreview.style.display = 'block';
+        mdPreview.style.flex = '1 1 50%';
+        mdPreview.style.width = '50%';
+        mdPreview.style.maxWidth = '50%';
+        mdPreview.style.minWidth = '0';
+        renderModalPreview();
+      }
+    } else if (mode === 'preview') {
+      if (textarea) {
+        textarea.classList.add('d-none');
+        textarea.style.display = 'none';
+      }
+      if (mdPreview) {
+        mdPreview.classList.remove('d-none');
+        mdPreview.style.display = 'block';
+        mdPreview.style.flex = '1 1 100%';
+        mdPreview.style.width = '100%';
+        mdPreview.style.maxWidth = '100%';
+        mdPreview.style.minWidth = '0';
+        renderModalPreview();
+      }
+    } else {
+      // mode === 'code'
+      if (mdPreview) {
+        mdPreview.classList.add('d-none');
+        mdPreview.style.display = 'none';
+      }
+      if (textarea) {
+        textarea.classList.remove('d-none');
+        textarea.style.display = 'block';
+        textarea.style.flex = '1 1 100%';
+        textarea.style.width = '100%';
+        textarea.style.maxWidth = '100%';
+        textarea.style.minWidth = '0';
+        textarea.focus();
+      }
+    }
+  };
 
   if (viewModeGroup) {
-
-
-
     if (isMarkdown) {
-
-
-
       viewModeGroup.classList.remove('d-none');
-
-
-
     } else {
-
-
-
       viewModeGroup.classList.add('d-none');
-
-
-
     }
-
-
-
   }
 
-
-
-  btnCode?.classList.add('active');
-
-
-
-  btnPreview?.classList.remove('active');
-
-
-
-  textarea?.classList.remove('d-none');
-
-
-
-  mdPreview?.classList.add('d-none');
+  applyModalMode(currentModalMode);
 
 
 
@@ -1374,178 +1591,56 @@ export async function openEditorModal(target, wsId) {
 
 
       if (textarea) {
-
-
-
         textarea.value = data.content ?? '';
-
-
-
         textarea.disabled = false;
 
-
+        // Если у файла нет расширения — определяем тип по бэкенду или по содержимому
+        if (!ext || ext === fileName.toLowerCase()) {
+          const detected = (data && data.detected_type) || detectFileTypeFromContent(data.content, fileName);
+          if (detected) {
+            ext = detected;
+            if (['md', 'markdown', 'mdown', 'mkd'].includes(ext)) {
+              isMarkdown = true;
+              if (viewModeGroup) viewModeGroup.classList.remove('d-none');
+              applyModalMode('split');
+            }
+          }
+        }
 
         setTimeout(() => textarea.focus(), 250);
-
-
-
+        if (isMarkdown && (currentModalMode === 'split' || currentModalMode === 'preview')) {
+          renderModalPreview();
+        }
       }
-
-
 
       if (saveBtn) saveBtn.disabled = false;
 
-
-
       const updateStats = () => {
-
-
-
         const val = textarea?.value || '';
-
-
-
         const lines = val.split('\n').length;
-
-
-
         const linesWord = window.i18n?.t('ide.linesWord', 'Строк');
-
-
-
         const charsWord = window.i18n?.t('ide.charsWord', 'Символов');
-
-
-
         if (statsEl) statsEl.textContent = `${linesWord}: ${lines} | ${charsWord}: ${val.length}`;
-
-
-
       };
-
-
 
       updateStats();
 
-
-
-      textarea?.addEventListener('input', updateStats);
-
-
-
+      textarea?.addEventListener('input', () => {
+        updateStats();
+        if (currentModalMode === 'split' || currentModalMode === 'preview') {
+          renderModalPreview();
+        }
+      });
     }
-
-
-
   } catch (err) {
-
-
-
     if (textarea) textarea.value = `Ошибка загрузки файла: ${err.message}`;
-
-
-
     showToast(`❌ Ошибка открытия: ${err.message}`, 'danger');
-
-
-
   }
 
-
-
-  // Переключение режимов: Редактор / Предпросмотр Markdown
-
-
-
-  const switchToCode = () => {
-
-
-
-    btnCode?.classList.add('active');
-
-
-
-    btnPreview?.classList.remove('active');
-
-
-
-    mdPreview?.classList.add('d-none');
-
-
-
-    textarea?.classList.remove('d-none');
-
-
-
-    textarea?.focus();
-
-
-
-  };
-
-
-
-  const switchToPreview = () => {
-
-
-
-    btnPreview?.classList.add('active');
-
-
-
-    btnCode?.classList.remove('active');
-
-
-
-    textarea?.classList.add('d-none');
-
-
-
-    if (mdPreview) {
-
-
-
-      mdPreview.classList.remove('d-none');
-
-
-
-      const raw = textarea?.value || '';
-
-
-
-      if (typeof window.marked !== 'undefined' && typeof window.marked.parse === 'function') {
-
-
-
-        mdPreview.innerHTML = window.marked.parse(raw);
-
-
-
-      } else {
-
-
-
-        mdPreview.textContent = raw;
-
-
-
-      }
-
-
-
-    }
-
-
-
-  };
-
-
-
-  if (btnCode) btnCode.onclick = switchToCode;
-
-
-
-  if (btnPreview) btnPreview.onclick = switchToPreview;
+  // Переключение режимов: Редактор / Вид/Редактор (Split) / Вид
+  if (btnCode) btnCode.onclick = () => applyModalMode('code');
+  if (btnSplit) btnSplit.onclick = () => applyModalMode('split');
+  if (btnPreview) btnPreview.onclick = () => applyModalMode('preview');
 
 
 
@@ -1918,6 +2013,7 @@ export async function openEditorModal(target, wsId) {
 
 
 window.openEditorModal = openEditorModal;
+window.detectFileTypeFromContent = detectFileTypeFromContent;
 
 
 

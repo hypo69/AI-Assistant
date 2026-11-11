@@ -8,19 +8,19 @@
  *
  * Usage Examples:
  *   HTML Link Tag:
- *     <link rel="stylesheet" href="/windows/api/webgui/css/overrides.css?v=20261004_v17">
+ *     <link rel="stylesheet" href="/apps/common/webgui/css/overrides.css?v=20261004_v17">
  *
  * File: overrides.css
- * Project: ai-windows-admin
- * Package: windows/api/webgui/css
+ * Project: ai-assistant
+ * Package: apps/common/webgui/css
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-25 20:35:00
+ * Updated: 2026-11-03 14:09:00
  * =============================================================================
  */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   THEME OVERRIDES & COMPATIBILITY — AI Windows Admin WebGUI
+   THEME OVERRIDES & COMPATIBILITY — AI-Assistant WebGUI
    Адаптивные переопределения Bootstrap и компонентов для светлых и тёмных тем
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -51,6 +51,7 @@ div.text-muted {
 /* ── Light & Brick Themes — Переопределения Bootstrap и утилит ─────────────── */
 [data-theme="light"],
 [data-theme="nightview"],
+[data-theme="nightview-70"],
 [data-theme="theme-light-enterprise"],
 [data-theme="brick"],
 :root[data-bs-theme="light"],
@@ -74,6 +75,7 @@ html[data-bs-theme="light"] {
 
 [data-theme="light"] body,
 [data-theme="nightview"] body,
+[data-theme="nightview-70"] body,
 [data-theme="theme-light-enterprise"] body,
 [data-theme="brick"] body,
 html[data-bs-theme="light"] body {
@@ -82,6 +84,7 @@ html[data-bs-theme="light"] body {
 
 [data-theme="light"],
 [data-theme="nightview"],
+[data-theme="nightview-70"],
 [data-theme="theme-light-enterprise"],
 [data-theme="brick"] {
   /* Инпуты, к которым JS или Bootstrap добавил bg-dark (терминал PowerShell консоли исключен) */
@@ -584,7 +587,15 @@ html[data-bs-theme="light"] body {
 [data-theme="nightview"] .about-sys-badge-warn,
 [data-theme="nightview"] .diag-badge-critical,
 [data-theme="nightview"] .diag-badge-warning,
-[data-theme="nightview"] .diag-badge-normal {
+[data-theme="nightview"] .diag-badge-normal,
+[data-theme="nightview-70"] .badge,
+[data-theme="nightview-70"] .ui-badge,
+[data-theme="nightview-70"] .status-badge-unified,
+[data-theme="nightview-70"] .about-sys-badge-ok,
+[data-theme="nightview-70"] .about-sys-badge-warn,
+[data-theme="nightview-70"] .diag-badge-critical,
+[data-theme="nightview-70"] .diag-badge-warning,
+[data-theme="nightview-70"] .diag-badge-normal {
   font-size: calc(0.72rem + 1pt);
 }
 

@@ -10,7 +10,7 @@
 # Package: plugins.invoice_processor
 # Author: hypo69
 # Copyright: (c) 2026 hypo69
-# Updated: 2026-11-10 14:24:00
+# Updated: 2026-11-10 17:28:00
 # =============================================================================
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from plugins.invoice_processor.extractor import (
     extract_structured_invoice_data,
     invoice_dict_to_row,
 )
-from src.utils.system_engineering import minor_units_to_decimal, money_to_minor_units, to_decimal_money
+from src.utils.convertors.money import minor_units_to_decimal, money_to_minor_units, to_decimal_money
 
 
 class InvoiceProcessorPlugin(BasePlugin):

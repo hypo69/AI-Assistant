@@ -17,12 +17,20 @@
  * Package: apps/common/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-07 00:26:00
+ * Updated: 2026-11-10 19:58:00
  * =============================================================================
  */
 
 (function () {
   'use strict';
+
+  if (window.__globalTooltipsLoaded) {
+    if (window.GlobalTooltips && typeof window.GlobalTooltips.initAll === 'function') {
+      window.GlobalTooltips.initAll();
+    }
+    return;
+  }
+  window.__globalTooltipsLoaded = true;
 
   const CACHE_STORAGE_KEY = 'ai_smart_tooltips_cache_v1';
   const TOOLTIP_CONTAINER_ID = 'ai-smart-tooltip-container';
@@ -1442,7 +1450,7 @@
               </div>
               <span class="ai-smart-tooltip-badge" id="ai-smart-tooltip-badge">WikiLLM</span>
             </div>
-            <div class="ai-smart-tooltip-body" id="ai-smart-tooltip-body">Загрузка...</div>
+            <div class="ai-smart-tooltip-body" id="ai-smart-tooltip-body" style="display: none;"></div>
             <div class="ai-smart-tooltip-arrow"></div>
           </div>
         `;
@@ -1773,9 +1781,23 @@
         badgeEl.style.display = 'inline-block';
       }
 
+      // Защита от показа сырых ключей вида titles.* / workspace.* в заголовке
+      let resolvedTitle = kbTitle || meta.titleFromI18n || (cached && cached.fullTitle) || (cached && cached.title) || meta.title;
+      if (resolvedTitle && (resolvedTitle.startsWith('titles.') || resolvedTitle.startsWith('workspace.') || resolvedTitle.startsWith('tooltips.'))) {
+        resolvedTitle = targetEl.getAttribute('title') || targetEl.getAttribute('data-bs-title') || t('tooltips.defaultTitle', 'Элемент интерфейса');
+      }
+      const safeTitle = resolvedTitle || t('tooltips.defaultTitle', 'Элемент интерфейса');
+      if (titleEl) titleEl.textContent = safeTitle;
+
       if (bodyEl) {
-        const desc = kbSummary || (cached && cached.summary) || meta.titleFromI18n || meta.title || '';
-        bodyEl.textContent = desc;
+        const desc = kbSummary || (cached && cached.summary) || '';
+        if (desc && desc !== safeTitle) {
+          bodyEl.textContent = desc;
+          bodyEl.style.display = 'block';
+        } else {
+          bodyEl.textContent = '';
+          bodyEl.style.display = 'none';
+        }
       }
 
       // Позиционируем по горизонтали НАД или ПОД мышкой (ось X)
@@ -2216,6 +2238,15 @@
         return;
       }
 
+      // Если в Bootstrap уже зарегистрирован экземпляр Tooltip для данного элемента, сохраняем ссылку и выходим
+      if (window.bootstrap && window.bootstrap.Tooltip && typeof window.bootstrap.Tooltip.getInstance === 'function') {
+        const existingTooltip = window.bootstrap.Tooltip.getInstance(el);
+        if (existingTooltip) {
+          this.instances.set(el, existingTooltip);
+          return;
+        }
+      }
+
       let titleText = '';
       if (el.hasAttribute('data-i18n-title')) {
         const key = el.getAttribute('data-i18n-title');
@@ -2228,6 +2259,17 @@
 
       if (!titleText) return;
 
+      // Элементы с другими Bootstrap-компонентами (табы, пилюли, коллапсы, дропдауны, модалки) не могут иметь Tooltip instance
+      if (
+        (el.hasAttribute && el.hasAttribute('data-bs-toggle') && el.getAttribute('data-bs-toggle') !== 'tooltip') ||
+        (el.matches && el.matches('[data-bs-toggle="tab"], [data-bs-toggle="pill"], [data-bs-toggle="collapse"], [data-bs-toggle="dropdown"], [data-bs-toggle="modal"], [data-bs-toggle="offcanvas"]'))
+      ) {
+        if (titleText) {
+          el.setAttribute('title', titleText);
+        }
+        return;
+      }
+
       if (el.hasAttribute('title')) {
         el.setAttribute('data-bs-title', titleText);
         el.removeAttribute('title');
@@ -2239,7 +2281,7 @@
 
       if (window.bootstrap && window.bootstrap.Tooltip) {
         try {
-          const tooltip = new window.bootstrap.Tooltip(el, {
+          const tooltipConfig = {
             title: () => {
               if (el.hasAttribute('data-i18n-title')) {
                 const key = el.getAttribute('data-i18n-title');
@@ -2254,7 +2296,12 @@
             delay: { show: 150, hide: 100 },
             html: true,
             container: 'body'
-          });
+          };
+
+          const tooltip = typeof window.bootstrap.Tooltip.getOrCreateInstance === 'function'
+            ? window.bootstrap.Tooltip.getOrCreateInstance(el, tooltipConfig)
+            : new window.bootstrap.Tooltip(el, tooltipConfig);
+
           this.instances.set(el, tooltip);
         } catch (_) {}
       }

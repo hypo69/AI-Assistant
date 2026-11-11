@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
-# Process Name: ai-assistant Scripts Cli - Installer
+# Process Name: AI-Windows-Admin Scripts Cli - Installer
 # =============================================================================
 # Description:
 #   Cross-platform installation system for AI Windows Admin.
@@ -14,14 +14,11 @@
 #     service = Language()
 #
 # File: installer.py
-# Project: ai-assistant
+# Project: ai-windows-admin
 # Package: scripts.cli
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 20:50:00
-# =============================================================================
-#   Изменения:
-#     - Удален TODO комментарий (TODO: Implement model download) - оставлен как план на будущее
+# Updated: 2026-10-28 16:32:00
 # =============================================================================
 
 """Cross-platform installation system for AI Windows Admin.
@@ -76,11 +73,9 @@ class Installer:
         """Get default installation directory"""
         if sys.platform == 'win32':
             localappdata = os.environ.get('LOCALAPPDATA', str(Path.home() / 'AppData' / 'Local'))
-            app_name = os.environ.get('APP_NAME', 'AI-Assistant')
-            return Path(localappdata) / app_name
+            return Path(localappdata) / (os.environ.get('APP_NAME') or 'ai-tc')
         else:
-            app_name = os.environ.get('APP_NAME', 'AI-Assistant')
-            return Path.home() / app_name
+            return Path.home() / (os.environ.get('APP_NAME') or 'ai-tc')
 
     def print_header(self):
         """Print installation header"""

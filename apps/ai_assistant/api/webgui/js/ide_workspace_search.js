@@ -15,12 +15,12 @@
  * Package: apps/ai_assistant/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-07 00:00:00
+ * Updated: 2026-11-10 20:10:00
  * =============================================================================
  */
 
 import { getActiveWorkspaceId } from './top_workspace_dropdown.js';
-import { openEditorModal } from './ide_tree_context_menu.js?v=20261028_v2';
+import { openEditorModal } from './ide_tree_context_menu.js?v=20261110_v3';
 import {
   getFileIconData,
   expandedFolders,
@@ -29,7 +29,7 @@ import {
   bindTreeEvents,
   getCurrentFilesData,
   setCurrentFilesData,
-} from './ide_file_explorer.js?v=20261106_v2';
+} from './ide_file_explorer.js?v=20261110_v3';
 
 /**
  * Инициализирует окно поиска по рабочей области в стиле VS Code Command Center (Quick Open).

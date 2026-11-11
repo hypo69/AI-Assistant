@@ -4,7 +4,7 @@
 # =============================================================================
 # Description:
 #   Индексатор системных команд Windows, атомарных операций, коллекторов телеметрии,
-#   параметров SafeOps и зондов для базы знаний WikiLLM.
+#   утилит System32, параметров SafeOps и зондов для базы знаний WikiLLM.
 #
 # Usage Examples:
 #   Python API:
@@ -20,7 +20,7 @@
 # Package: src.ai.wikillm
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 21:05:00
+# Updated: 2026-10-10 17:35:00
 # =============================================================================
 
 from __future__ import annotations
@@ -272,8 +272,98 @@ class CommandKnowledgeIndexer:
             logger.warning(f"[CommandKnowledgeIndexer] Ошибка индексации system_param: {exc}")
             return 0
 
+    def index_system32_catalog(self) -> int:
+        """Индексирует каталог системных утилит System32 (system32_catalog.py).
+
+        Returns:
+            Количество проиндексированных утилит.
+        """
+        try:
+            from apps.windows.sdk.core.system32_catalog import System32Catalog
+            catalog = System32Catalog.get_instance()
+            count = 0
+
+            for tool_name, tool in catalog._tools.items():
+                tool_key = tool_name.lower().replace('.exe', '')
+                canonical_key = f"sys32:{tool_key}"
+                danger_str = getattr(tool.danger_level, "value", str(tool.danger_level)).lower()
+                cat_str = getattr(tool.category, "value", str(tool.category)).lower()
+                tier_str = getattr(tool.telemetry_tier, "value", str(tool.telemetry_tier)).lower()
+
+                cmd_example = tool.command_templates[0] if tool.command_templates else tool.executable
+
+                action = ResolutionAction(
+                    title=f"Утилита Windows: {tool.executable}",
+                    description=tool.purpose,
+                    command=cmd_example,
+                    risk_level=danger_str,
+                    is_automated=(danger_str in ("none", "low", "safe")),
+                )
+
+                diag_info = DiagnosticKnowledge(
+                    symptoms=[f"Требуется системный инструмент: {tool.executable}"],
+                    possible_causes=[f"Категория: {cat_str}", f"Control Plane: {getattr(tool.primary_control_plane, 'value', str(tool.primary_control_plane))}"],
+                    diagnostic_actions=[action] if danger_str in ("none", "low", "safe") else [],
+                    remediation_steps=[action],
+                    related_components=[tool.executable],
+                )
+
+                claims = [
+                    Claim(
+                        statement=f"Системный инструмент Windows System32 ({tool.executable}). Назначение: {tool.purpose}. Риск: {danger_str}, Tier: {tier_str}.",
+                        confidence=1.0,
+                        source=KnowledgeSource.DOCUMENTED,
+                        verified=True,
+                    )
+                ]
+
+                if tool.powershell_equivalent:
+                    claims.append(Claim(
+                        statement=f"PowerShell эквивалент: {tool.powershell_equivalent}",
+                        confidence=1.0,
+                        source=KnowledgeSource.DOCUMENTED,
+                        verified=True,
+                    ))
+                if tool.wmi_cim_equivalent:
+                    claims.append(Claim(
+                        statement=f"WMI/CIM эквивалент: {tool.wmi_cim_equivalent}",
+                        confidence=1.0,
+                        source=KnowledgeSource.DOCUMENTED,
+                        verified=True,
+                    ))
+                if tool.native_api_equivalent:
+                    claims.append(Claim(
+                        statement=f"Win32 C-FFI эквивалент: {tool.native_api_equivalent}",
+                        confidence=1.0,
+                        source=KnowledgeSource.DOCUMENTED,
+                        verified=True,
+                    ))
+
+                entity = KnowledgeEntity(
+                    canonical_key=canonical_key,
+                    entity_type=ArtifactType.COMMAND,
+                    name=tool.executable,
+                    summary=tool.purpose[:250],
+                    category=cat_str,
+                    severity="warning" if danger_str in ("high", "critical") else "info",
+                    confidence=1.0,
+                    provenance_source=KnowledgeSource.DOCUMENTED,
+                    diagnostic_info=diag_info,
+                    claims=claims,
+                    tags=["sys32", "utility", "windows", cat_str, danger_str] + list(tool.tags or []),
+                )
+
+                self.storage.save_entity(entity)
+                count += 1
+
+            logger.info(f"[CommandKnowledgeIndexer] Успешно проиндексировано {count} утилит System32.")
+            return count
+        except Exception as exc:
+            logger.warning(f"[CommandKnowledgeIndexer] Ошибка индексации System32 catalog: {exc}")
+            return 0
+
     def index_all(self) -> Dict[str, int]:
-        """Запускает полную индексацию всех команд, коллекторов и параметров.
+        """Запускает полную индексацию всех команд, коллекторов, System32 утилит и параметров.
 
         Returns:
             Словарь с количеством проиндексированных сущностей по категориям.
@@ -281,11 +371,14 @@ class CommandKnowledgeIndexer:
         atomic_cnt = self.index_atomic_capabilities()
         collector_cnt = self.index_telemetry_collectors()
         param_cnt = self.index_system_params()
-        total = atomic_cnt + collector_cnt + param_cnt
+        sys32_cnt = self.index_system32_catalog()
+        total = atomic_cnt + collector_cnt + param_cnt + sys32_cnt
 
         return {
             "atomic_capabilities": atomic_cnt,
             "telemetry_collectors": collector_cnt,
             "system_params": param_cnt,
+            "system32_tools": sys32_cnt,
             "total_commands_indexed": total,
         }
+

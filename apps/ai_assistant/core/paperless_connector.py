@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:05:00
+# Updated: 2026-11-11 19:45:00
 # =============================================================================
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any, Dict, Iterator, List, Optional
 
 import requests
@@ -87,6 +88,7 @@ class PaperlessConnector:
         )
         retry = Retry(
             total=retries,
+            connect=0,
             backoff_factor=0.5,
             status_forcelist=(502, 503, 504),
             allowed_methods=frozenset({"GET", "HEAD"}),
@@ -124,7 +126,7 @@ class PaperlessConnector:
             workspace_tag_prefix=section["workspace_tag_prefix"],
         )
 
-    def _request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
+    def _request(self, method: str, path: str, *, log_error: bool = True, **kwargs: Any) -> requests.Response:
         """Выполняет HTTP-запрос и приводит сетевые/HTTP-ошибки к PaperlessError."""
         kwargs.setdefault("timeout", self._timeout)
         url = f"{self.base_url}{path}"
@@ -132,7 +134,8 @@ class PaperlessConnector:
             response = self._session.request(method, url, **kwargs)
             response.raise_for_status()
         except requests.RequestException as exc:
-            logger.error(f"[PaperlessConnector] {method} {path}: {exc}")
+            if log_error:
+                logger.error(f"[PaperlessConnector] {method} {path}: {exc}", exc_info=False)
             raise PaperlessError(f"{method} {path}: {exc}") from exc
         return response
 
@@ -170,7 +173,7 @@ class PaperlessConnector:
             bool: True, если API отвечает и токен принят; иначе False.
         """
         try:
-            self._request("GET", "/api/documents/", params={"page_size": 1})
+            self._request("GET", "/api/documents/", params={"page_size": 1}, log_error=False)
         except PaperlessError:
             return False
         return True
@@ -238,6 +241,28 @@ class PaperlessConnector:
         )
         return resp.content
 
+    PAPERLESS_SUPPORTED_EXTENSIONS = frozenset({
+        ".pdf",
+        ".docx", ".doc", ".odt", ".rtf",
+        ".xlsx", ".xls", ".ods", ".csv", ".tsv",
+        ".pptx", ".ppt",
+        ".txt", ".html", ".xhtml",
+        ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".webp",
+    })
+
+    @classmethod
+    def is_supported_file(cls, path_or_name: Path | str) -> bool:
+        """Проверяет, подходит ли расширение файла для обработки и OCR в Paperless-ngx.
+
+        Args:
+            path_or_name: Путь к файлу или его имя.
+
+        Returns:
+            bool: True, если формат релевантен для Paperless, иначе False.
+        """
+        suffix = Path(path_or_name).suffix.lower()
+        return suffix in cls.PAPERLESS_SUPPORTED_EXTENSIONS
+
     def upload_document(self, file_path: Path, title: str, tag_ids: List[int]) -> str:
         """Загружает документ в Paperless (асинхронная обработка).
 
@@ -258,7 +283,12 @@ class PaperlessConnector:
                 data=data,
                 timeout=self._upload_timeout,
             )
-        return str(resp.json())
+        raw = resp.json()
+        if isinstance(raw, str):
+            return raw.strip('"')
+        if isinstance(raw, dict):
+            return str(raw.get("task_id") or raw.get("id") or "")
+        return str(raw).strip('"')
 
     def get_task_status(self, task_id: str) -> Dict[str, Any]:
         """Возвращает состояние фоновой задачи обработки документа.
@@ -266,15 +296,138 @@ class PaperlessConnector:
         Raises:
             PaperlessError: Если задача не найдена.
         """
-        results = self._request("GET", "/api/tasks/", params={"task_id": task_id}).json()
+        clean_task_id = str(task_id).strip('"')
+        results = self._request("GET", "/api/tasks/", params={"task_id": clean_task_id}).json()
         items = results if isinstance(results, list) else results.get("results", [])
         if not items:
-            raise PaperlessError(f"Задача {task_id} не найдена")
+            raise PaperlessError(f"Задача {clean_task_id} не найдена")
         return dict(items[0])
 
-    def workspace_tag_name(self, workspace_id: str) -> str:
-        """Имя тега Paperless, соответствующего рабочей области."""
-        return f"{self.workspace_tag_prefix}{workspace_id}"
+    def wait_for_task(
+        self,
+        task_id: str,
+        timeout: float = 60.0,
+        poll_interval: float = 1.0,
+    ) -> Optional[int]:
+        """Опрашивает статус фоновой задачи Paperless до завершения и возвращает ID созданного документа.
+
+        Args:
+            task_id: Идентификатор задачи.
+            timeout: Максимальное время ожидания, сек.
+            poll_interval: Интервал между опросами, сек.
+
+        Returns:
+            Optional[int]: Идентификатор созданного документа (paperless_id) или None при таймауте.
+
+        Raises:
+            PaperlessError: Если задача завершилась с ошибкой.
+        """
+        deadline = time.time() + timeout
+        clean_task_id = str(task_id).strip('"')
+        while time.time() < deadline:
+            try:
+                task = self.get_task_status(clean_task_id)
+            except PaperlessError:
+                time.sleep(poll_interval)
+                continue
+
+            status = str(task.get("status", "")).lower()
+            if status == "success":
+                rel_ids = task.get("related_document_ids") or []
+                if rel_ids:
+                    return int(rel_ids[0])
+                res_data = task.get("result_data") or {}
+                if isinstance(res_data, dict) and res_data.get("document_id"):
+                    return int(res_data["document_id"])
+                if task.get("related_document"):
+                    return int(task["related_document"])
+                return None
+
+            if status in ("failure", "failed"):
+                err_msg = task.get("result") or task.get("result_data") or "Неизвестная ошибка обработки"
+                raise PaperlessError(f"Задача Paperless {clean_task_id} завершилась ошибкой: {err_msg}")
+
+            time.sleep(poll_interval)
+
+        logger.warning(f"[PaperlessConnector] Таймаут ожидания задачи {clean_task_id} ({timeout} сек)")
+        return None
+
+    def ingest_file(
+        self,
+        file_path: Path,
+        workspace_id: str,
+        workspace_name: Optional[str] = None,
+        title: Optional[str] = None,
+        timeout: float = 60.0,
+    ) -> Optional[Dict[str, Any]]:
+        """Полный цикл импорта документа в Paperless: назначение тега с именем рабочей области, загрузка, ожидание OCR и возврат контента.
+
+        Args:
+            file_path: Путь к файлу на диске.
+            workspace_id: Идентификатор рабочей области для привязки тега.
+            workspace_name: Читаемое имя рабочей области (например, 'דוד משה').
+            title: Заголовок документа (по умолчанию имя файла).
+            timeout: Максимальное время ожидания OCR-обработки.
+
+        Returns:
+            Optional[Dict[str, Any]]: Словарь с paperless_id, content (OCR текст) и metadata,
+                                      или None при неудаче.
+        """
+        fpath = Path(file_path)
+        if not fpath.exists():
+            raise PaperlessError(f"Файл не найден: {fpath}")
+
+        doc_title = title or fpath.name
+        ws_tag_id = self.ensure_workspace_tag(workspace_id, workspace_name=workspace_name)
+        task_id = self.upload_document(fpath, title=doc_title, tag_ids=[ws_tag_id])
+        paperless_id = self.wait_for_task(task_id, timeout=timeout)
+        if paperless_id is None:
+            return None
+
+        content = self.get_document_content(paperless_id)
+        metadata = self.get_document_metadata(paperless_id)
+        return {
+            "paperless_id": paperless_id,
+            "content": content,
+            "metadata": metadata,
+            "task_id": task_id,
+            "workspace_tag_id": ws_tag_id,
+        }
+
+    def delete_document(self, document_id: int) -> None:
+        """Удаляет документ из Paperless-ngx.
+
+        Args:
+            document_id: Идентификатор документа.
+        """
+        self._request("DELETE", f"/api/documents/{int(document_id)}/")
+
+    def workspace_tag_name(self, workspace_id: str, workspace_name: Optional[str] = None) -> str:
+        """Имя тега Paperless, строго соответствующее имени рабочей области (например, 'דוד משה').
+
+        Args:
+            workspace_id: Идентификатор рабочей области.
+            workspace_name: Читаемое имя рабочей области.
+
+        Returns:
+            str: Название тега (имя рабочей области).
+        """
+        tag = (workspace_name or "").strip()
+        if not tag:
+            try:
+                from apps.ai_assistant.core.workspace_registry import WorkspaceRegistry
+                reg = WorkspaceRegistry()
+                ws_info = reg.get_workspace(workspace_id)
+                if ws_info and ws_info.get("name"):
+                    tag = str(ws_info["name"]).strip()
+            except Exception:
+                pass
+        if not tag:
+            tag = workspace_id.strip()
+
+        if self.workspace_tag_prefix:
+            return f"{self.workspace_tag_prefix}{tag}"
+        return tag
 
     def ensure_tag(self, name: str) -> int:
         """Возвращает id тега, создавая его при отсутствии.
@@ -290,9 +443,9 @@ class PaperlessConnector:
             return int(found[0]["id"])
         return int(self._request("POST", "/api/tags/", json={"name": name}).json()["id"])
 
-    def ensure_workspace_tag(self, workspace_id: str) -> int:
-        """Возвращает id тега рабочей области, создавая его при необходимости."""
-        return self.ensure_tag(self.workspace_tag_name(workspace_id))
+    def ensure_workspace_tag(self, workspace_id: str, workspace_name: Optional[str] = None) -> int:
+        """Возвращает id тега рабочей области (по её имени, например, 'דוד משה'), создавая его при необходимости."""
+        return self.ensure_tag(self.workspace_tag_name(workspace_id, workspace_name=workspace_name))
 
     def close(self) -> None:
         """Закрывает HTTP-сессию."""

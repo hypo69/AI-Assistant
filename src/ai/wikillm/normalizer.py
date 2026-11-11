@@ -16,7 +16,7 @@
 # Package: src.ai.wikillm
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 17:35:00
+# Updated: 2026-11-01 13:06:00
 # =============================================================================
 
 from __future__ import annotations
@@ -167,8 +167,9 @@ class CanonicalKeyNormalizer:
                 return f"registry:{cls.normalize_registry_path(query)}"
 
             # Проверка на процесс (*.exe)
-            if query.lower().endswith(".exe"):
-                return f"process:{query.lower()}"
+            exe_query_match = re.search(r"([a-zA-Z0-9_\-\.]+\.exe)", query, re.IGNORECASE)
+            if exe_query_match:
+                return f"process:{exe_query_match.group(1).lower()}"
 
             # Проверка на драйвер (*.sys)
             if query.lower().endswith(".sys"):
@@ -211,9 +212,20 @@ class CanonicalKeyNormalizer:
             prefix = "ntstatus" if norm_code.startswith("0xc") else "win32"
             return f"{prefix}:{norm_code}"
 
+        # Если окно рабочего стола (desktop_window / window)
+        if raw_type in ("desktop_window", "desktop_windows", "window", "windows", "hwnd"):
+            title_slug = re.sub(r"[^a-zA-Z0-9а-яА-ЯёЁ_\-]+", "_", raw_title.lower()).strip("_")
+            sub_slug = re.sub(r"[^a-zA-Z0-9_\-.]+", "_", (subtitle or "").split("(")[0].strip().lower()).strip("_")
+            combined_slug = f"{sub_slug}:{title_slug[:48]}" if sub_slug and title_slug else (title_slug[:64] or sub_slug or "unspecified")
+            return f"desktop_window:{combined_slug}"
+
         # Если process
-        if raw_type in ("process", "proc") or raw_title.lower().endswith(".exe"):
-            clean_proc = raw_title.split()[0].lower() if raw_title else "unknown.exe"
+        if raw_type in ("process", "proc") or raw_title.lower().endswith(".exe") or ".exe" in raw_title.lower():
+            exe_match = re.search(r"([a-zA-Z0-9_\-\.]+\.exe)", f"{raw_title} {subtitle or ''}", re.IGNORECASE)
+            if exe_match:
+                clean_proc = exe_match.group(1).lower()
+            else:
+                clean_proc = raw_title.split()[0].lower() if raw_title else "unknown.exe"
             return f"process:{clean_proc}"
 
         # Если service
@@ -267,3 +279,4 @@ class CanonicalKeyNormalizer:
 
         combined = f"{canonical_key}|{prov}|{eid}|{msg_template}"
         return hashlib.sha256(combined.encode("utf-8")).hexdigest()[:24]
+

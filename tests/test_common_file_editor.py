@@ -12,7 +12,7 @@
 # Package: tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 17:15:00
+# Updated: 2026-11-10 20:30:00
 # =============================================================================
 
 from __future__ import annotations
@@ -223,4 +223,52 @@ def test_tab_file_editor_i18n_ids_and_static_serving() -> None:
     assert r_html.status_code == 200
     assert r_js.status_code == 200
     assert "initFileEditorTab" in r_js.text
+
+
+def test_supported_file_catalog_detect_type_from_content() -> None:
+    """Проверяет эвристическое определение типа файла без расширения по содержимому и имени."""
+    # 1. Shebang
+    assert SupportedFileCatalog.detect_type_from_content("#!/usr/bin/env python3\nprint(1)") == "py"
+    assert SupportedFileCatalog.detect_type_from_content("#!/bin/bash\necho test") == "sh"
+    assert SupportedFileCatalog.detect_type_from_content("#!/usr/bin/env node\nconsole.log(1)") == "js"
+
+    # 2. HTML / SVG / XML
+    assert SupportedFileCatalog.detect_type_from_content("<!DOCTYPE html><html><body>Hi</body></html>") == "html"
+    assert SupportedFileCatalog.detect_type_from_content("<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>") == "svg"
+    assert SupportedFileCatalog.detect_type_from_content("<?xml version=\"1.0\"?><root></root>") == "xml"
+
+    # 3. JSON
+    assert SupportedFileCatalog.detect_type_from_content('{"name": "test", "value": 123}') == "json"
+    assert SupportedFileCatalog.detect_type_from_content('[1, 2, 3]') == "json"
+
+    # 4. Markdown с YAML Frontmatter (Obsidian, Hugo, Jekyll)
+    obsidian_frontmatter = "---\ntitle: \"דוד משה\"\nworkspace_id: דוד_משה\n---\n\nלדוד משה היתה חווה"
+    assert SupportedFileCatalog.detect_type_from_content(obsidian_frontmatter) == "md"
+
+    # 5. Markdown заголовки, wikilinks, callouts
+    assert SupportedFileCatalog.detect_type_from_content("# Заголовок документа\n\nТекст параграфа") == "md"
+    assert SupportedFileCatalog.detect_type_from_content("Смотрите [[דוד משה]] для подробностей") == "md"
+    assert SupportedFileCatalog.detect_type_from_content("> [!NOTE]\n> Важная информация") == "md"
+    assert SupportedFileCatalog.detect_type_from_content("- [ ] Выполнить задачу\n- [x] Готово") == "md"
+
+    # 6. CSV / TSV
+    assert SupportedFileCatalog.detect_type_from_content("id,name,value\n1,alice,100\n2,bob,200") == "csv"
+
+    # 7. Особые имена файлов без расширения
+    assert SupportedFileCatalog.detect_type_from_content("", file_name="README") == "md"
+    assert SupportedFileCatalog.detect_type_from_content("", file_name="Dockerfile") == "dockerfile"
+    assert SupportedFileCatalog.detect_type_from_content("", file_name="Makefile") == "makefile"
+    assert SupportedFileCatalog.detect_type_from_content("", file_name=".env") == "ini"
+
+    # 8. Интеграция с SupportedFileCatalog.get_descriptor
+    desc_md = SupportedFileCatalog.get_descriptor("some_note", content=obsidian_frontmatter)
+    assert desc_md.extension == "md"
+    assert desc_md.language_id == "markdown"
+    assert desc_md.default_mode == EditorMode.MARKDOWN
+
+    desc_py = SupportedFileCatalog.get_descriptor("entrypoint", content="#!/usr/bin/env python\npass")
+    assert desc_py.extension == "py"
+    assert desc_py.language_id == "python"
+    assert desc_py.default_mode == EditorMode.CODE
+
 

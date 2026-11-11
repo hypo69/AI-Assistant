@@ -12,7 +12,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:08:00
+# Updated: 2026-11-10 20:30:00
 # =============================================================================
 
 from __future__ import annotations
@@ -58,6 +58,10 @@ async def test_central_file_editor_assets_and_tabs_bar() -> None:
         assert 'id="fe-active-file-name"' in html
         assert 'id="fe-active-file-path"' in html
         assert 'id="fe-view-mode-group"' in html
+        assert 'id="fe-tab-mode-code"' in html
+        assert 'id="fe-tab-mode-split"' in html
+        assert 'id="fe-mode-split-text"' in html
+        assert 'id="fe-tab-mode-preview"' in html
         assert 'id="fe-btn-save"' in html
         assert 'id="fe-btn-system-open"' in html
 
@@ -138,3 +142,147 @@ async def test_context_menu_routes_to_central_editor() -> None:
         # Проверяем вызовы центрального редактора
         assert 'openFileInWasmEditor' in js
         assert 'panel-file-editor' in js
+
+
+@pytest.mark.asyncio
+async def test_file_editor_view_mode_split_support() -> None:
+    """Проверяет поддержку режимов 'Вид', 'Редактор' и 'Вид/Редактор' (Split)."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Разметка редактора
+        res_html = await client.get("/html/tab_file_editor/index.html")
+        assert res_html.status_code == 200
+        html = res_html.text
+        assert 'id="fe-tab-mode-code"' in html
+        assert 'id="fe-tab-mode-split"' in html
+        assert 'id="fe-tab-mode-preview"' in html
+        assert 'data-i18n="ide.editorTabSplit"' in html
+        assert 'data-i18n="ide.editorTabView"' in html
+
+        # 2. Логика скрипта: наличие split и переключения
+        res_js = await client.get("/html/tab_file_editor/main.js")
+        assert res_js.status_code == 200
+        js = res_js.text
+        assert "switchActiveViewMode" in js
+        assert "applyViewMode" in js
+        assert "wasm-split-mode" in js
+        assert "wasm-preview-mode" in js
+        assert "fe-tab-mode-split" in js
+
+        # 3. Стили split-режима
+        res_css = await client.get("/html/tab_file_editor/style.css")
+        assert res_css.status_code == 200
+        css = res_css.text
+        assert "wasm-split-mode" in css
+        assert "wasm-preview-mode" in css
+        assert "#fe-markdown-preview" in css
+
+
+@pytest.mark.asyncio
+async def test_markdown_preview_rendering_and_local_assets() -> None:
+    """Проверяет локальную доступность библиотеки marked и парсера Markdown для файлов .md."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Локальная библиотека marked.min.js отдаётся со статусом 200 без зависимости от внешнего CDN
+        res_marked = await client.get("/html/js/marked.min.js")
+        assert res_marked.status_code == 200
+        assert len(res_marked.content) > 10000
+
+        # 2. Главный скрипт редактора содержит встроенный оффлайн-парсер parseMarkdownToHtml
+        res_js = await client.get("/html/tab_file_editor/main.js")
+        assert res_js.status_code == 200
+        js = res_js.text
+        assert "parseMarkdownToHtml" in js
+        assert "ensureMarkedLoaded" in js
+        # Автоматический режим split по умолчанию для Markdown
+        assert "(ext === 'md' || ext === 'markdown') ? 'split' : 'code'" in js
+
+
+@pytest.mark.asyncio
+async def test_modal_file_editor_split_mode_and_markdown_preview() -> None:
+    """Проверяет наличие кнопки Вид/Редактор и поддержку Markdown-предосмотра в модальном окне редактора."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Проверяем наличие кнопки сплит-режима в модальном окне редактора index.html
+        res_html = await client.get("/")
+        assert res_html.status_code == 200
+        html = res_html.text
+        assert 'id="ide-editor-tab-split"' in html
+        assert 'data-i18n="ide.editorTabSplit"' in html
+        assert 'id="ide-editor-stage"' in html
+
+        # 2. Проверяем поддержку раздельного вида и оффлайн-парсера в ide_tree_context_menu.js
+        res_js = await client.get("/html/js/ide_tree_context_menu.js")
+        assert res_js.status_code == 200
+        js = res_js.text
+        assert "ide-editor-tab-split" in js
+        assert "applyModalMode" in js
+        assert "parseMarkdownToHtmlFallback" in js
+        assert "window.parseMarkdownToHtml" in js
+        assert "preprocessMarkdownContent" in js
+
+
+@pytest.mark.asyncio
+async def test_obsidian_frontmatter_and_wikilinks_formatting() -> None:
+    """Проверяет корректность разбора YAML Frontmatter, ссылок Obsidian [[...]] и защиты переносов."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/html/tab_file_editor/main.js")
+        assert res.status_code == 200
+        js = res.text
+        # Проверяем наличие предобработчика фронтматтера и викиссылок
+        assert "preprocessMarkdownContent" in js
+        assert "obsidian-wikilink" in js
+        assert "YAML Frontmatter (Obsidian Metadata)" in js
+        assert "window.marked.setOptions({ breaks: true, gfm: true })" in js
+
+
+@pytest.mark.asyncio
+async def test_extensionless_file_content_detection_and_api(tmp_path: Path) -> None:
+    """Проверяет эвристическое определение типа для файла без расширения через API и клиентские скрипты."""
+    from apps.ai_assistant.core.workspace_file_ops import WorkspaceFileOps
+    from apps.ai_assistant.core.workspace_manager import WorkspaceManager
+
+    # 1. Создаем файл без расширения с Obsidian Frontmatter в тестовой рабочей области
+    wm = WorkspaceManager(workspaces_dir=tmp_path / "workspaces")
+    ws_id = "test_ws"
+    wm.ensure_workspace_folder(ws_id)
+    obsidian_content = (
+        "---\n"
+        "generator: ai_assistant_obsidian\n"
+        "title: \"דוד משה\"\n"
+        "workspace_id: דוד_משה\n"
+        "---\n\n"
+        "לדוד משה היתה חווה\n"
+    )
+    WorkspaceFileOps.create_item(
+        wm=wm,
+        workspace_id=ws_id,
+        rel_path="hebrew_note",
+        is_dir=False,
+        content=obsidian_content,
+    )
+
+    # 2. Вызываем WorkspaceFileOps.get_content
+    res = WorkspaceFileOps.get_content(wm=wm, workspace_id=ws_id, rel_path="hebrew_note")
+    assert res["status"] == "ok"
+    assert res["is_binary"] is False
+    assert res.get("detected_type") == "md"
+
+    # 3. Проверяем клиентскую функцию detectFileTypeFromContent в main.js и ide_tree_context_menu.js
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res_main = await client.get("/html/tab_file_editor/main.js")
+        assert res_main.status_code == 200
+        assert "detectFileTypeFromContent" in res_main.text
+        assert "detected_type" in res_main.text
+
+        res_menu = await client.get("/html/js/ide_tree_context_menu.js")
+        assert res_menu.status_code == 200
+        assert "detectFileTypeFromContent" in res_menu.text
+        assert "window.detectFileTypeFromContent = detectFileTypeFromContent" in res_menu.text
+
+
+
+
+

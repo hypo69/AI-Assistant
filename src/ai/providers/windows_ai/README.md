@@ -39,5 +39,5 @@ print("Windows AI Available:", status["available"])
 # Initialize provider
 provider = WindowsAIChatBase(model_id="phi-silica")
 if provider.is_available():
-    response = await provider.ask("Hello from AI-Assistant")
+    response = await provider.ask("Hello from AI Windows Admin")
 ```

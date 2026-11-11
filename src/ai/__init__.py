@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
-# Process Name: AI-Assistant AI - Init Module
+# Process Name: AI-Windows-Admin AI -   Init   Module
 # =============================================================================
 # Description:
 #   Модуль основной системы (`__init__`).
@@ -9,11 +9,11 @@
 #
 #
 # File: __init__.py
-# Project: ai-assistant
+# Project: ai-windows-admin
 # Package: src.ai
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 23:05:00
+# Updated: 2026-11-10 18:16:00
 # =============================================================================
 
 from __future__ import annotations
@@ -28,9 +28,13 @@ from .providers.huggingface import HFChatBase
 from .providers.ollama import OllamaChatBase, OllamaClient
 from .providers.base import BaseChatProvider
 from .gemini import GoogleGenerativeAI
-from .agents import MediaSearchAgent, MCPClientManager
-from .orchestration import get_available_models, actualize_all_models, add_unsupported_model, load_unsupported_models, UnifiedChatModel, is_provider_enabled
-from .rag import TextRAG
+from .agents import MCPClientManager, MediaSearchAgent
+from .orchestration import get_available_models, actualize_all_models, add_unsupported_model, load_unsupported_models, UnifiedChatModel, is_provider_enabled, get_provider_config
+from .rag import UnifiedKnowledgeHub, TextRAG, PixelRAG, LogRAG
+try:
+    from apps.windows.wikillm import WikiLLMEngine, WikiStorage
+except ImportError:
+    from .wikillm import WikiLLMEngine, WikiStorage
 
 __all__ = [
     'BaseChatProvider',
@@ -55,6 +59,7 @@ __all__ = [
     'add_unsupported_model',
     'load_unsupported_models',
     'is_provider_enabled',
+    'get_provider_config',
     'MediaSearchAgent',
     'MCPClientManager',
     'UnifiedKnowledgeHub',
@@ -64,3 +69,4 @@ __all__ = [
     'WikiLLMEngine',
     'WikiStorage',
 ]
+

@@ -18,7 +18,7 @@
 # Package: src.ai.rag
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:55:00
+# Updated: 2026-11-10 18:12:00
 # =============================================================================
 
 from __future__ import annotations
@@ -35,15 +35,26 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from logger import logger
-from src.ai.wikillm.models import (
-    ArtifactType,
-    Claim,
-    DiagnosticKnowledge,
-    KnowledgeEntity,
-    KnowledgeSource,
-    ResolutionAction,
-)
-from src.ai.wikillm.storage import WikiStorage
+try:
+    from apps.windows.wikillm.models import (
+        ArtifactType,
+        Claim,
+        DiagnosticKnowledge,
+        KnowledgeEntity,
+        KnowledgeSource,
+        ResolutionAction,
+    )
+    from apps.windows.wikillm.storage import WikiStorage
+except ImportError:
+    from src.ai.wikillm.models import (
+        ArtifactType,
+        Claim,
+        DiagnosticKnowledge,
+        KnowledgeEntity,
+        KnowledgeSource,
+        ResolutionAction,
+    )
+    from src.ai.wikillm.storage import WikiStorage
 
 _WORD_RE = re.compile(r"\w+")
 
@@ -58,7 +69,7 @@ class LogRAG:
 
     def __init__(
         self,
-        storage_dir: Optional[Path] = None,
+        storage_dir: Optional[Path] = False,
         max_chunks: int = 2000,
     ) -> None:
         """Инициализирует LogRAG.
@@ -67,14 +78,14 @@ class LogRAG:
             storage_dir: Директория хранения индекса.
             max_chunks: Максимальное количество чанков в памяти.
         """
-        self.storage_dir = storage_dir or Path("data/rag/logs_storage")
+        self.storage_dir = Path(storage_dir) if storage_dir else Path("data/rag/logs_storage")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.max_chunks = max_chunks
         self.chunks: List[Dict[str, Any]] = []
 
         # Интеграция с базой знаний WikiLLM
         wiki_db_path = self.storage_dir / "wikillm_logs.db"
-        self.wiki_storage = WikiStorage(db_path=wiki_db_path)
+        self.wiki_storage = WikiStorage(db_path=str(wiki_db_path))
         self._load()
 
     def _get_chunks_file(self) -> Path:
@@ -247,3 +258,4 @@ class LogRAG:
             "channels": dict(channels),
             "wiki_entities_count": wiki_count,
         }
+

@@ -15,7 +15,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:35:00
+# Updated: 2026-11-11 20:00:00
 # =============================================================================
 
 from __future__ import annotations
@@ -257,7 +257,7 @@ async def test_tab_create_workspace_assets_and_navigation():
         assert 'id="btn-browse-ws-path"' in tab_html
         assert 'id="picker-create-ws-path"' in tab_html
         assert 'id="create-ws-desc-input"' in tab_html
-        assert 'id="btn-create-ws-submit"' in tab_html
+        assert 'id="btn-create-ws-submit-bottom"' in tab_html
         assert 'id="input-watch-directory-path"' in tab_html
         assert 'id="btn-browse-watch-dir"' in tab_html
         assert 'id="input-watch-file-path"' in tab_html

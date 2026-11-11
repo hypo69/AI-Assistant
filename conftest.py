@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
-# Process Name: AI-Windows-Admin Root - Conftest
+# Process Name: ai-tc Root - Conftest
 # =============================================================================
 # Description:
 #   Test configuration for ai-windows-admin.
@@ -16,7 +16,7 @@
 # Package: root
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-13 19:15:00
+# Updated: 2026-11-10 18:24:00
 # =============================================================================
 
 """Test configuration for ai-windows-admin.
@@ -98,7 +98,8 @@ def sample_media_records():
 @pytest.fixture(autouse=True)
 def setup_env():
     """Configure environment for each test."""
-    preserved = {k: v for k, v in os.environ.items() if k in ('APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'USERNAME', 'SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'PROGRAMDATA', 'ALLUSERSPROFILE', 'ProgramData')}
+    preserved = {k: v for k, v in os.environ.items() if k in ('APP_NAME', 'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'USERNAME', 'SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'PROGRAMDATA', 'ALLUSERSPROFILE', 'ProgramData')}
+    preserved.setdefault('APP_NAME', ROOT.name.lower())
     preserved.update({'GOOGLE_CLIENT_ID': 'test_client_id', 'GOOGLE_CLIENT_SECRET': 'test_secret', 'JWT_SECRET': 'test_jwt_secret', 'NGROK_AUTOTOKEN': 'test_ngrok', 'GEMINI_API_KEY_NAMES': 'test_key'})
     with patch.dict(os.environ, preserved, clear=True):
         yield

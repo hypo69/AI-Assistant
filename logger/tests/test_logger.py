@@ -11,7 +11,7 @@
 # Package: logger.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-12 06:41:30
+# Updated: 2026-10-28 14:32:00
 # =============================================================================
 
 """Модульные тесты для пакета logger."""
@@ -70,6 +70,8 @@ def test_logger_console_with_colors_and_levels():
     """Проверяет вызов logger.console с различными цветами и уровнями логирования."""
     # Вызов с цветом
     logger.console("Цветное консольное сообщение", text_color="green", bg_color="black")
+    logger.console("Серое консольное сообщение", text_color="gray")
+    logger.console("Серое консольное сообщение (light_gray)", text_color="light_gray")
     
     # Вызов с ошибкой и exc_info
     try:
@@ -107,3 +109,44 @@ def test_compressing_handler_auto_flush_no_deadlock(tmp_path):
     content = log_file.read_text(encoding='utf-8')
     assert "Unique message 0" in content
     assert "Unique message 104" in content
+
+
+def test_logger_console_has_console_level_label():
+    """Проверяет, что сообщения logger.console форматируются с меткой CONSOLE."""
+    from logger import CONSOLE_LEVEL
+    from logger.logger import PrettyConsoleFormatter
+
+    formatter = PrettyConsoleFormatter('%(asctime)s - %(levelname)s - %(message)s')
+    record = logging.LogRecord(
+        name="logger_console",
+        level=CONSOLE_LEVEL,
+        pathname=__file__,
+        lineno=10,
+        msg="Проверка метки консоли",
+        args=(),
+        exc_info=None,
+    )
+    formatted = formatter.format(record)
+    assert " - CONSOLE - " in formatted
+    assert "Проверка метки консоли" in formatted
+
+
+def test_logger_console_extra_label():
+    """Проверяет, что флаг is_console_only форматирует нестандартные уровни с префиксом CONSOLE."""
+    from logger.logger import PrettyConsoleFormatter
+
+    formatter = PrettyConsoleFormatter('%(asctime)s - %(levelname)s - %(message)s')
+    record = logging.LogRecord(
+        name="logger_console",
+        level=logging.ERROR,
+        pathname=__file__,
+        lineno=10,
+        msg="Ошибка только для консоли",
+        args=(),
+        exc_info=None,
+    )
+    record.is_console_only = True
+    formatted = formatter.format(record)
+    assert " - CONSOLE:ERROR - " in formatted
+    assert "Ошибка только для консоли" in formatted
+

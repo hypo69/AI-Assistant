@@ -11,7 +11,7 @@
 # Package: src.ai.wikillm
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:57:00
+# Updated: 2026-11-10 17:29:00
 # =============================================================================
 
 from __future__ import annotations
@@ -219,7 +219,7 @@ class WikiLLMClient:
         queries: List[str],
         use_cache: bool = True,
     ) -> List[ResolutionResult]:
-        """Пакетное (батчированное) параллельное разрешение списка запросов с ограничением параллелизма.
+        """Пакетное (батчированное) параллельное разрешение списка запросов.
 
         Args:
             queries: Список поисковых строк.
@@ -228,15 +228,16 @@ class WikiLLMClient:
         Returns:
             Список ResolutionResult в порядке исходных запросов.
         """
-        sem = asyncio.Semaphore(10)
+        sem = asyncio.Semaphore(8)
 
-        async def _limited_resolve(q: str) -> ResolutionResult:
+        async def _bounded_resolve(q: str) -> ResolutionResult:
             async with sem:
                 return await self.resolve(q, use_cache=use_cache)
 
-        tasks = [_limited_resolve(q) for q in queries]
+        tasks = [_bounded_resolve(q) for q in queries]
         return await asyncio.gather(*tasks)
 
     def resolve_sync(self, query: str) -> ResolutionResult:
         """Синхронная обертка над resolve для консольных скриптов."""
         return asyncio.run(self.resolve(query))
+

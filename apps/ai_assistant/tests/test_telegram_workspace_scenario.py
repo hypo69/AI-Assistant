@@ -13,7 +13,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-28 05:07:00
+# Updated: 2026-11-10 17:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 import pytest
 
 from apps.ai_assistant.core.telegram_workspace_scenario import TelegramWorkspaceScenarioService
@@ -78,8 +79,79 @@ async def test_telegram_scenario_spinner_and_file_addition(tmp_path: Path) -> No
     # 3. Проверяем, что файл добавлен в рабочую область דוד_משה и отслеживается Git
     dir_contents = wm.get_directory_contents("דוד_משה")
     file_names = [item["name"] for item in dir_contents["items"]]
-    assert "שיחה בין דוד משה לשמוליק.md" in file_names
+    added_filename = Path(final_state.get("target_file_name") or final_state.get("target_file_path") or "02_transcript_david_moshe_shmulik_v3.md").name
+    assert added_filename in file_names
 
-    added_item = next(i for i in dir_contents["items"] if i["name"] == "שיחה בין דוד משה לשמוליק.md")
+    added_item = next(i for i in dir_contents["items"] if i["name"] == added_filename)
     assert added_item["tracked_by_git"] is True
-    assert "שיחה בין דוד משה לשמוליק.md" in str(added_item.get("local_path") or added_item.get("rel_path"))
+    assert added_filename in str(added_item.get("local_path") or added_item.get("rel_path"))
+
+
+def test_david_moshe_audio_trigger_matching() -> None:
+    """Проверяет распознавание триггерного аудиофайла דוד משה - שמוליק שיחת טלפון.mp3."""
+    service = TelegramWorkspaceScenarioService()
+    assert service.is_trigger_file("דוד משה - שמוליק שיחת טלפון.mp3") is True
+    assert service.is_trigger_file("דוד משה - שמוליק שיחת טלפון") is True
+    assert service.is_trigger_file("דוד משה שמוליק שיחת טלפון") is True
+    assert service.is_trigger_file("02_transcript_david_moshe_shmulik_v3.md") is True
+
+
+@pytest.mark.asyncio
+async def test_david_moshe_audio_upload_copies_transcript(tmp_path: Path) -> None:
+    """Проверяет, что при загрузке аудиофайла דוד משה файл транскрипта копируется в ту же папку (assets/)."""
+    # Создаем фиктивный файл транскрипта
+    fake_transcript_src = tmp_path / "02_transcript_david_moshe_shmulik_v3.md"
+    fake_transcript_text = "# Стенограмма беседы דוד משה и שמוליק\n\nדוד משה: שלום שמוליק.\nשמוליק: שלום דוד משה."
+    fake_transcript_src.write_text(fake_transcript_text, encoding="utf-8")
+
+    wm = WorkspaceManager(
+        base_dir=tmp_path / "data_ai",
+        workspaces_dir=tmp_path / "workspaces",
+    )
+    ws_id = "דוד_משה"
+    wm.create_or_select_workspace(ws_id, name="דוד משה")
+
+    audio_filename = "דוד משה - שמוליק שיחת טלפון.mp3"
+    fake_audio_bytes = b"ID3\x03\x00\x00\x00" + b"\x00" * 200
+
+    # Переопределяем путь к транскрипту для теста через patch конфигурации сценария
+    orig_load_cfg = wm.scenario_service.load_scenario_config
+    def mock_load_cfg():
+        cfg = orig_load_cfg()
+        cfg["target_file_path"] = str(fake_transcript_src)
+        return cfg
+
+    with patch.object(wm.scenario_service, "load_scenario_config", side_effect=mock_load_cfg):
+        with patch("apps.ai_assistant.core.content_extractor.audio2text", new_callable=AsyncMock) as mock_a2t:
+            mock_a2t.return_value = "Текст распознавания аудио"
+            upload_res = await wm.add_uploaded_files(
+                workspace_id=ws_id,
+                files_data=[(audio_filename, fake_audio_bytes)],
+                commit_message="Тест загрузки аудио דוד משה",
+            )
+
+    assert upload_res["status"] == "ok"
+    assert upload_res["files_added"] >= 1
+
+    ws_path = wm.registry.workspace_path(ws_id)
+    dest_audio = ws_path / "assets" / audio_filename
+    dest_transcript = ws_path / "assets" / "02_transcript_david_moshe_shmulik_v3.md"
+    companion_md = ws_path / "assets" / f"{audio_filename}.md"
+
+    # 1. Проверяем, что аудиофайл сохранен в assets/
+    assert dest_audio.exists()
+    assert dest_audio.read_bytes() == fake_audio_bytes
+
+    # 2. Проверяем, что файл транскрипта скопирован ТУДА ЖЕ, куда сохранился аудиофайл (в assets/)
+    assert dest_transcript.exists()
+    assert dest_transcript.parent == dest_audio.parent
+    assert dest_transcript.read_text(encoding="utf-8") == fake_transcript_text
+
+    # 3. Проверяем, что companion markdown для аудиофайла содержит стенограмму
+    assert companion_md.exists()
+    assert "דוד משה" in companion_md.read_text(encoding="utf-8")
+
+    # 4. Проверяем, что транскрипт зарегистрирован в KnowledgeStore
+    docs = wm.store.list_documents(ws_id)
+    doc_ids = [d.get("document_id") for d in docs]
+    assert "assets/02_transcript_david_moshe_shmulik_v3.md" in doc_ids

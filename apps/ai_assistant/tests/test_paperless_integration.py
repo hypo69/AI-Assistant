@@ -11,7 +11,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:15:00
+# Updated: 2026-11-11 19:44:00
 # =============================================================================
 
 from __future__ import annotations
@@ -152,3 +152,177 @@ def test_launch_in_new_terminal_fails_without_docker(monkeypatch) -> None:
 
     monkeypatch.setattr(pb, "find_docker", lambda: None)
     assert pb.launch_in_new_terminal() is False
+
+
+def test_is_supported_file_extensions() -> None:
+    """Проверяет классификацию расширений для Paperless."""
+    assert PaperlessConnector.is_supported_file("document.pdf") is True
+    assert PaperlessConnector.is_supported_file("scan.PNG") is True
+    assert PaperlessConnector.is_supported_file("invoice.docx") is True
+    assert PaperlessConnector.is_supported_file("data.txt") is True
+    assert PaperlessConnector.is_supported_file("audio.mp3") is False
+    assert PaperlessConnector.is_supported_file("script.py") is False
+
+
+def test_workspace_tag_name_is_workspace_name() -> None:
+    """Обязательный тег для Paperless — читаемое имя рабочей области (например, 'דוד משה')."""
+    c = PaperlessConnector("http://pl:8000/", "tok", 10, 1.0, 2.0, 3.0, 0, "")
+    tag = c.workspace_tag_name("דוד_משה", workspace_name="דוד משה")
+    assert tag == "דוד משה"
+
+
+def test_wait_for_task_success(monkeypatch) -> None:
+    """Опрос задачи возвращает ID созданного документа при статусе success."""
+    c = _connector()
+    monkeypatch.setattr(
+        c, "get_task_status",
+        MagicMock(return_value={"status": "success", "related_document_ids": [42]}),
+    )
+    doc_id = c.wait_for_task("task-123", timeout=2.0, poll_interval=0.01)
+    assert doc_id == 42
+
+
+def test_wait_for_task_failure_raises_error(monkeypatch) -> None:
+    """Сбойная задача в Paperless выбрасывает PaperlessError."""
+    c = _connector()
+    monkeypatch.setattr(
+        c, "get_task_status",
+        MagicMock(return_value={"status": "failure", "result": "OCR error"}),
+    )
+    with pytest.raises(PaperlessError, match="OCR error"):
+        c.wait_for_task("task-123", timeout=2.0, poll_interval=0.01)
+
+
+def test_ingest_file_workflow(monkeypatch, tmp_path) -> None:
+    """Полный цикл импорта документа через PaperlessConnector.ingest_file."""
+    c = _connector()
+    test_file = tmp_path / "contract.pdf"
+    test_file.write_bytes(b"%PDF-1.4 fake")
+
+    monkeypatch.setattr(c, "ensure_workspace_tag", MagicMock(return_value=101))
+    monkeypatch.setattr(c, "upload_document", MagicMock(return_value="uuid-abc"))
+    monkeypatch.setattr(c, "wait_for_task", MagicMock(return_value=77))
+    monkeypatch.setattr(c, "get_document_content", MagicMock(return_value="Распознанный текст договора"))
+    monkeypatch.setattr(c, "get_document_metadata", MagicMock(return_value={"id": 77, "title": "contract.pdf"}))
+
+    res = c.ingest_file(test_file, workspace_id="ws_test", timeout=5.0)
+    assert res is not None
+    assert res["paperless_id"] == 77
+    assert res["content"] == "Распознанный текст договора"
+    assert res["workspace_tag_id"] == 101
+
+
+@pytest.mark.asyncio
+async def test_process_file_with_paperless_ingest(monkeypatch, tmp_path) -> None:
+    """WorkspaceItemsTracker направляет релевантный файл в Paperless и сохраняет paperless_id в базе знаний."""
+    from apps.ai_assistant.core.workspace_manager import WorkspaceManager
+    from apps.ai_assistant.core.workspace_items_tracker import WorkspaceItemsTracker
+
+    wm = WorkspaceManager(base_dir=tmp_path / "data_ai", workspaces_dir=tmp_path / "workspaces")
+    ws_id = "test_pl_ws"
+    wm.create_or_select_workspace(ws_id, name="Тест Paperless")
+
+    fake_conn = _connector()
+    monkeypatch.setattr(PaperlessConnector, "from_config", MagicMock(return_value=fake_conn))
+    monkeypatch.setattr(fake_conn, "ping", MagicMock(return_value=True))
+    monkeypatch.setattr(
+        fake_conn, "ingest_file",
+        MagicMock(return_value={"paperless_id": 88, "content": "Текст из Paperless OCR", "metadata": {}}),
+    )
+
+    tracker = WorkspaceItemsTracker(wm)
+    ws, ws_path = tracker._resolve_workspace_path(ws_id)
+    doc_path = ws_path / "assets" / "scan.pdf"
+    doc_path.parent.mkdir(parents=True, exist_ok=True)
+    doc_path.write_bytes(b"%PDF-1.4 test")
+
+    file_info = await tracker._process_and_commit_file(
+        workspace_id=ws_id,
+        ws_path=ws_path,
+        dest_file=doc_path,
+        doc_id="assets/scan.pdf",
+    )
+
+    assert file_info["paperless_id"] == 88
+    # Проверяем, что в SQLite документ зафиксирован с paperless_id и без дублирования текста
+    docs = wm.store.list_documents(ws_id)
+    assert len(docs) == 1
+    assert docs[0]["paperless_id"] == 88
+
+
+def test_ping_returns_false_without_connect_retries_or_error_log(monkeypatch) -> None:
+    """Проверка ping() не повторяет connect-ошибки и не спамит ERROR в лог."""
+    import requests
+    from apps.ai_assistant.core import paperless_connector as pc
+
+    c = PaperlessConnector("http://127.0.0.1:8000", "tok", 10, 1.0, 2.0, 3.0, 3, "ws-")
+    adapter = c._session.get_adapter("http://127.0.0.1:8000")
+    assert adapter.max_retries.connect == 0
+
+    mock_req = MagicMock(side_effect=requests.ConnectionError("refused"))
+    mock_err = MagicMock()
+    monkeypatch.setattr(c._session, "request", mock_req)
+    monkeypatch.setattr(pc.logger, "error", mock_err)
+
+    assert c.ping() is False
+    assert mock_req.call_count == 1
+    mock_err.assert_not_called()
+
+
+def test_is_docker_running_checks_daemon(monkeypatch) -> None:
+    """is_docker_running возвращает False при остановленном Docker daemon или ошибке."""
+    import subprocess
+    from apps.ai_assistant.core import paperless_bootstrap as pb
+
+    monkeypatch.setattr(pb, "find_docker", lambda: None)
+    assert pb.is_docker_running() is False
+
+    monkeypatch.setattr(pb, "find_docker", lambda: r"C:\docker.exe")
+    monkeypatch.setattr(pb.subprocess, "run", lambda *a, **kw: MagicMock(returncode=1))
+    assert pb.is_docker_running() is False
+
+    def _timeout(*a, **kw):
+        raise subprocess.TimeoutExpired(cmd="docker info", timeout=1)
+
+    monkeypatch.setattr(pb.subprocess, "run", _timeout)
+    assert pb.is_docker_running() is False
+
+    monkeypatch.setattr(pb.subprocess, "run", lambda *a, **kw: MagicMock(returncode=0))
+    assert pb.is_docker_running() is True
+
+
+def test_ensure_paperless_running_skips_wait_when_docker_stopped(monkeypatch) -> None:
+    """При выключенном Docker daemon ensure_paperless_running не открывает окно и не ждёт таймаут."""
+    from apps.ai_assistant.core import paperless_bootstrap as pb
+    from apps.ai_assistant.core.paperless_connector import PaperlessConnector
+
+    fake_conn = _connector()
+    monkeypatch.setattr(fake_conn, "ping", MagicMock(return_value=False))
+    monkeypatch.setattr(PaperlessConnector, "from_config", MagicMock(return_value=fake_conn))
+    monkeypatch.setattr(pb, "load_paperless_config", lambda: {"autostart": True, "startup_timeout_sec": 180, "startup_poll_sec": 5})
+    monkeypatch.setattr(pb, "is_docker_running", lambda: False)
+    launch_mock = MagicMock()
+    monkeypatch.setattr(pb, "launch_in_new_terminal", launch_mock)
+    monkeypatch.setenv("AI_ASSISTANT_PAPERLESS_WINDOW_LAUNCHED", "1")
+
+    assert pb.ensure_paperless_running() is False
+    launch_mock.assert_not_called()
+
+
+def test_ensure_paperless_running_async_runs_in_daemon_thread(monkeypatch) -> None:
+    """ensure_paperless_running_async запускает bootstrap в фоновом потоке без блокировки."""
+    import threading
+    from apps.ai_assistant.core import paperless_bootstrap as pb
+
+    called = threading.Event()
+
+    def _fake_ensure() -> bool:
+        called.set()
+        return False
+
+    monkeypatch.setattr(pb, "ensure_paperless_running", _fake_ensure)
+    t = pb.ensure_paperless_running_async()
+    assert t.daemon is True
+    assert called.wait(timeout=2.0)
+    t.join(timeout=2.0)
+

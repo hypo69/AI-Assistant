@@ -22,7 +22,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:40:00
+# Updated: 2026-11-10 18:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -778,6 +778,7 @@ class WorkspaceManager:
         commit_message: Optional[str] = None,
         language: Optional[str] = None,
         force_reanalyze: bool = False,
+        paperless_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Импортирует или обновляет документ в рабочей области, коммитит в Git и индексирует знания."""
         t0 = time.perf_counter()
@@ -825,6 +826,7 @@ class WorkspaceManager:
             language=language,
             force_reanalyze=force_reanalyze,
             t0=t0,
+            paperless_id=paperless_id,
         )
 
     def _extract_file_sync(self, fpath: Path) -> str:
@@ -899,6 +901,7 @@ class WorkspaceManager:
         language: Optional[str] = None,
         force_reanalyze: bool = False,
         host_name: Optional[str] = None,
+        paperless_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Индексирует документ из связанного внешнего источника БЕЗ копирования оригинала, сохраняя полный путь с именем ПК."""
         t0 = time.perf_counter()
@@ -999,6 +1002,7 @@ class WorkspaceManager:
             host_name=resolved_host,
             qualified_path=qualified_path,
             relocated_from=relocated_from,
+            paperless_id=paperless_id,
         )
 
     def link_source(

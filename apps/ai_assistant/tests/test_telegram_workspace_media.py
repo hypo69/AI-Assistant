@@ -12,7 +12,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-06 20:15:00
+# Updated: 2026-11-10 18:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -220,3 +220,78 @@ async def test_bot_engine_workspace_command_registration() -> None:
         assert "workspace" in all_cmds
         assert "ws" in all_cmds
         assert "w" in all_cmds
+
+
+@pytest.mark.asyncio
+async def test_incoming_document_paperless_pipeline(tmp_path: Path) -> None:
+    """Проверяет прохождение документа из Telegram через Paperless-ngx с индексацией в базе знаний."""
+    from apps.ai_assistant.core.paperless_connector import PaperlessConnector
+
+    wm = WorkspaceManager(
+        base_dir=tmp_path / "data_ai",
+        workspaces_dir=tmp_path / "workspaces",
+    )
+    ws_id = "test_doc_ws"
+    wm.create_or_select_workspace(ws_id, name="Документы")
+
+    fake_auth = tmp_path / "telegram_auth.json"
+
+    update = MagicMock()
+    status_msg = AsyncMock()
+    update.message.reply_text = AsyncMock(return_value=status_msg)
+    update.message.chat.send_action = AsyncMock()
+    update.effective_user.id = 88888
+    update.effective_user.first_name = "Анна"
+
+    fake_file = MagicMock()
+    fake_file.download_as_bytearray = AsyncMock(return_value=bytearray(b"%PDF-1.4 TEST_PDF_DATA"))
+    context = MagicMock()
+    context.bot.get_file = AsyncMock(return_value=fake_file)
+
+    attachment = MagicMock()
+    attachment.file_id = "test_doc_file_456"
+
+    fake_conn = MagicMock()
+    fake_conn.ping.return_value = True
+    fake_conn.ingest_file.return_value = {
+        "paperless_id": 99,
+        "content": "Распознанный в Paperless текст документа PDF",
+        "metadata": {"title": "report.pdf"},
+    }
+
+    with patch("plugins.telegram_bot.user_auth._AUTH_FILE", fake_auth):
+        user_manager.set_user_workspace(88888, ws_id)
+
+        with patch.object(PaperlessConnector, "from_config", return_value=fake_conn):
+            await handle_incoming_media(
+                update=update,
+                context=context,
+                wm=wm,
+                attachment=attachment,
+                default_filename="financial_report.pdf",
+                admin_ids=[88888],
+                is_audio=False,
+            )
+
+    # 1. Оригинал сохранён в assets/
+    ws_path = wm.registry.workspace_path(ws_id)
+    saved_pdf = ws_path / "assets" / "financial_report.pdf"
+    assert saved_pdf.exists()
+    assert saved_pdf.read_bytes() == b"%PDF-1.4 TEST_PDF_DATA"
+
+    # 2. Companion .md содержит OCR текст из Paperless
+    companion = ws_path / "assets" / "financial_report.pdf.md"
+    assert companion.exists()
+    assert "Распознанный в Paperless текст" in companion.read_text(encoding="utf-8")
+
+    # 3. Документ сохранён в SQLite базе знаний с paperless_id=99
+    docs = wm.store.list_documents(ws_id)
+    assert len(docs) == 1
+    assert docs[0]["paperless_id"] == 99
+
+    # 4. В ответе Telegram пользователю упомянут Paperless ID
+    assert status_msg.edit_text.called
+    last_text = status_msg.edit_text.call_args[0][0]
+    assert "Paperless-ngx" in last_text
+    assert "#99" in last_text
+

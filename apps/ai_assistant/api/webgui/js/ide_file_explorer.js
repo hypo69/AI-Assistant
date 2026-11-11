@@ -40,7 +40,7 @@
 
  * Copyright: © 2026 hypo69
 
- * Updated: 2026-11-07 00:00:00
+ * Updated: 2026-11-10 20:10:00
 
 
  * =============================================================================
@@ -51,9 +51,9 @@
 
 import { getActiveWorkspaceId, getActiveRepoPath, setGlobalActiveRepo, fetchAvailableRepositories } from './top_workspace_dropdown.js';
 
-import { initIdeTreeContextMenu, openEditorModal } from './ide_tree_context_menu.js?v=20261028_v2';
+import { initIdeTreeContextMenu, openEditorModal } from './ide_tree_context_menu.js?v=20261110_v3';
 
-import { initIdeWorkspaceSearch } from './ide_workspace_search.js?v=20261030_v1';
+import { initIdeWorkspaceSearch } from './ide_workspace_search.js?v=20261110_v3';
 
 
 

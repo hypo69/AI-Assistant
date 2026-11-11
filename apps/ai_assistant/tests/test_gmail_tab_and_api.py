@@ -12,7 +12,7 @@
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-23 19:23:00
+# Updated: 2026-11-10 20:02:00
 # =============================================================================
 
 from __future__ import annotations
@@ -154,9 +154,22 @@ def test_gmail_tab_registered_in_index_and_main_js(client: TestClient):
     assert r_index.status_code == 200
     assert 'data-tab="tab-gmail"' in r_index.text
     assert 'id="tab-gmail"' in r_index.text
-    assert 'id="top-nav-gmail-btn"' in r_index.text
+    assert 'id="ide-nav-gmail"' in r_index.text
     assert 'id="top-nav-gmail-badge"' in r_index.text
 
     r_main_js = client.get("/html/js/main.js")
     assert r_main_js.status_code == 200
     assert "'gmail':" in r_main_js.text or '"gmail":' in r_main_js.text
+
+
+def test_gmail_manager_thread_lock_and_cache():
+    """Проверяет работу поаккаунтной блокировки и механизма кэширования GmailManager."""
+    mgr = GmailManager(default_account="test_acc")
+    lock1 = mgr._get_account_lock("test_acc")
+    lock2 = mgr._get_account_lock("test_acc")
+    assert lock1 is lock2
+
+    mgr._cache["test_acc:profile"] = (100.0, {"email": "test@example.com"})
+    assert "test_acc:profile" in mgr._cache
+    mgr.clear_cache("test_acc")
+    assert "test_acc:profile" not in mgr._cache

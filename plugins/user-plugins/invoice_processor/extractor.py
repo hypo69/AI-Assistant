@@ -10,7 +10,7 @@
 # Package: plugins.invoice_processor
 # Author: hypo69
 # Copyright: (c) 2026 hypo69
-# Updated: 2026-11-10 14:24:00
+# Updated: 2026-11-10 17:32:00
 # =============================================================================
 
 from __future__ import annotations
@@ -22,7 +22,10 @@ import re
 from typing import Any, Dict, List, Optional, Union
 
 from logger.logger import logger
-from src.utils.system_engineering import money_to_minor_units, to_decimal_money
+try:
+    from src.utils.convertors.money import money_to_minor_units, to_decimal_money
+except ImportError:
+    from src.utils.system_engineering import money_to_minor_units, to_decimal_money
 
 
 async def extract_document_text(file_path: Union[str, Path]) -> str:

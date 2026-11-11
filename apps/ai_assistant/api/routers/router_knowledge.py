@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.api.routers
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:50:00
+# Updated: 2026-11-10 17:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -846,7 +846,12 @@ async def upload_workspace_files(
             files_data.append((f.filename or "uploaded_file", content_bytes))
 
         scen_srv = _workspace_manager.scenario_service
-        if scen_srv.is_david_moshe_workspace(workspace_id) and any(scen_srv.is_trigger_file(fn) for fn, _ in files_data):
+        from pathlib import Path as _P
+        is_audio_trigger = any(
+            scen_srv.is_trigger_file(fn) and _P(fn).suffix.lower() in {".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac"}
+            for fn, _ in files_data
+        )
+        if not is_audio_trigger and scen_srv.is_david_moshe_workspace(workspace_id) and any(scen_srv.is_trigger_file(fn) for fn, _ in files_data):
             trig_name = next((fn for fn, _ in files_data if scen_srv.is_trigger_file(fn)), files_data[0][0])
             scen_state = await scen_srv.trigger_scenario(
                 wm=_workspace_manager,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
-# Process Name: ai-assistant AI - Prompts Module
+# Process Name: AI-Windows-Admin AI - Prompts Module
 # =============================================================================
 # Description:
 #   Модуль основной системы (`prompts`).
@@ -10,7 +10,7 @@
 #     import src.ai.agents.prompts as prompts
 #
 # File: prompts.py
-# Project: ai-assistant
+# Project: ai-windows-admin
 # Package: src.ai.agents
 # Author: hypo69
 # Copyright: © 2026 hypo69
@@ -84,4 +84,5 @@ WINDOWS_TOOL_SELECTION_GUIDELINES = """Руководство по выбору 
 - Журналы сбоев, Sysmon, ScriptBlock -> `windows_event_log_query` / `windows_event_log_intelligence`.
 - Управление окнами и Snap Layouts -> `windows_control_plane_action` / `windows_taskbar_action`.
 """
+
 

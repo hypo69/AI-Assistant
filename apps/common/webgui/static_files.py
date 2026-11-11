@@ -12,16 +12,22 @@
 # Package: apps.common.webgui
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 14:31:50
+# Updated: 2026-11-11 19:55:00
 # =============================================================================
 
 from __future__ import annotations
 
 import os
+import stat
 from pathlib import Path
 from typing import Any, Optional
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import Response
+from starlette.responses import HTMLResponse, Response
+
+from apps.common.webgui.i18n_renderer import (
+    detect_language_from_scope,
+    render_i18n_placeholders,
+)
 
 
 class SmartMultiDirStaticFiles(StaticFiles):
@@ -71,18 +77,42 @@ class SmartMultiDirStaticFiles(StaticFiles):
         return "", None
 
     async def get_response(self, path: str, scope: Any) -> Response:
-        """Формирует HTTP-ответ со статическим файлом.
+        """Формирует HTTP-ответ со статическим файлом с SSR-подстановкой i18n для HTML.
 
         Args:
             path: Запрашиваемый путь к файлу.
             scope: ASGI scope запроса.
 
         Returns:
-            Response: Ответ со статическим файлом.
+            Response: Ответ со статическим или SSR-отрендеренным файлом.
         """
+        lower_path = (path or "").lower()
+        method = str(scope.get("method", "GET")).upper()
+        if method in ("GET", "HEAD") and lower_path.endswith((".html", ".htm")):
+            full_path, stat_result = self.lookup_path(path)
+            if full_path and stat_result and stat.S_ISREG(stat_result.st_mode):
+                raw_html = Path(full_path).read_text(encoding="utf-8")
+                if "{{" in raw_html or "<html" in raw_html.lower():
+                    lang = detect_language_from_scope(scope)
+                    rendered = render_i18n_placeholders(raw_html, lang, self.directories)
+                    headers = {
+                        "Cache-Control": "no-cache",
+                        "Vary": "Cookie, Accept-Language",
+                        "Content-Language": lang,
+                    }
+                    if method == "HEAD":
+                        encoded = rendered.encode("utf-8")
+                        headers["Content-Length"] = str(len(encoded))
+                        return Response(
+                            content=b"",
+                            status_code=200,
+                            media_type="text/html; charset=utf-8",
+                            headers=headers,
+                        )
+                    return HTMLResponse(content=rendered, status_code=200, headers=headers)
+
         response = await super().get_response(path, scope)
 
-        lower_path = path.lower()
         if lower_path.endswith((".js", ".mjs", ".css", ".html", ".json")):
             response.headers["Cache-Control"] = "no-cache"
 

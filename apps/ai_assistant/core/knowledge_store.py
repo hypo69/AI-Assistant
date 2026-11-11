@@ -19,7 +19,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:40:00
+# Updated: 2026-11-10 17:15:00
 # =============================================================================
 
 from __future__ import annotations
@@ -106,7 +106,17 @@ class KnowledgeStore(WorkspaceRepoMixin, DocumentFactRepoMixin, TelemetryRepoMix
             conn.execute("PRAGMA foreign_keys=ON;")
 
             with self._lock:
-                if path_str not in self._initialized_paths:
+                needs_init = path_str not in self._initialized_paths
+                if not needs_init:
+                    # Проверяем физическое наличие ключевой таблицы documents (на случай внешней/частичной инициализации)
+                    try:
+                        cur = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents' LIMIT 1")
+                        if cur.fetchone() is None:
+                            needs_init = True
+                    except Exception:
+                        needs_init = True
+
+                if needs_init:
                     if len(self._initialized_paths) >= MAX_INITIALIZED_PATHS_CACHE:
                         self._initialized_paths.clear()
                     self._init_schema(existing_conn=conn)
@@ -124,6 +134,8 @@ class KnowledgeStore(WorkspaceRepoMixin, DocumentFactRepoMixin, TelemetryRepoMix
             except Exception as exc:
                 logger.debug(f"[KnowledgeStore] Ошибка закрытия соединения SQLite: {exc}")
                 return False
+            finally:
+                conn = None
         return True
 
     def close(self) -> bool:
@@ -155,6 +167,7 @@ class KnowledgeStore(WorkspaceRepoMixin, DocumentFactRepoMixin, TelemetryRepoMix
                         pass
         except Exception as exc:
             logger.error(f"[KnowledgeStore] Ошибка создания схемы SQLite: {exc}")
+            raise
         finally:
             if not existing_conn:
                 self._close_conn(conn)

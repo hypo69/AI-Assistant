@@ -17,7 +17,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:40:00
+# Updated: 2026-11-10 19:05:00
 # =============================================================================
 
 from __future__ import annotations
@@ -69,7 +69,9 @@ def sync_workspace_from_paperless(wm: Any, connector: PaperlessConnector, worksp
     Returns:
         Dict[str, Any]: Отчёт: workspace_id, indexed, failed.
     """
-    tag = connector.workspace_tag_name(workspace_id)
+    ws = wm.get_workspace(workspace_id) if hasattr(wm, "get_workspace") else None
+    ws_name = (ws.get("name") if ws else None) or workspace_id
+    tag = connector.workspace_tag_name(workspace_id, workspace_name=ws_name)
     indexed, failed = 0, 0
     for doc in connector.iter_documents(tag_name=tag):
         paperless_id = int(doc["id"])

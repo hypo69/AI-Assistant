@@ -11,7 +11,7 @@
 #   Python API:
 #     from src.ai.agents.loader import load_agent_from_manifest, list_available_agents
 #
-#     agent = load_agent_from_manifest("workspace_agent")
+#     agent = load_agent_from_manifest("windows_controller_agent")
 #     agents_list = list_available_agents()
 #
 # File: loader.py
@@ -19,7 +19,7 @@
 # Package: src.ai.agents
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-01 17:40:00
+# Updated: 2026-10-10 17:35:00
 # =============================================================================
 
 from __future__ import annotations
@@ -144,3 +144,4 @@ def load_agent_from_manifest(name_or_id: str) -> Any:
             logger.warning(f"[AgentLoader] Не удалось загрузить класс {class_path}, используется универсальный исполнитель: {exc}")
 
     return UniversalDeclarativeAgent(manifest_data)
+

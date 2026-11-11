@@ -12,7 +12,7 @@ File: test_workspace_prompt_generator.py
 Package: apps/ai_assistant/tests
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-11-03 13:16:00
+Updated: 2026-11-10 17:15:00
 =============================================================================
 """
 
@@ -86,3 +86,29 @@ async def test_follow_up_prompts_generation() -> None:
     assert len(follow_ups) == 2
     assert "manual.docx" in follow_ups[0]["text"]
     assert "TemporalGraph" in follow_ups[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_prompts_generated_when_workspace_database_uninitialized(tmp_path) -> None:
+    """Проверяет генерацию подсказок при пустой/нераскатанной БД (no such table) без сбоев."""
+    import sqlite3
+    from apps.ai_assistant.core.knowledge_store import KnowledgeStore
+
+    # Создаём физическую директорию рабочего пространства с пустой БД без таблиц
+    ws_meta = tmp_path / "workspaces" / "דוד_משה" / ".workspace"
+    ws_meta.mkdir(parents=True, exist_ok=True)
+    empty_db = ws_meta / "knowledge_store.db"
+    conn = sqlite3.connect(str(empty_db))
+    conn.close()
+
+    mock_wm = MagicMock()
+    mock_wm.get_workspace_commits = AsyncMock(return_value=[])
+    # Реальное хранилище на базе KnowledgeStore
+    mock_wm.store = KnowledgeStore(db_path=tmp_path / "global.db", workspaces_dir=tmp_path / "workspaces")
+
+    generator = WorkspacePromptGenerator(mock_wm)
+    res = await generator.generate_prompts("דוד_משה", language="he", limit=3)
+    assert res["status"] == "ok"
+    assert res["source"] == "fallback"
+    assert len(res["prompts"]) == 3
+

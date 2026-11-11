@@ -10,15 +10,20 @@
 # Package: logger
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-10 17:35:00
+# Updated: 2026-11-10 14:16:00
 # =============================================================================
 
 """Пакет централизованного логирования AI-Windows-Admin."""
 
 from .logger import (
+    CONSOLE_LEVEL,
     Logger,
     logger,
     JsonFormatter,
     get_uvicorn_log_config,
     get_subsystem_logger,
+    set_trace_context,
+    get_trace_context,
+    clear_trace_context,
+    trace_context,
 )

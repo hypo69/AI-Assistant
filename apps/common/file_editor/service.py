@@ -17,7 +17,7 @@
 # Package: apps.common.file_editor
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 14:31:20
+# Updated: 2026-11-10 20:20:00
 # =============================================================================
 
 from __future__ import annotations
@@ -169,7 +169,9 @@ class FileEditorService:
         raw_bytes = target.read_bytes()
         size_bytes = len(raw_bytes)
         is_binary_detected = b"\x00" in raw_bytes[:8192]
-        descriptor = SupportedFileCatalog.get_descriptor(clean_rel, is_binary_detected=is_binary_detected)
+        descriptor = SupportedFileCatalog.get_descriptor(
+            clean_rel, is_binary_detected=is_binary_detected, content=raw_bytes
+        )
 
         is_binary = is_binary_detected or descriptor.is_binary_default
         line_ending = "CRLF" if b"\r\n" in raw_bytes[:8192] else "LF"

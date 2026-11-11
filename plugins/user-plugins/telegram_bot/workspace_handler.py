@@ -12,7 +12,7 @@
 # Package: plugins.telegram_bot
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:45:00
+# Updated: 2026-11-10 18:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -313,9 +313,9 @@ async def handle_incoming_media(
         raw_bytes = bytes(file_bytes)
         size_str = _format_size(len(raw_bytes))
 
-        # 2. Проверяем триггер специального сценария דוד משה
+        # 2. Проверяем триггер текстового сценария דוד משה (для не-аудио файлов)
         scenario = wm.scenario_service
-        if scenario.is_trigger_file(clean_name) or (scenario.is_david_moshe_workspace(ws_id) and "שיחה" in clean_name):
+        if not is_audio_file and (scenario.is_trigger_file(clean_name) or (scenario.is_david_moshe_workspace(ws_id) and "שיחה" in clean_name)):
             await status_msg.edit_text(
                 f"⚙️ <i>Обнаружен сценарий для «{ws_name}». Запускаю обработку файла «{clean_name}»...</i>",
                 parse_mode="HTML",
@@ -337,14 +337,22 @@ async def handle_incoming_media(
             )
             return
 
-        # 3. Сохраняем файл в рабочую область через add_uploaded_files (в assets/ с транскрибацией)
-        await status_msg.edit_text(
-            f"⚙️ <i>Сохраняю оригинал <code>{clean_name}</code> в <code>assets/</code> области «{ws_name}» "
-            f"и запускаю транскрибацию контента...</i>",
-            parse_mode="HTML",
-        )
+        # 3. Сохраняем файл в рабочую область через add_uploaded_files (в assets/ с обработкой в Paperless-ngx или транскрибацией)
+        from apps.ai_assistant.core.paperless_connector import PaperlessConnector
+        is_paperless_doc = PaperlessConnector.is_supported_file(clean_name)
+        if is_paperless_doc:
+            status_text = (
+                f"⚙️ <i>Отправляю <code>{clean_name}</code> в Paperless-ngx для OCR-распознавания "
+                f"и индексации в базе знаний «{ws_name}»...</i>"
+            )
+        else:
+            status_text = (
+                f"⚙️ <i>Сохраняю оригинал <code>{clean_name}</code> в <code>assets/</code> области «{ws_name}» "
+                f"и запускаю транскрибацию контента...</i>"
+            )
+        await status_msg.edit_text(status_text, parse_mode="HTML")
 
-        commit_msg = f"Telegram ({user_name}): добавлен {clean_name} в assets с транскрибацией"
+        commit_msg = f"Telegram ({user_name}): добавлен {clean_name} в assets (Paperless/Git)"
         upload_result = await wm.add_uploaded_files(
             workspace_id=ws_id,
             files_data=[(clean_name, raw_bytes)],
@@ -373,13 +381,25 @@ async def handle_incoming_media(
             logger.debug(f"[TelegramBot] Резервная копия файла: {b_exc}")
 
         # 6. Формируем структурированный ответ
+        copied_transcript_name = ""
+        paperless_id_val = None
+        for tf in upload_result.get("tracked_files", []):
+            if tf.get("source") == "david_moshe_scenario_transcript":
+                copied_transcript_name = Path(tf.get("path") or tf.get("name") or "").name
+            if tf.get("paperless_id"):
+                paperless_id_val = tf.get("paperless_id")
+
         lines: List[str] = [
             "🎙 <b>Аудиозапись успешно обработана!</b>" if is_audio_file else "📄 <b>Файл успешно добавлен!</b>",
             "",
             f"📁 <b>Рабочая область:</b> <b>{ws_name}</b> (<code>{ws_id}</code>)",
             f"💾 <b>Оригинал сохранён в:</b> <code>assets/{clean_name}</code> ({size_str})",
-            "🧠 <b>База знаний:</b> Текст транскрибирован, добавлен в рабочую область и проиндексирован в RAG / Obsidian.",
         ]
+        if paperless_id_val is not None:
+            lines.append(f"📑 <b>Paperless-ngx:</b> Документ обработан и распознан (ID: <code>#{paperless_id_val}</code>)")
+        if copied_transcript_name:
+            lines.append(f"📄 <b>Стенограмма скопирована в:</b> <code>assets/{copied_transcript_name}</code>")
+        lines.append("🧠 <b>База знаний:</b> Факты сохранены в SQLite, проиндексированы в RAG FAISS и Obsidian.")
 
         if transcript_text:
             preview = transcript_text[:2000].strip()

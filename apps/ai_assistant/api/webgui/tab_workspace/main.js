@@ -12,7 +12,7 @@
  * Package: apps/ai_assistant/api/webgui/tab_workspace
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-10 13:17:00
+ * Updated: 2026-11-10 20:10:00
  * =============================================================================
  */
 
@@ -58,7 +58,7 @@ import {
   initFileEditorTab,
   openDocumentInTab,
   saveActiveDocument,
-} from '/html/tab_file_editor/main.js?v=20261110_v1';
+} from '/html/tab_file_editor/main.js?v=20261110_v3';
 
 let initialized = false;
 
@@ -281,7 +281,7 @@ export async function initWorkspaceTab() {
   const editorContainer = document.getElementById('ws-embedded-editor-container');
   if (editorContainer && !editorContainer.hasChildNodes()) {
     try {
-      const res = await fetch('/html/tab_file_editor/index.html?v=20261107_v1');
+      const res = await fetch('/html/tab_file_editor/index.html?v=20261110_v3');
       if (res.ok) {
         editorContainer.innerHTML = await res.text();
       }

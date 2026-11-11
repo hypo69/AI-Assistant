@@ -12,7 +12,7 @@
  * Package: apps/common/webgui/tab_file_editor
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-11-07 00:35:00
+ * Updated: 2026-11-10 20:10:00
  * =============================================================================
  */
 
@@ -180,6 +180,93 @@
   padding: 1rem;
   border-inline-start: 1px solid var(--border-color, var(--bs-border-color));
   background: var(--surface-1, var(--bs-body-bg));
+}
+
+/* Режимы отображения редактора: Редактор, Вид/Редактор (Split), Вид */
+.wasm-code-stage.wasm-split-mode .wasm-line-gutter {
+  display: block;
+}
+
+.wasm-code-stage.wasm-split-mode .wasm-code-textarea {
+  flex: 1 1 50%;
+  width: 50%;
+  max-width: calc(50% - 27px);
+}
+
+.wasm-code-stage.wasm-split-mode #fe-markdown-preview {
+  flex: 1 1 50%;
+  width: 50%;
+  max-width: 50%;
+  display: block !important;
+}
+
+.wasm-code-stage.wasm-preview-mode .wasm-line-gutter,
+.wasm-code-stage.wasm-preview-mode .wasm-code-textarea {
+  display: none !important;
+}
+
+.wasm-code-stage.wasm-preview-mode #fe-markdown-preview {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  border-inline-start: none !important;
+  display: block !important;
+}
+
+/* Оформление Markdown предпросмотра */
+#fe-markdown-preview {
+  color: var(--text-color, var(--bs-body-color));
+  background-color: var(--surface-1, var(--bs-body-bg));
+  line-height: 1.6;
+}
+
+#fe-markdown-preview h1,
+#fe-markdown-preview h2,
+#fe-markdown-preview h3,
+#fe-markdown-preview h4,
+#fe-markdown-preview h5,
+#fe-markdown-preview h6 {
+  color: var(--text-color, var(--bs-body-color));
+}
+
+#fe-markdown-preview pre {
+  background-color: var(--surface-2, var(--bs-tertiary-bg));
+  color: var(--text-color, var(--bs-body-color));
+  border-radius: var(--radius-sm, 0.35rem);
+}
+
+#fe-markdown-preview code {
+  color: var(--ui-accent, var(--bs-primary));
+}
+
+#fe-markdown-preview pre code {
+  color: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+#fe-markdown-preview blockquote {
+  border-inline-start: 4px solid var(--ui-accent, var(--bs-primary));
+  padding-inline-start: 0.75rem;
+  margin: 0.75rem 0;
+  color: var(--text-muted, var(--bs-secondary-color));
+}
+
+#fe-markdown-preview table {
+  width: 100%;
+  margin-bottom: 1rem;
+  border-collapse: collapse;
+}
+
+#fe-markdown-preview th,
+#fe-markdown-preview td {
+  border: 1px solid var(--border-color, var(--bs-border-color));
+  padding: 0.35rem 0.6rem;
+}
+
+#fe-markdown-preview th {
+  background-color: var(--surface-2, var(--bs-tertiary-bg));
+  font-weight: 600;
 }
 
 /* Сетка Hex-редактора в стиле VS Code Hex Editor */

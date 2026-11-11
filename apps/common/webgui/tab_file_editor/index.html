@@ -18,11 +18,11 @@ Project: ai-assistant
 Package: apps/common/webgui/tab_file_editor
 Author: hypo69
 Copyright: © 2026 hypo69
-Updated: 2026-11-07 00:45:00
+Updated: 2026-11-10 20:10:00
 =============================================================================
 -->
 
-<link rel="stylesheet" href="/html/tab_file_editor/style.css?v=20261106_v1">
+<link rel="stylesheet" href="/html/tab_file_editor/style.css?v=20261110_v3">
 
 <div class="wasm-editor-shell shadow-sm d-flex flex-column h-100" id="wasm-file-editor-root">
 
@@ -53,13 +53,16 @@ Updated: 2026-11-07 00:45:00
 
     <!-- Режимы Редактор / Предпросмотр (для Markdown и др.) + Действия -->
     <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
-      <!-- Режимы: Редактор / Предпросмотр -->
+      <!-- Режимы: Редактор / Вид/Редактор / Вид -->
       <div class="btn-group btn-group-sm d-none" id="fe-view-mode-group" role="group">
-        <button type="button" class="btn btn-sm btn-outline-primary active py-0.5 px-2" id="fe-tab-mode-code">
+        <button type="button" class="btn btn-sm btn-outline-primary active py-0.5 px-2" id="fe-tab-mode-code" data-i18n-title="ide.editorTabCodeTitle" title="Редактор">
           <i class="bi bi-pencil me-1"></i><span data-i18n="ide.editorTabCode" id="fe-mode-code-text">Редактор</span>
         </button>
-        <button type="button" class="btn btn-sm btn-outline-primary py-0.5 px-2" id="fe-tab-mode-preview">
-          <i class="bi bi-eye me-1"></i><span data-i18n="ide.editorTabPreview" id="fe-mode-preview-text">Предпросмотр</span>
+        <button type="button" class="btn btn-sm btn-outline-primary py-0.5 px-2" id="fe-tab-mode-split" data-i18n-title="ide.editorTabSplitTitle" title="Вид/Редактор">
+          <i class="bi bi-layout-split me-1"></i><span data-i18n="ide.editorTabSplit" id="fe-mode-split-text">Вид/Редактор</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-primary py-0.5 px-2" id="fe-tab-mode-preview" data-i18n-title="ide.editorTabViewTitle" title="Вид">
+          <i class="bi bi-eye me-1"></i><span data-i18n="ide.editorTabView" id="fe-mode-preview-text">Вид</span>
         </button>
       </div>
 

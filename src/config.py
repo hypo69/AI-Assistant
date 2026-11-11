@@ -10,14 +10,14 @@
 # Usage Examples:
 #   Python API:
 #     from src.config import app_name, WORKING_DIR, DATA_DIR, LOGS_DIR, TMP_DIR
-#     print(app_name, DATA_DIR, LOGS_DIR, TMP_DIR)
+#     from src.config import app_dir, data_dir, logs_dir, tmp_dir, is_app_enabled
 #
 # File: config.py
 # Project: ai-windows-admin
 # Package: src
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 14:35:00
+# Updated: 2026-11-10 18:11:00
 # =============================================================================
 
 """Модуль основной системы (`config`)."""
@@ -29,7 +29,12 @@ from src.utils.jjson import j_loads_ns
 from header import __root__
 from logger import logger
 
-_cfg_env = os.getenv('AIWINDOWSADMIN_CONFIG') or os.getenv('CONFIG_FILE')
+_cfg_env = (
+    os.getenv('AITC_CONFIG')
+    or os.getenv('AI_TC_CONFIG')
+    or os.getenv('AIWINDOWSADMIN_CONFIG')
+    or os.getenv('CONFIG_FILE')
+)
 if _cfg_env:
     _cfg_path = Path(_cfg_env)
     if _cfg_path.is_absolute() and _cfg_path.exists():
@@ -50,30 +55,44 @@ if not CONFIG_FILE.exists() and (__root__ / 'config.json').exists():
 
 global_settings = j_loads_ns(CONFIG_FILE)
 
-# Название рабочей директории из конфигурации (по умолчанию 'AI-Assistant')
-app_name: str = str(getattr(global_settings, 'app_name', None) or 'AI-Assistant')
+# Название рабочей директории и приложения из конфигурации или окружения
+app_name: str = str(
+    getattr(global_settings, 'app_name', None)
+    or getattr(getattr(global_settings, 'app', None), 'app_name', None)
+    or os.getenv('APP_NAME')
+    or (__root__.name if __root__.exists() else 'AI-Assistant')
+)
 APP_NAME: str = app_name
+os.environ['APP_NAME'] = APP_NAME
 
 # Базовые системные каталоги окружения
-_localappdata_env: str = os.environ.get('LOCALAPPDATA') or str(Path.home() / 'AppData' / 'Local')
-_appdata_env: str = os.environ.get('APPDATA') or str(Path.home() / 'AppData' / 'Roaming')
+localappdata_base: str = os.environ.get('LOCALAPPDATA') or str(Path.home() / 'AppData' / 'Local')
+appdata_base: str = os.environ.get('APPDATA') or str(Path.home() / 'AppData' / 'Roaming')
 
-LOCALAPPDATA_DIR: Path = Path(_localappdata_env)
-APPDATA_DIR: Path = Path(_appdata_env)
+LOCALAPPDATA_DIR: Path = Path(localappdata_base)
+APPDATA_DIR: Path = Path(appdata_base)
 
 # Рабочая директория: %LOCALAPPDATA% / app_name
 WORKING_DIR: Path = LOCALAPPDATA_DIR / APP_NAME
+app_dir: Path = WORKING_DIR if WORKING_DIR.exists() or not __root__.exists() else __root__
+APP_DIR: Path = app_dir
 
-# Внутренний путь к data
+# Внутренний путь к хранилищу данных data
 if (WORKING_DIR / 'data').exists():
     DATA_DIR: Path = WORKING_DIR / 'data'
+elif (app_dir / 'data').exists():
+    DATA_DIR = app_dir / 'data'
 else:
-    DATA_DIR: Path = __root__ / 'data'
+    DATA_DIR = __root__ / 'data'
+data_dir: Path = DATA_DIR
 
-# Внутренние пути в %APPDATA% для логов и временных файлов tmp
-LOGS_DIR: Path = APPDATA_DIR / APP_NAME / 'logs'
-TMP_DIR: Path = APPDATA_DIR / APP_NAME / 'tmp'
+# Пути к логам и временным файлам tmp: %APPDATA% / app_name / logs и tmp
+appdata_dir: Path = APPDATA_DIR / APP_NAME
+LOGS_DIR: Path = appdata_dir / 'logs'
+TMP_DIR: Path = appdata_dir / 'tmp'
 TEMP_DIR: Path = TMP_DIR
+logs_dir: Path = LOGS_DIR
+tmp_dir: Path = TMP_DIR
 
 
 def get_app_paths() -> dict[str, Path]:
@@ -156,6 +175,30 @@ def is_app_enabled(target_app_name: str) -> bool:
         if len(enabled_list) > 0:
             return target_app_name in enabled_list
     return True
+
+
+def is_provider_enabled(provider_name: str) -> bool:
+    """Проверяет, активен (enabled) ли AI-провайдер согласно текущей конфигурации.
+
+    Args:
+        provider_name (str): Имя провайдера (например, 'gemini', 'foundry', 'ollama', 'hf', 'onnx', 'openai').
+
+    Returns:
+        bool: True, если провайдер включен (enabled == True); иначе False.
+    """
+    prov = (provider_name or '').lower().strip()
+    if not prov:
+        return False
+    providers = getattr(ai_cfg, 'providers', None)
+    if providers is not None:
+        prov_obj = getattr(providers, prov, None) if not isinstance(providers, dict) else providers.get(prov)
+        if prov_obj is not None:
+            enabled = getattr(prov_obj, 'enabled', None) if not isinstance(prov_obj, dict) else prov_obj.get('enabled')
+            if enabled is not None:
+                return bool(enabled)
+    if prov in ('gemini', 'gemini_cli', 'agy'):
+        return True
+    return False
 
 
 def is_debug_mode() -> bool:

@@ -21,7 +21,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:50:00
+# Updated: 2026-11-10 17:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import time
 import unicodedata
 import uuid
@@ -48,7 +49,7 @@ if TYPE_CHECKING:
     from apps.ai_assistant.core.workspace_manager import WorkspaceManager
 
 DEFAULT_SCENARIO_TARGET_FILE = (
-    Path.home() / "Desktop" / "דוד מושה — רשימת מסמכים" / "שיחה בין דוד משה לשמוליק.md"
+    Path.home() / "Desktop" / "דוד מושה — רשימת מסמכים" / "02_transcript_david_moshe_shmulik_v3.md"
 )
 
 
@@ -102,6 +103,11 @@ class TelegramWorkspaceScenarioService:
             "trigger_file_names": list(
                 cfg_data.get("trigger_file_names")
                 or [
+                    "דוד משה - שמוליק שיחת טלפון.mp3",
+                    "דוד משה - שמוליק שיחת טלפון",
+                    "דוד משה שמוליק שיחת טלפון",
+                    "דוד_משה_-_שמוליק_שיחת_טלפון.mp3",
+                    "02_transcript_david_moshe_shmulik_v3.md",
                     "שיחה בין דוד משה לשמוליק",
                     "שיחה_בין_דוד_משה_לשמוליק",
                     "שיחה בין דוד מושה לשמוליק",
@@ -152,6 +158,151 @@ class TelegramWorkspaceScenarioService:
             if norm_input == norm_trig or norm_trig in norm_input or norm_trig in raw_clean:
                 return True
         return False
+
+    async def handle_audio_upload_scenario(
+        self,
+        wm: WorkspaceManager,
+        workspace_id: str,
+        audio_path: Path,
+    ) -> Optional[Dict[str, Any]]:
+        """Копирует целевой транскрипт туда же, куда сохранен аудиофайл דוד משה, с фиксацией в Git и базе знаний.
+
+        Args:
+            wm: Экземпляр WorkspaceManager.
+            workspace_id: Идентификатор рабочей области.
+            audio_path: Абсолютный путь к сохраненному аудиофайлу на диске.
+
+        Returns:
+            Словарь с данными о скопированном транскрипте или None, если сценарий не сработал.
+        """
+        if not self.is_david_moshe_workspace(workspace_id):
+            return None
+
+        clean_name = audio_path.name
+        is_trigger = self.is_trigger_file(clean_name)
+        if not is_trigger:
+            norm_name = _normalize_hebrew_token(clean_name)
+            if "דוד משה" in norm_name and "שמוליק" in norm_name:
+                is_trigger = True
+
+        if not is_trigger:
+            return None
+
+        cfg = self.load_scenario_config()
+        if not cfg.get("enabled", True):
+            return None
+
+        target_path_str = cfg.get("target_file_path") or str(DEFAULT_SCENARIO_TARGET_FILE)
+        candidate_paths = [
+            Path(target_path_str),
+            Path.home() / "Desktop" / "דוד מושה — רשימת מסמכים" / "02_transcript_david_moshe_shmulik_v3.md",
+            Path.home() / "Desktop" / "דוד מושה — רשימת מסמכים" / "שיחה בין דוד משה לשמוליק.md",
+            audio_path.parent / "02_transcript_david_moshe_shmulik_v3.md",
+            audio_path.parent.parent / "02_transcript_david_moshe_shmulik_v3.md",
+        ]
+        src_transcript: Optional[Path] = None
+        for cand in candidate_paths:
+            if cand.exists() and cand.is_file():
+                src_transcript = cand
+                break
+
+        dest_dir = audio_path.parent
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_filename = src_transcript.name if src_transcript else Path(target_path_str).name
+        dest_transcript_path = dest_dir / dest_filename
+
+        transcript_text = ""
+        if src_transcript and src_transcript.resolve() != dest_transcript_path.resolve():
+            try:
+                shutil.copy2(src_transcript, dest_transcript_path)
+                transcript_text = dest_transcript_path.read_text(encoding="utf-8")
+                logger.console(
+                    f"[DavidMosheScenario] Транскрипт '{src_transcript.name}' скопирован "
+                    f"туда же, где сохранён аудиофайл: {dest_transcript_path}"
+                )
+            except Exception as copy_exc:
+                logger.error(f"[DavidMosheScenario] Ошибка копирования транскрипта: {copy_exc}")
+        elif dest_transcript_path.exists():
+            try:
+                transcript_text = dest_transcript_path.read_text(encoding="utf-8")
+            except Exception:
+                pass
+
+        if transcript_text:
+            try:
+                companion_md = audio_path.with_name(f"{audio_path.name}.md")
+                companion_md.write_text(transcript_text, encoding="utf-8")
+            except Exception as comp_exc:
+                logger.debug(f"[DavidMosheScenario] Запись companion .md для аудио: {comp_exc}")
+
+        rel_doc_id = ""
+        try:
+            _, ws_path = wm._get_or_create_workspace(workspace_id)
+            rel_doc_id = str(dest_transcript_path.relative_to(ws_path)).replace("\\", "/")
+            if transcript_text:
+                wm.import_document(
+                    workspace_id=workspace_id,
+                    document_id=rel_doc_id,
+                    content=transcript_text,
+                    commit_message=(
+                        f"Сценарий דוד משה: скопирован транскрипт {dest_filename} "
+                        f"к аудио {clean_name}"
+                    ),
+                )
+        except Exception as imp_exc:
+            logger.debug(f"[DavidMosheScenario] Ошибка импорта в KnowledgeStore: {imp_exc}")
+
+        if src_transcript:
+            cur_host = get_current_host_name()
+            try:
+                wm.link_source(
+                    workspace_id=workspace_id,
+                    target=str(src_transcript),
+                    name=src_transcript.stem,
+                    auto_watch=True,
+                    host_name=cur_host,
+                )
+            except Exception as link_exc:
+                logger.debug(f"[DavidMosheScenario] Привязка внешнего источника: {link_exc}")
+
+        now_ts = time.time()
+        state: Dict[str, Any] = {
+            "status": "completed",
+            "workspace_id": workspace_id,
+            "trigger_file": clean_name,
+            "target_file_path": str(src_transcript or dest_transcript_path),
+            "target_file_name": dest_filename,
+            "destination_file": str(dest_transcript_path),
+            "completed_at": now_ts,
+            "result": {
+                "transcript_file": dest_filename,
+                "transcript_path": str(dest_transcript_path),
+                "audio_file": clean_name,
+                "copied": bool(src_transcript and dest_transcript_path.exists()),
+            },
+        }
+        self._write_state(state)
+
+        return {
+            "status": "ok",
+            "scenario": "david_moshe_audio_transcript",
+            "audio_path": str(audio_path),
+            "transcript_path": str(dest_transcript_path),
+            "transcript_name": dest_filename,
+            "transcript_text": transcript_text,
+            "file_info": {
+                "name": rel_doc_id or dest_filename,
+                "path": str(dest_transcript_path),
+                "size": dest_transcript_path.stat().st_size if dest_transcript_path.exists() else 0,
+                "type": "uploaded_file",
+                "source": "david_moshe_scenario_transcript",
+                "rel_path": rel_doc_id or dest_filename,
+                "converted": False,
+                "is_raw": False,
+                "in_assets": True,
+                "tracked_by_git": True,
+            },
+        }
 
     def resolve_david_moshe_workspace_id(self, wm: WorkspaceManager, preferred_id: Optional[str] = None) -> str:
         """Находит существующий идентификатор рабочей области דוד משה в реестре или возвращает канонический."""
@@ -287,6 +438,15 @@ class TelegramWorkspaceScenarioService:
         target_path = Path(target_path_str)
 
         try:
+            if not target_path.exists():
+                for alt_cand in [
+                    DEFAULT_SCENARIO_TARGET_FILE,
+                    Path.home() / "Desktop" / "דוד מושה — רשימת מסמכים" / "02_transcript_david_moshe_shmulik_v3.md",
+                    Path.home() / "Desktop" / "דוד מושה — רשימת מסמכים" / "שיחה בין דוד משה לשמוליק.md",
+                ]:
+                    if alt_cand.exists() and alt_cand.is_file():
+                        target_path = alt_cand
+                        break
             if not target_path.exists():
                 raise FileNotFoundError(f"Целевой файл сценария не найден: {target_path_str}")
 

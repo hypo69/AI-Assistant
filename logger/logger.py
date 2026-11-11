@@ -21,7 +21,7 @@
 # Package: logger
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 14:35:00
+# Updated: 2026-11-10 17:27:00
 # =============================================================================
 
 from __future__ import annotations
@@ -29,6 +29,8 @@ from __future__ import annotations
 
 import atexit
 from collections import Counter
+from contextlib import contextmanager
+import contextvars
 import copy
 from datetime import datetime, timezone
 import inspect
@@ -39,11 +41,68 @@ import os
 from pathlib import Path
 import sys
 import threading
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import colorama
 import header
 from header import __root__
+
+# Контекстные переменные сквозной трассировки (SRE Observability / W3C TraceContext)
+_TRACE_ID_CTX: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")
+_USER_ID_CTX: contextvars.ContextVar[str] = contextvars.ContextVar("user_id", default="")
+_SERVICE_NAME_CTX: contextvars.ContextVar[str] = contextvars.ContextVar("service_name", default="ai-windows-admin")
+
+
+def set_trace_context(
+    trace_id: str = "",
+    user_id: str = "",
+    service_name: str = "",
+) -> Dict[str, str]:
+    """Устанавливает атрибуты контекста распределенной трассировки для текущего контекста выполнения."""
+    if trace_id:
+        _TRACE_ID_CTX.set(str(trace_id))
+    if user_id:
+        _USER_ID_CTX.set(str(user_id))
+    if service_name:
+        _SERVICE_NAME_CTX.set(str(service_name))
+    return get_trace_context()
+
+
+def get_trace_context() -> Dict[str, str]:
+    """Возвращает текущие значения trace_id, user_id и service_name."""
+    return {
+        "trace_id": _TRACE_ID_CTX.get(),
+        "user_id": _USER_ID_CTX.get(),
+        "service_name": _SERVICE_NAME_CTX.get(),
+    }
+
+
+def clear_trace_context() -> None:
+    """Сбрасывает контекст трассировки в значения по умолчанию."""
+    _TRACE_ID_CTX.set("")
+    _USER_ID_CTX.set("")
+    _SERVICE_NAME_CTX.set("ai-windows-admin")
+
+
+@contextmanager
+def trace_context(
+    trace_id: str = "",
+    user_id: str = "",
+    service_name: str = "",
+) -> Generator[Dict[str, str], None, None]:
+    """Контекстный менеджер для временной привязки trace_id и user_id к логам."""
+    tok_trace = _TRACE_ID_CTX.set(str(trace_id)) if trace_id else False
+    tok_user = _USER_ID_CTX.set(str(user_id)) if user_id else False
+    tok_srv = _SERVICE_NAME_CTX.set(str(service_name)) if service_name else False
+    try:
+        yield get_trace_context()
+    finally:
+        if tok_trace:
+            _TRACE_ID_CTX.reset(tok_trace)
+        if tok_user:
+            _USER_ID_CTX.reset(tok_user)
+        if tok_srv:
+            _SERVICE_NAME_CTX.reset(tok_srv)
 
 colorama.init(autoreset=False)
 
@@ -56,8 +115,10 @@ TEXT_COLORS: Dict[str, str] = {
     'magenta': colorama.Fore.MAGENTA,
     'cyan': colorama.Fore.CYAN,
     'white': colorama.Fore.WHITE,
-    'gray': colorama.Fore.LIGHTBLACK_EX,
     'light_gray': colorama.Fore.LIGHTBLACK_EX,
+    'gray': colorama.Fore.LIGHTBLACK_EX,
+    'grey': colorama.Fore.LIGHTBLACK_EX,
+    'dark_gray': colorama.Fore.LIGHTBLACK_EX,
     'light_red': colorama.Fore.LIGHTRED_EX,
     'light_green': colorama.Fore.LIGHTGREEN_EX,
     'light_yellow': colorama.Fore.LIGHTYELLOW_EX,
@@ -75,8 +136,10 @@ BG_COLORS: Dict[str, str] = {
     'magenta': colorama.Back.MAGENTA,
     'cyan': colorama.Back.CYAN,
     'white': colorama.Back.WHITE,
-    'gray': colorama.Back.LIGHTBLACK_EX,
     'light_gray': colorama.Back.LIGHTBLACK_EX,
+    'gray': colorama.Back.LIGHTBLACK_EX,
+    'grey': colorama.Back.LIGHTBLACK_EX,
+    'dark_gray': colorama.Back.LIGHTBLACK_EX,
     'light_red': colorama.Back.LIGHTRED_EX,
     'light_green': colorama.Back.LIGHTGREEN_EX,
     'light_yellow': colorama.Back.LIGHTYELLOW_EX,
@@ -85,15 +148,18 @@ BG_COLORS: Dict[str, str] = {
     'light_cyan': colorama.Back.LIGHTCYAN_EX,
 }
 
+CONSOLE_LEVEL: int = 25
+logging.addLevelName(CONSOLE_LEVEL, 'CONSOLE')
+
 # =============================================================================
 # Декларативная карта маршрутизации логов по подсистемам
 # =============================================================================
 SUBSYSTEM_ROUTING_MAP: List[Tuple[Tuple[str, ...], str]] = [
-    # 1. Стек Windows (apps/ai_assistant)
-    (('apps/ai_assistant/api', 'apps\\ai_assistant\\api', 'router_tc', 'internal_app'), 'windows_api.log'),
-    (('apps/ai_assistant/telemetry', 'apps\\ai_assistant\\telemetry', 'analytics'), 'telemetry.log'),
-    (('apps/ai_assistant/wikillm', 'apps\\ai_assistant\\wikillm'), 'wikillm.log'),
-    (('apps/ai_assistant', 'apps\\ai_assistant', 'src/ai/agents/windows_tools', 'src\\ai\\agents\\windows_tools', 'windows_admin'), 'windows.log'),
+    # 1. Стек Windows (apps/windows)
+    (('apps/windows/api', 'apps\\windows\\api', 'router_tc', 'internal_app'), 'windows_api.log'),
+    (('apps/windows/telemetry', 'apps\\windows\\telemetry', 'analytics'), 'telemetry.log'),
+    (('apps/windows/wikillm', 'apps\\windows\\wikillm'), 'wikillm.log'),
+    (('apps/windows', 'apps\\windows', 'src/ai/agents/windows_tools', 'src\\ai\\agents\\windows_tools', 'windows_admin'), 'windows.log'),
 
     # 2. Изолированные провайдеры ИИ и CLI
     (('src/ai/providers/gemini_cli', 'src\\ai\\providers\\gemini_cli', 'gemini_cli_chat', 'gemini_cli'), 'gemini_cli.log'),
@@ -186,16 +252,25 @@ class SingletonMeta(type):
 
 
 class JsonFormatter(logging.Formatter):
-    """Кастомный форматтер для сериализации лог-записей в JSON формат со строгим UTC ISO 8601."""
+    """Кастомный форматтер для сериализации лог-записей в структурированный SRE JSON формат."""
 
     def format(self, record: logging.LogRecord) -> str:
-        utc_ts = datetime.fromtimestamp(record.created, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        ts_utc = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        err_stack = self.formatException(record.exc_info) if record.exc_info else ""
+        trace_id = getattr(record, "trace_id", "") or _TRACE_ID_CTX.get()
+        user_id = getattr(record, "user_id", "") or _USER_ID_CTX.get()
+        service_name = getattr(record, "service_name", "") or _SERVICE_NAME_CTX.get() or "ai-windows-admin"
+
         log_entry: Dict[str, Any] = {
-            'timestamp': utc_ts,
+            'timestamp': ts_utc,
             'level': record.levelname,
             'levelname': record.levelname,
+            'service_name': service_name,
+            'trace_id': trace_id,
+            'user_id': user_id,
             'message': record.getMessage().replace('"', "'"),
-            'exc_info': self.formatException(record.exc_info) if record.exc_info else None,
+            'error_stack': err_stack,
+            'exc_info': err_stack if err_stack else None,
         }
         return json.dumps(log_entry, ensure_ascii=False)
 
@@ -258,7 +333,20 @@ class PrettyConsoleFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         from src.utils.printer import pformat
+        orig_levelname = record.levelname
         try:
+            if getattr(record, 'is_console_only', False) or record.levelno == CONSOLE_LEVEL:
+                if record.levelno in (logging.INFO, CONSOLE_LEVEL):
+                    record.levelname = 'CONSOLE'
+                elif record.levelno == logging.DEBUG:
+                    record.levelname = 'CONSOLE:DEBUG'
+                elif record.levelno == logging.WARNING:
+                    record.levelname = 'CONSOLE:WARNING'
+                elif record.levelno in (logging.ERROR, logging.CRITICAL):
+                    record.levelname = 'CONSOLE:ERROR'
+                else:
+                    record.levelname = 'CONSOLE'
+
             orig_msg = record.getMessage()
             formatted_msg = pformat(orig_msg)
             orig_record_msg = record.msg
@@ -271,24 +359,32 @@ class PrettyConsoleFormatter(logging.Formatter):
             return result
         except Exception:
             return super().format(record)
+        finally:
+            record.levelname = orig_levelname
 
 
-def _resolve_app_name() -> str:
-    """Определяет имя приложения из переменной окружения APP_NAME или config.json."""
-    env_name = os.environ.get('APP_NAME')
-    if env_name:
-        return env_name
+def _get_app_name() -> str:
+    """Возвращает название приложения из окружения, конфигурации или имени корневой директории."""
+    if os.environ.get('APP_NAME'):
+        return os.environ['APP_NAME']
     try:
-        config_file = __root__ / 'config.json'
-        if config_file.is_file():
-            with open(config_file, 'r', encoding='utf-8') as f:
+        cfg = __root__ / 'config.json'
+        if cfg.exists():
+            with open(cfg, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                resolved = data.get('app_name') or (data.get('app', {}).get('name') if isinstance(data.get('app'), dict) else None)
-                if resolved:
-                    return str(resolved)
+                return (
+                    data.get('app_name')
+                    or data.get('app', {}).get('app_name')
+                    or data.get('app', {}).get('name')
+                    or data.get('global_settings', {}).get('application_name')
+                    or __root__.name
+                )
     except Exception:
         pass
-    return 'AI-Assistant'
+    return __root__.name
+
+
+_resolve_app_name = _get_app_name
 
 
 class Logger(metaclass=SingletonMeta):
@@ -297,6 +393,8 @@ class Logger(metaclass=SingletonMeta):
     Обеспечивает цветной консольный вывод, JSON-журналирование и автоматическую
     маршрутизацию в отдельные файлы подсистем с ротацией.
     """
+
+    CONSOLE: int = CONSOLE_LEVEL
 
     # Цветовые константы текста и фона для вызовов logger.console(...)
     black: str = 'black'
@@ -308,6 +406,8 @@ class Logger(metaclass=SingletonMeta):
     cyan: str = 'cyan'
     white: str = 'white'
     gray: str = 'gray'
+    grey: str = 'grey'
+    dark_gray: str = 'dark_gray'
     light_gray: str = 'light_gray'
     light_red: str = 'light_red'
     light_green: str = 'light_green'
@@ -326,13 +426,14 @@ class Logger(metaclass=SingletonMeta):
         self._lock = threading.Lock()
         self._module_loggers: Dict[str, logging.Logger] = {}
 
-        env_dir = os.environ.get('AI_WINDOWS_ADMIN_LOGS_DIR') or os.environ.get('LOG_DIR')
+        env_dir = os.environ.get('AITC_LOGS_DIR') or os.environ.get('AI_TC_LOGS_DIR') or os.environ.get('AI_WINDOWS_ADMIN_LOGS_DIR') or os.environ.get('LOG_DIR')
         if env_dir:
             self.log_files_path = Path(env_dir)
         else:
+            app_name = _get_app_name()
             appdata = os.environ.get('APPDATA') or os.environ.get('LOCALAPPDATA')
             base_dir = Path(appdata) if appdata and os.path.exists(appdata) else Path.home() / '.config'
-            self.log_files_path = base_dir / _resolve_app_name() / 'logs'
+            self.log_files_path = base_dir / app_name / 'logs'
 
         self.info_log_path: Path = self.log_files_path / (info_log_path or 'info.log')
         self.debug_log_path: Path = self.log_files_path / (debug_log_path or 'debug.log')
@@ -692,9 +793,12 @@ class Logger(metaclass=SingletonMeta):
         exc_info: bool = False,
         text_color: str = '',
         bg_color: str = '',
-        level: int = logging.INFO,
+        level: int = CONSOLE_LEVEL,
     ) -> None:
         """Выводит сообщение исключительно в консоль без записи в файлы логов.
+
+        Содержит собственную метку уровня CONSOLE для однозначной идентификации
+        вывода только в консоль.
 
         Args:
             message (Any): Первое сообщение или объект для вывода.
@@ -704,9 +808,9 @@ class Logger(metaclass=SingletonMeta):
             exc_info (bool): Флаг включения трассировки стека исключения.
             text_color (str): Цвет текста (из TEXT_COLORS). По умолчанию без изменения цвета.
             bg_color (str): Цвет фона (из BG_COLORS). По умолчанию без фона.
-            level (int): Уровень логирования (по умолчанию logging.INFO).
+            level (int): Уровень логирования (по умолчанию CONSOLE_LEVEL).
         """
-        if level == logging.DEBUG and (not self.is_debug_mode):
+        if (level == logging.DEBUG or level == 10) and (not self.is_debug_mode):
             return
 
         if args:
@@ -721,7 +825,13 @@ class Logger(metaclass=SingletonMeta):
         colored_message = self._format_message(combined_message, ex, color)
         if self.logger_console:
             try:
-                self.logger_console.log(level, colored_message, exc_info=exc_info)
+                rec_level = CONSOLE_LEVEL if level in (logging.INFO, CONSOLE_LEVEL) else level
+                self.logger_console.log(
+                    rec_level,
+                    colored_message,
+                    exc_info=exc_info,
+                    extra={'is_console_only': True, 'console_tag': 'CONSOLE'},
+                )
             except Exception:
                 pass
 
@@ -750,13 +860,14 @@ def get_uvicorn_log_config(log_filename: str = 'fastapi.log') -> Dict[str, Any]:
     """
     try:
         import uvicorn.config
-        env_dir = os.environ.get('AI_WINDOWS_ADMIN_LOGS_DIR') or os.environ.get('LOG_DIR')
+        env_dir = os.environ.get('AITC_LOGS_DIR') or os.environ.get('AI_TC_LOGS_DIR') or os.environ.get('AI_WINDOWS_ADMIN_LOGS_DIR') or os.environ.get('LOG_DIR')
         if env_dir:
             logs_dir = Path(env_dir)
         else:
+            app_name = _get_app_name()
             appdata = os.environ.get('APPDATA') or os.environ.get('LOCALAPPDATA')
             base_dir = Path(appdata) if appdata and os.path.exists(appdata) else Path.home() / '.config'
-            logs_dir = base_dir / _resolve_app_name() / 'logs'
+            logs_dir = base_dir / app_name / 'logs'
 
         logs_dir.mkdir(parents=True, exist_ok=True)
         target_path = str(logs_dir / log_filename)

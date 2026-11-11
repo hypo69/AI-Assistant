@@ -16,7 +16,7 @@
 # Package: src.ai.wikillm
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 16:57:00
+# Updated: 2026-11-10 17:29:00
 # =============================================================================
 
 from __future__ import annotations
@@ -163,16 +163,13 @@ async def record_observation_endpoint(req: ObserveRequest) -> ObservationRecord:
 @router.post("/code/ingest")
 async def ingest_code(req: CodeIngestRequest) -> Dict[str, Any]:
     """Запускает индексацию AST структуры исходного кода кодовой базы."""
+    target = Path(req.target_path).resolve()
     root_resolved = Path(__root__).resolve()
-    target_resolved = (root_resolved / req.target_path).resolve()
-    try:
-        target_resolved.relative_to(root_resolved)
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Доступ запрещен: выход за пределы корневой директории проекта")
-
+    if not target.is_relative_to(root_resolved):
+        raise HTTPException(status_code=403, detail="Запрещена индексация директорий за пределами корня проекта")
     engine = get_engine()
     indexer = CodeKnowledgeIndexer(engine.storage)
-    count = await asyncio.to_thread(indexer.index_directory, target_resolved)
+    count = await asyncio.to_thread(indexer.index_directory, str(target))
     return {
         "status": "success",
         "target_path": req.target_path,
@@ -204,6 +201,8 @@ class ApproveKnowledgeRequest(BaseModel):
     possible_causes: List[str] = Field(default_factory=list, description="Возможные причины")
     tags: List[str] = Field(default_factory=list, description="Теги для поиска")
     model_name: Optional[str] = Field(default=None, description="Модель, сгенерировавшая исходный ответ")
+    developer_advice: Optional[str] = Field(default="", description="Советы разработчику")
+    general_summary: Optional[str] = Field(default=None, description="Общие справочные данные о программе для WikiLLM")
 
 
 @router.post("/approve", response_model=Dict[str, Any])
@@ -236,14 +235,34 @@ async def approve_knowledge(req: ApproveKnowledgeRequest) -> Dict[str, Any]:
         )
 
 
-    canonical_key = req.canonical_key
-    if not canonical_key or canonical_key == "unknown:unspecified":
-        from .normalizer import CanonicalKeyNormalizer
-        canonical_key = CanonicalKeyNormalizer.compute_key_from_parts(
-            table_type=req.table_type,
-            title=req.title,
-            subtitle=req.subtitle or "",
-        )
+    # База данных WikiLLM для процессов должна запоминать только общие данные (без transient PID и CPU/RAM телеметрии)
+    clean_title = req.title.strip()
+    effective_summary = req.summary
+    effective_perf = req.performance_impact
+
+    if req.table_type.lower() == "process" or (req.canonical_key and req.canonical_key.startswith("process:")):
+        import re
+        exe_match = re.search(r"([a-zA-Z0-9_\-\.]+\.exe)", f"{req.title} {req.canonical_key or ''}", re.IGNORECASE)
+        if exe_match:
+            clean_title = exe_match.group(1).lower()
+            canonical_key = f"process:{clean_title}"
+        else:
+            clean_title = re.sub(r"[\s\[\(]+PID[:\s]*\d+[\s\]\)]*", "", req.title, flags=re.IGNORECASE).strip()
+            if not clean_title or clean_title.lower().startswith("pid"):
+                clean_title = req.title.split()[0].strip()
+            canonical_key = f"process:{clean_title.lower()}"
+        if req.general_summary and len(req.general_summary.strip()) >= 10:
+            effective_summary = req.general_summary.strip()
+        effective_perf = "Штатный профиль приложения (из базы знаний WikiLLM)"
+    else:
+        canonical_key = req.canonical_key
+        if not canonical_key or canonical_key == "unknown:unspecified":
+            from .normalizer import CanonicalKeyNormalizer
+            canonical_key = CanonicalKeyNormalizer.compute_key_from_parts(
+                table_type=req.table_type,
+                title=clean_title,
+                subtitle=req.subtitle or "",
+            )
 
     from .models import (
         Claim,
@@ -284,7 +303,7 @@ async def approve_knowledge(req: ApproveKnowledgeRequest) -> Dict[str, Any]:
 
     claims = [
         Claim(
-            statement=req.summary,
+            statement=effective_summary,
             confidence=1.0,
             source=KnowledgeSource.DOCUMENTED,
             verified=True,
@@ -299,12 +318,30 @@ async def approve_knowledge(req: ApproveKnowledgeRequest) -> Dict[str, Any]:
                 verified=True,
             )
         )
+    if req.developer_advice:
+        claims.append(
+            Claim(
+                statement=f"Советы разработчику: {req.developer_advice}",
+                confidence=1.0,
+                source=KnowledgeSource.DOCUMENTED,
+                verified=True,
+            )
+        )
+    if effective_perf:
+        claims.append(
+            Claim(
+                statement=f"Влияние на производительность: {effective_perf}",
+                confidence=1.0,
+                source=KnowledgeSource.DOCUMENTED,
+                verified=True,
+            )
+        )
 
     entity = KnowledgeEntity(
         canonical_key=canonical_key,
         entity_type=entity_type,
-        name=req.title,
-        summary=req.summary,
+        name=clean_title,
+        summary=effective_summary,
         category=req.category or "system",
         severity=req.severity or "info",
         confidence=1.0,
@@ -326,3 +363,4 @@ async def approve_knowledge(req: ApproveKnowledgeRequest) -> Dict[str, Any]:
         "message": f"Знание '{canonical_key}' верифицировано и сохранено в локальной базе WikiLLM.",
         "entity": entity.model_dump(),
     }
+

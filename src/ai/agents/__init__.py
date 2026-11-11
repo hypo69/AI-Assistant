@@ -13,7 +13,7 @@
 # Package: src.ai.agents
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-10-25 19:55:00
+# Updated: 2026-11-01 11:32:00
 # =============================================================================
 
 """Автоматическая регистрация всех агентов.
@@ -53,9 +53,8 @@ _discover_agents()
 
 from .mcp_client import MCPClientManager
 
-# Явный экспорт часто‑используемых агентов для обратной совместимости
-# (может быть удалено в будущих версиях)
-MediaSearchAgent = AGENT_REGISTRY.get("MediaSearchAgent", None)
-TravelAgent = AGENT_REGISTRY.get("TravelAgent", None)
+# Явный экспорт агентов при их наличии в реестре
+MediaSearchAgent = AGENT_REGISTRY.get("MediaSearchAgent")
+TravelAgent = AGENT_REGISTRY.get("TravelAgent")
 
 __all__ = ["AGENT_REGISTRY", "MediaSearchAgent", "TravelAgent", "MCPClientManager"]

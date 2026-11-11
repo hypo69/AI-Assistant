@@ -20,7 +20,7 @@
  * Package: windows/api/webgui/js
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-25 22:42:00
+ * Updated: 2026-11-11 19:55:00
  * =============================================================================
  */
 
@@ -222,10 +222,11 @@ export async function initI18n(langOrLocale) {
     setupLanguageEvents();
     i18nInitialized = true;
 
-    // Сохраняем в localStorage
+    // Сохраняем в localStorage и cookie (для SSR-подстановки при загрузке HTML)
     try {
         localStorage.setItem('app_locale', locale);
         localStorage.setItem('app_language', lang);
+        document.cookie = `app_language=${encodeURIComponent(lang)}; path=/; max-age=31536000; SameSite=Lax`;
     } catch {}
 
     // Уведомляем систему через события
@@ -261,6 +262,7 @@ export async function switchLocale(langOrLocale) {
     try {
         localStorage.setItem('app_locale', locale);
         localStorage.setItem('app_language', lang);
+        document.cookie = `app_language=${encodeURIComponent(lang)}; path=/; max-age=31536000; SameSite=Lax`;
     } catch {}
 
     // Глобальные события для компонентов и вкладок

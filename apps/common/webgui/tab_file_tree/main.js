@@ -20,7 +20,7 @@
  * Package: apps.common.webgui.tab_file_tree
  * Author: hypo69
  * Copyright: © 2026 hypo69
- * Updated: 2026-10-30 15:10:00
+ * Updated: 2026-11-03 13:30:00
  * =============================================================================
  */
 
@@ -565,12 +565,15 @@ async function openFileInEditor(relPath) {
     return;
   }
 
-  // Если открыт таб переключения
-  if (typeof window.switchTab === 'function') {
-    await window.switchTab('tab-file-editor');
-    if (typeof window.openFileInWasmEditor === 'function') {
-      await window.openFileInWasmEditor(relPath, currentWorkspaceId, false);
-    }
+  // Гарантированно открываем в tab-workspace#panel-file-editor
+  if (typeof window.switchTab === 'function' && typeof window.isTabActive === 'function' && !window.isTabActive('tab-workspace')) {
+    await window.switchTab('tab-workspace');
+  }
+  if (typeof window.switchWorkspaceSubTab === 'function') {
+    window.switchWorkspaceSubTab('panel-file-editor', true);
+  }
+  if (typeof window.openFileInWasmEditor === 'function') {
+    await window.openFileInWasmEditor(relPath, currentWorkspaceId, true);
   } else {
     showToast(`Открытие ${relPath} в редакторе...`, 'info');
   }

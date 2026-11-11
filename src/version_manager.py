@@ -16,7 +16,7 @@
 # Package: src
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 14:35:00
+# Updated: 2026-11-10 18:15:00
 # =============================================================================
 
 """Менеджер версий и обработчик автоматических обновлений приложения.
@@ -106,8 +106,11 @@ class VersionManager:
             repo_path: Путь к репозиторию (по умолчанию __root__).
         """
         self.repo_path: Path = repo_path or __root__
-        self.temp_backup_dir: Path = Path(tempfile.gettempdir()) / 'ai-windows-admin' / 'backups'
-        self.update_log_dir: Path = Path(tempfile.gettempdir()) / 'ai-windows-admin' / 'updates'
+        app_name = os.environ.get('APP_NAME') or (__root__.name if __root__.exists() else 'ai-windows-admin')
+        appdata = os.environ.get('APPDATA')
+        base_tmp = (Path(appdata) / app_name / 'tmp') if appdata else (Path(tempfile.gettempdir()) / app_name)
+        self.temp_backup_dir: Path = base_tmp / 'backups'
+        self.update_log_dir: Path = base_tmp / 'updates'
         self.current_version: str = '1.0.0'
         self.remote_url: str = 'origin'
         self._lock = threading.RLock()

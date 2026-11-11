@@ -4,14 +4,14 @@
 # =============================================================================
 # Description:
 #   TDD-тесты для проверки вкладки редактора всплывающих подсказок (tab_tooltips),
-#   API-эндпоинтов /api/v1/tooltips, одноразового автоперевода, сохранения
-#   и отсутствия кнопок вызова AI-модели в контейнере подсказки.
+#   API-эндпоинтов /api/v1/tooltips, одноразового автоперевода, сохранения,
+#   отсутствия кнопок вызова AI-модели и исключения плейсхолдеров/сырых ключей.
 #
 # File: test_tooltips_editor_tab.py
 # Package: apps.ai_assistant.tests
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-07 00:35:00
+# Updated: 2026-11-10 17:36:00
 # =============================================================================
 
 from __future__ import annotations
@@ -44,6 +44,33 @@ async def test_tooltips_api_get_catalog() -> None:
         assert "titles" in first
         assert "summaries" in first
         assert "ru" in first["titles"]
+
+
+@pytest.mark.asyncio
+async def test_no_placeholder_or_raw_keys_in_tooltips_catalog() -> None:
+    """Проверяет отсутствие сырых ключей перевода и плейсхолдеров в каталоге тултипов."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/v1/tooltips")
+        assert res.status_code == 200
+        data = res.json()
+        tooltips = data.get("tooltips", [])
+        
+        suspicious_list = []
+        for item in tooltips:
+            k = item.get("key", "")
+            for lang, text in item.get("titles", {}).items():
+                if text == k and ("." in k or "_" in k):
+                    suspicious_list.append(f"Сырой ключ вместо перевода: key='{k}' lang='{lang}' val='{text}'")
+                if "Загрузка..." in str(text):
+                    suspicious_list.append(f"Плейсхолдер 'Загрузка...' в заголовке: key='{k}' lang='{lang}'")
+            for lang, text in item.get("summaries", {}).items():
+                if text == k and ("." in k or "_" in k):
+                    suspicious_list.append(f"Сырой ключ вместо описания: key='{k}' lang='{lang}' val='{text}'")
+                if "Загрузка..." in str(text):
+                    suspicious_list.append(f"Плейсхолдер 'Загрузка...' в описании: key='{k}' lang='{lang}'")
+
+        assert len(suspicious_list) == 0, "\n".join(suspicious_list)
 
 
 @pytest.mark.asyncio

@@ -164,7 +164,7 @@
       "qaTitle": "Questions & Answers (Q&A)",
       "chatTitle": "Chat with AI Assistant",
       "editor": "File Editor",
-      "editorTitle": "Section: Редактор файлов",
+      "editorTitle": "Universal Workspace File Editor (Studio Code)",
       "panel-filesTitle": "Section: Файлы",
       "panel-documentsTitle": "Section: Шаг 2: Документы и факты (Git)",
       "panel-qaTitle": "Section: Шаг 3: Вопрос-Ответ (QA)",
@@ -415,7 +415,13 @@
     "hideSystemFiles": "Hide system files",
     "newDocTitle": "Create new document in workspace",
     "seedDemoBtn": "Seed with demo data",
-    "toggleSystemFilesTitle": "Show or hide system files (.git, .gitignore, README.md, etc.)"
+    "toggleSystemFilesTitle": "Show or hide system files (.git, .gitignore, README.md, etc.)",
+    "blocks": {
+      "block-dirTitle": "Repository Contents (Git)",
+      "block-trackTitle": "Add Files & Folders to Git Tracking",
+      "block-obsidianTitle": "Knowledge Base & Notes (Obsidian Vault)",
+      "block-sourcesTitle": "External Data & Context Sources"
+    }
   },
   "auth": {
     "googleSignIn": "Sign in with Google",
@@ -440,703 +446,708 @@
         "category": "Рабочая область"
       },
       "commits": {
-        "title": "Commit History",
-        "summary": "Interactive repository commit feed with change analysis and diffs."
+        "title": "Git Commits History",
+        "summary": "Interactive Git commits feed with change analysis and smart diff descriptions.",
+        "category": "Версионирование"
       },
       "rag": {
-        "title": "RAG Search",
-        "summary": "Global 5-stage RAG search based on FAISS vector embeddings, fact extraction and semantic analysis."
+        "title": "RAG Semantic Search",
+        "summary": "Global 5-stage RAG search powered by FAISS vector embeddings, fact extraction, and semantic doc analysis.",
+        "category": "База знаний"
       },
       "diff": {
-        "title": "Version Diff",
-        "summary": "Intelligent diff viewer between commits, snapshots and branches with Smart Blame analysis."
+        "title": "Smart Diff & Blame",
+        "summary": "Intelligent diff visualizer between commits, snapshots, and branches with Smart Blame analysis.",
+        "category": "Версионирование"
       },
       "timeline": {
-        "title": "Timeline",
-        "summary": "Chronological timeline of codebase evolution, tracking architectural decisions and development milestones."
+        "title": "Codebase Evolution Timeline",
+        "summary": "Chronological timeline of codebase evolution, tracking architectural decisions and development milestones.",
+        "category": "Хронология"
       },
       "obsidian": {
-        "title": "Obsidian Vault",
-        "summary": "Export documents, entities and links into Obsidian Markdown vault format with graph support."
+        "title": "Obsidian Vault Export",
+        "summary": "Export workspace docs, entities, and relationships to Obsidian notes vault with Markdown and graph support.",
+        "category": "Интеграция"
       },
       "git_engine": {
-        "title": "Движок Git",
-        "summary": "Высокоскоростной локальный движок Git для слежения за файлами на месте без перемещения и создания снимков состояния.",
-        "category": "Versioning"
+        "title": "Local Git Engine",
+        "summary": "High-performance local Git engine for in-place file tracking and snapshot creation without moving files.",
+        "category": "Версионирование"
       },
       "graph": {
-        "title": "Темпоральный граф",
-        "summary": "Интерактивный темпоральный граф архитектурных сущностей, зависимостей файлов и связей базы знаний.",
-        "category": "Analytics"
+        "title": "Temporal Knowledge Graph",
+        "summary": "Interactive temporal graph of architectural entities, file dependencies, and knowledge base relationships.",
+        "category": "Аналитика"
       },
       "models": {
-        "title": "ИИ Модели и Провайдеры",
-        "summary": "Реестр и диспетчер ИИ-моделей: Google Gemini, Microsoft Foundry Local (Phi-3), Ollama (Llama-3), ONNX/DirectML.",
-        "category": "AI Environment"
+        "title": "AI Models & Providers",
+        "summary": "AI models registry & dispatcher: Google Gemini, Microsoft Foundry Local (Phi-3), Ollama (Llama-3), ONNX/DirectML.",
+        "category": "Среда ИИ"
       },
       "verification": {
-        "title": "Контур верификации",
-        "summary": "Автоматический двухшаговый контур проверки целостности, архитектурных инвариантов и контрактов подсистем.",
-        "category": "Verification"
+        "title": "Subsystem Verification Circuit",
+        "summary": "Automated 2-step verification circuit for integrity, architectural invariants, and subsystem contracts.",
+        "category": "Верификация"
       },
       "plugins": {
-        "title": "Менеджер плагинов",
-        "summary": "Менеджер плагинов и модулей расширения функциональности ассистента с изолированным жизненным циклом.",
-        "category": "Extensions"
+        "title": "Extensions & Plugins Hub",
+        "summary": "Plugins & extensions manager for assistant capabilities with isolated lifecycle management.",
+        "category": "Расширения"
       },
       "gmail": {
-        "title": "Управление Gmail",
-        "summary": "Интеграция с почтовой инфраструктурой Gmail: поиск сообщений, категоризация, извлечение фактов и отправка отчетов.",
-        "category": "Communications"
+        "title": "Gmail Manager",
+        "summary": "Gmail integration: message search, categorisation, fact extraction, and dispatching reports.",
+        "category": "Коммуникации"
       },
       "create_workspace": {
-        "title": "Создать новое пространство",
-        "summary": "Создание изолированного рабочего пространства с инициализацией Git и слежением за файлами и директориями на месте без их перемещения.",
-        "category": "Workspace"
+        "title": "Create New Workspace",
+        "summary": "Create an isolated workspace with Git init and in-place tracking of local files and directories.",
+        "category": "Рабочая область"
       },
       "qa": {
-        "title": "Вопросы и ответы (Q&A)",
-        "summary": "Семантический вопросно-ответный модуль на базе векторного хранилища FAISS и WikiLLM.",
-        "category": "Knowledge Base"
+        "title": "Knowledge Q&A Engine",
+        "summary": "Semantic Q&A module based on FAISS vector store and WikiLLM knowledge engine.",
+        "category": "База знаний"
       },
       "system_tour": {
-        "title": "Тур по системе",
-        "summary": "Пошаговый интерактивный гид по ключевым экранам и возможностям веб-интерфейса.",
+        "title": "Interactive System Tour",
+        "summary": "Interactive System Tour: inspection and management tool.",
         "category": "Обучение"
       },
       "cfa": {
-        "title": "Ransomware / CFA",
-        "summary": "Controlled Folder Access (CFA) — компонент защиты Защитника Windows от программ-вымогателей (Ransomware). Непрерывно контролирует попытки модификации файлов и блокирует несанкционированные изменения в защищаемых системных и пользовательских каталогах (Документы, Рабочий стол, Картинки).",
+        "title": "Controlled Folder Access (CFA)",
+        "summary": "Controlled Folder Access (CFA): inspection and management tool.",
         "category": "Защита от вымогателей"
       },
       "asr": {
-        "title": "Правила ASR",
-        "summary": "Правила снижения поверхности атак (ASR) блокируют типичные векторы проникновения угроз: вредоносные макросы Office, исполнение недоверенных скриптов PowerShell/WScript, внедрение кода в чужие процессы и обфусцированные эксплойты.",
+        "title": "Attack Surface Reduction (ASR)",
+        "summary": "Attack Surface Reduction (ASR): inspection and management tool.",
         "category": "Снижение поверхности атак"
       },
       "exclusions": {
-        "title": "Исключения Defender",
-        "summary": "Список путей, расширений и процессов, исключенных администратором из сканирования в реальном времени. Требуют регулярного аудита для предотвращения скрытого запуска зловредов из доверенных каталогов.",
+        "title": "Defender Antivirus Exclusions",
+        "summary": "Defender Antivirus Exclusions: inspection and management tool.",
         "category": "Политики исключений"
       },
       "threats": {
-        "title": "Угрозы и Карантин",
-        "summary": "Централизованный журнал нейтрализованных угроз и изолированное безопасное хранилище (Карантин), позволяющее администратору восстановить ложно сработавшие файлы или окончательно удалить опасные артефакты.",
+        "title": "Active Threats & Quarantine",
+        "summary": "Active Threats & Quarantine: inspection and management tool.",
         "category": "Журнал инцидентов"
       },
       "procs": {
-        "title": "Дерево Процессов / Fileless",
-        "summary": "Модуль профилирования родительско-дочерних связей процессов для выявления бесфайловых угроз (Fileless Malware), аномального использования системных утилит (LOLBins: powershell, rundll32, mshta) и инъекций памяти.",
+        "title": "Process Trees & Memory Inspection",
+        "summary": "Process Trees & Memory Inspection: inspection and management tool.",
         "category": "Поведенческий анализ"
       },
       "events": {
-        "title": "Журнал Событий",
-        "summary": "События телеметрии Microsoft-Windows-Windows Defender/Operational (Event ID 1116, 1117, 1123, 1124) с детализацией заблокированных модулей, подозрительных сетевых попыток и статусов сканирования.",
+        "title": "Windows Event Viewer",
+        "summary": "Windows Event Viewer: inspection and management tool.",
         "category": "События и аудит"
       },
       "diag": {
-        "title": "AI Диагностика Defender",
-        "summary": "Комплексный автоматический аудит политик антивирусной защиты, состояния служб, эффективности правил ASR и сигнатур угроз с формированием практических рекомендаций системному администратору.",
+        "title": "AI Diagnostic Engine",
+        "summary": "AI Diagnostic Engine: inspection and management tool.",
         "category": "ИИ Диагностика"
       },
       "quick_scan": {
-        "title": "Быстрое сканирование",
-        "summary": "Быстрое сканирование активных процессов, оперативной памяти, системного реестра и каталогов автозагрузки Windows на присутствие активных вредоносных программ.",
+        "title": "Windows Defender Quick Scan",
+        "summary": "Windows Defender Quick Scan: inspection and management tool.",
         "category": "Антивирусное сканирование"
       },
       "full_scan": {
-        "title": "Полное сканирование",
-        "summary": "Пофайловая проверка всех разделов жестких дисков, съемных накопителей, архивов и системных библиотек Windows на наличие скрытых руткитов и вредоносных утилит.",
+        "title": "Windows Defender Full Scan",
+        "summary": "Windows Defender Full Scan: inspection and management tool.",
         "category": "Антивирусное сканирование"
       },
       "update_sigs": {
-        "title": "Обновление сигнатур",
-        "summary": "Принудительная загрузка новейших антивирусных баз сигнатур и обновления движка Microsoft Defender через защищенные каналы Microsoft Security Intelligence.",
+        "title": "Update Antivirus Signatures",
+        "summary": "Update Antivirus Signatures: inspection and management tool.",
         "category": "Сигнатурные базы"
       },
       "realtime": {
-        "title": "Real-Time Shield",
-        "summary": "Постоянный перехват и проверка файлов при обращении, чтении и записи. Защищает операционную систему от запуска троянов, вымогателей и шпионского ПО до его выполнения.",
+        "title": "Real-time Antivirus Protection",
+        "summary": "Real-time Antivirus Protection: inspection and management tool.",
         "category": "Ядро антивируса"
       },
       "cloud_tamper": {
         "title": "Cloud & Tamper Protection",
-        "summary": "Защита от подделки (Tamper Protection) блокирует попытки вредоносных программ отключить Защитник Windows. Облачная защита (MAPS) сверяет неизвестные хэши с глобальным облаком Microsoft в миллисекунды.",
+        "summary": "Cloud & Tamper Protection: inspection and management tool.",
         "category": "Расширенная защита"
       },
       "summary-dashboard": {
-        "title": "Сводка сбоев и аномалий",
-        "summary": "Агрегированная сводка критических сбоев: аварийные отключения питания (Kernel-Power 41), фатальные аварии BSOD (BugCheck), сбои драйверов устройств и всплески подозрительной активности.",
+        "title": "System Failure Summary Dashboard",
+        "summary": "System Failure Summary Dashboard: inspection and management tool.",
         "category": "Сводная диагностика"
       },
       "event-logs": {
-        "title": "Журналы событий Windows",
-        "summary": "Централизованный доступ к основным журналам Windows (System, Application, Security, PowerShell, TaskScheduler) для детального аудита системных записей и устранения неполадок.",
+        "title": "System Event Logs",
+        "summary": "System Event Logs: inspection and management tool.",
         "category": "Журналы Windows"
       },
       "activity": {
-        "title": "Журнал активности",
-        "summary": "Хроника внутренних фоновых процессов, запусков и остановок служб, сессий телеметрии и сервисных задач операционной системы.",
+        "title": "Host Background Activity",
+        "summary": "Host Background Activity: inspection and management tool.",
         "category": "Активность системы"
       },
       "power-lifecycle": {
-        "title": "Жизненный цикл питания",
-        "summary": "Хронология сессий питания: включение ПК, штатные выключения (Event 1074, 6006), периоды сна, гибернации и внезапные аварийные сбои (Event 41, 6008).",
+        "title": "Power Lifecycle & Wake Events",
+        "summary": "Power Lifecycle & Wake Events: inspection and management tool.",
         "category": "Электропитание"
       },
       "defender-logs": {
-        "title": "Журналы Defender",
-        "summary": "События антивирусной защиты: детектирование вредоносных программ, изоляция в карантин, сканирование и блокировки несанкционированного доступа (CFA / ASR).",
+        "title": "Windows Defender Event Logs",
+        "summary": "Windows Defender Event Logs: inspection and management tool.",
         "category": "Безопасность / Defender"
       },
       "forensics": {
-        "title": "⏱️ Форензика",
-        "summary": "Раздел фиксации истории работы операционной системы («черный ящик» ПК). Отображает хронологию запусков программ, сессий питания и событий активности для быстрого расследования сбоев и подозрительных действий.",
+        "title": "История действий и активности компьютера (Форензика)",
+        "summary": "История действий и активности компьютера (Форензика): inspection and management tool.",
         "category": "История работы ПК"
       },
       "mode-live": {
-        "title": "Live Events",
-        "summary": "Отображение непрерывного потока событий выбранного журнала в реальном времени по мере их возникновения в операционной системе.",
+        "title": "Поток событий журнала в реальном времени",
+        "summary": "Поток событий журнала в реальном времени: inspection and management tool.",
         "category": "Режим отображения"
       },
       "mode-audit": {
-        "title": "Аудит (Smart Digest)",
-        "summary": "Разведочный анализ (EDA), дедупликация повторяющихся событий, вычисление частотности и частотных аномалий журнала.",
+        "title": "Интеллектуальный аудит и агрегация журнала",
+        "summary": "Интеллектуальный аудит и агрегация журнала: inspection and management tool.",
         "category": "Аналитика журнала"
       },
       "mode-rag": {
-        "title": "RAG Поиск",
-        "summary": "Интеллектуальный поиск по записям журнала и инструкциям устранения сбоев с привлечением векторных эмбеддингов и модели ИИ.",
+        "title": "Семантический поиск по базе знаний журнала через AI",
+        "summary": "Семантический поиск по базе знаний журнала через AI: inspection and management tool.",
         "category": "ИИ Поиск"
       },
       "mode-incidents": {
-        "title": "Инциденты",
-        "summary": "Автоматическая группировка связанных аварий, повторяющихся сбоев и цепочек ошибок в изолированные инциденты для расследования первопричин (RCA).",
+        "title": "Кластеры сгруппированных сбоев",
+        "summary": "Кластеры сгруппированных сбоев: inspection and management tool.",
         "category": "Корреляция сбоев"
       },
       "mode-timeline": {
-        "title": "Таймлайн событий",
-        "summary": "Графическая временная шкала плотности событий (тепловая карта и импульсы активности) для быстрого выявления пиковых интервалов сбоев.",
+        "title": "Хронологическая графическая шкала событий",
+        "summary": "Хронологическая графическая шкала событий: inspection and management tool.",
         "category": "Временная шкала"
       },
       "mode-errors": {
-        "title": "Только ошибки",
-        "summary": "Мгновенная фильтрация журнала событий: скрытие информационных сообщений и отображение исключительно ошибок (Error) и критических сбоев (Critical).",
+        "title": "Фильтрация: исключение информационных событий",
+        "summary": "Фильтрация: исключение информационных событий: inspection and management tool.",
         "category": "Фильтрация потока"
       },
       "mode-raw": {
-        "title": "Исходная запись",
-        "summary": "Детальный просмотр исходной структуры события Windows Event Log со всеми системными свойствами, параметрами и дескрипторами.",
+        "title": "Необработанное тело события (XML / JSON телеметрия)",
+        "summary": "Необработанное тело события (XML / JSON телеметрия): inspection and management tool.",
         "category": "Сырые данные"
       },
       "sum-power": {
-        "title": "Сбои питания (Kernel-Power 41)",
-        "summary": "Журнал внезапных обесточиваний и сбоев электропитания (Event ID 41), когда система выключилась или перезагрузилась без корректного завершения.",
+        "title": "Аварийные отключения и сбои питания ПК",
+        "summary": "Аварийные отключения и сбои питания ПК: inspection and management tool.",
         "category": "Критические сбои"
       },
       "sum-bsod": {
-        "title": "BSOD / BugCheck",
-        "summary": "Анализ аварийных остановов ядра (BugCheck / Stop Error), кодов ошибок (0x000000D1, 0x0000003B и др.), дампов памяти и сбойных модулей драйверов.",
+        "title": "Фатальные системные сбои (Синий экран смерти)",
+        "summary": "Фатальные системные сбои (Синий экран смерти): inspection and management tool.",
         "category": "Критические сбои"
       },
       "sum-drivers": {
-        "title": "Ошибки драйверов",
-        "summary": "Сбои инициализации драйверов оборудования, аппаратные задержки ввода-вывода (I/O Errors) и сбои контроллеров периферии.",
+        "title": "Журнал аппаратных сбоев и ошибок драйверов устройств",
+        "summary": "Журнал аппаратных сбоев и ошибок драйверов устройств: inspection and management tool.",
         "category": "Аппаратные сбои"
       },
       "sum-suspicious": {
-        "title": "Подозрительная активность",
-        "summary": "Нетипичные системные всплески, частые перезапуски критических служб и блокировки доступа, требующие внимания системного администратора.",
-        "category": "Security"
+        "title": "Подозрительные системные всплески и аномалии",
+        "summary": "Подозрительные системные всплески и аномалии: inspection and management tool.",
+        "category": "Безопасность"
       },
       "slc-scan": {
-        "title": "Сканировать журналы",
-        "summary": "Немедленный сбор свежих событий из активных журналов Windows Event Log и обновление локальной базы данных телеметрии.",
+        "title": "Host Component Diagnostic Scan",
+        "summary": "Host Component Diagnostic Scan: inspection and management tool.",
         "category": "Операции"
       },
       "slc-refresh": {
-        "title": "Обновить поток",
-        "summary": "Синхронизация и обновление таблицы событий в реальном времени с учетом выбранных фильтров и провайдеров.",
+        "title": "Refresh Diagnostic Data",
+        "summary": "Refresh Diagnostic Data: inspection and management tool.",
         "category": "Операции"
       },
       "sum-refresh": {
-        "title": "Обновить сводку сбоев",
-        "summary": "Принудительный пересчет показателей сбоев питания, аварий BSOD, ошибок драйверов и подозрительной активности за выбранный интервал.",
+        "title": "Повторный расчёт метрик и счетчиков сбоев",
+        "summary": "Повторный расчёт метрик и счетчиков сбоев: inspection and management tool.",
         "category": "Операции"
       },
       "ask-ai": {
-        "title": "Спросить ИИ-ассистента",
-        "summary": "Передача текущего среза журнала или сводки сбоев в ИИ-ассистент для формирования структурированного заключения, оценки рисков и шагов решения.",
+        "title": "Интеллектуальный анализ выборки инцидентов через ИИ",
+        "summary": "Интеллектуальный анализ выборки инцидентов через ИИ: inspection and management tool.",
         "category": "ИИ Диагностика"
       },
       "sum-export": {
-        "title": "Экспорт журнала",
-        "summary": "Выгрузка отфильтрованных событий журнала или сводки инцидентов в файл JSON или CSV для документирования и отчетов.",
+        "title": "Экспорт собранных записей в JSON или CSV",
+        "summary": "Экспорт собранных записей в JSON или CSV: inspection and management tool.",
         "category": "Операции"
       },
       "sw-inventory": {
-        "title": "Реестр программ (Инвентарь)",
-        "summary": "Консолидированный реестр Win32 и Store приложений: сбор путей установки, параметров Quiet Uninstall, версий, издателей и точного занимаемого объема на диске.",
+        "title": "Installed Software Inventory",
+        "summary": "Installed Software Inventory: inspection and management tool.",
         "category": "Инвентарь ПО"
       },
       "sw-packages": {
-        "title": "Менеджер пакетов",
-        "summary": "Управление централизованными репозиториями пакетов Winget и Ninite: пакетная установка, фоновое обновление версий одной командой и проверка целостности манифестов.",
+        "title": "Package Managers (WinGet, Store, Ninite)",
+        "summary": "Package Managers (WinGet, Store, Ninite): inspection and management tool.",
         "category": "Менеджер пакетов"
       },
       "sw-dormant": {
-        "title": "Спящие программы и Сироты",
-        "summary": "Детектирование приложений без активности более 90 дней по телеметрии UserAssist (ROT13) и Prefetch, а также выявление битых служб, задач и каталогов удаленных программ.",
+        "title": "Dormant / Unused Applications",
+        "summary": "Dormant / Unused Applications: inspection and management tool.",
         "category": "Аудит неактивности"
       },
       "sw-transparency": {
-        "title": "ИИ-Аудит прозрачности и рисков",
-        "summary": "Комплексный скоринг благонадежности приложений через LLM: анализ цифровых сертификатов Authenticode, сетевой телеметрии, повышенных привилегий и потенциальных угроз (PUA/Adware).",
+        "title": "Software Transparency & Publisher Check",
+        "summary": "Software Transparency & Publisher Check: inspection and management tool.",
         "category": "ИИ Безопасность"
       },
       "sw-heavy": {
-        "title": "Ресурсоемкие программы",
-        "summary": "Профилирование программного обеспечения с пиковой утилизацией аппаратных ресурсов: интенсивность ядер процессора, объем выделенной памяти и операции ввода-вывода (I/O).",
+        "title": "Heavy Disk Consumers",
+        "summary": "Heavy Disk Consumers: inspection and management tool.",
         "category": "Производительность"
       },
       "sw-sockets": {
-        "title": "Конфигурации и сокеты",
-        "summary": "Инспекция прослушиваемых локальных портов TCP/UDP, активных сетевых соединений и сопоставление сокетов с исполняемыми файлами и процессами Windows.",
+        "title": "Active Network Sockets & Connections",
+        "summary": "Active Network Sockets & Connections: inspection and management tool.",
         "category": "Сетевая активность"
       },
       "sw-winget": {
-        "title": "Пакеты WinGet",
-        "summary": "Интеграция с официальным репозиторием Winget: поиск обновлений, установка проверенных манифестов и автоматизированное управление пакетами.",
+        "title": "WinGet Windows Package Manager",
+        "summary": "WinGet Windows Package Manager: inspection and management tool.",
         "category": "Пакетный менеджер"
       },
       "sw-msi": {
-        "title": "Пакеты MSI",
-        "summary": "Каталог программного обеспечения, установленного через Windows Installer (msiexec) и стандартные установщики реестра: коды продуктов (ProductCode), версии и деинсталляция.",
+        "title": "Установленные пакеты Windows Installer (MSI) и системного реестра",
+        "summary": "Установленные пакеты Windows Installer (MSI) и системного реестра: inspection and management tool.",
         "category": "Пакетный менеджер"
       },
       "sw-store": {
-        "title": "Microsoft Store (AppX/MSIX)",
-        "summary": "Приложения, установленные через Microsoft Store и платформу пакетов AppX/MSIX: Store ID, версии, быстрый переход в магазин ms-windows-store:// и управление обновлениями.",
+        "title": "Microsoft Store App Manager",
+        "summary": "Microsoft Store App Manager: inspection and management tool.",
         "category": "Пакетный менеджер"
       },
       "sw-ninite": {
-        "title": "Автообновление Ninite",
-        "summary": "Пакетное обновление стандартного набора утилит без встроенной рекламы, всплывающих окон подтверждения и сторонних тулбаров.",
+        "title": "Ninite Package Installer",
+        "summary": "Ninite Package Installer: inspection and management tool.",
         "category": "Пакетный менеджер"
       },
       "sw-scan-trigger": {
-        "title": "Запустить сканирование",
-        "summary": "Запуск фонового обхода реестра Windows, папок Program Files, кэша Prefetch, записей UserAssist, служб и планировщика задач для выявления всех установленных программ и следов.",
+        "title": "Trigger Software Audit Scan",
+        "summary": "Trigger Software Audit Scan: inspection and management tool.",
         "category": "Операции сканера"
       },
       "sw-scan-modes": {
-        "title": "Режим сканирования ПО",
-        "summary": "Переключение профилей: Быстрый опрос (Quick), Глубокое сканирование (Deep), Форензика артефактов (Forensic) или прицельный поиск сирот и битых ссылок (Orphans).",
+        "title": "Software Audit Scan Modes",
+        "summary": "Software Audit Scan Modes: inspection and management tool.",
         "category": "Конфигурация"
       },
       "sw-filter-dormant": {
-        "title": "Фильтр: Спящие программы (>90 дн.)",
-        "summary": "Отображение установленных программ, к которым пользователь не обращался более 90 дней, для освобождения памяти и снижения поверхности атаки.",
+        "title": "Фильтрация приложений без запусков за последние 3 месяца",
+        "summary": "Фильтрация приложений без запусков за последние 3 месяца: inspection and management tool.",
         "category": "Фильтры реестра"
       },
       "sw-filter-orphan": {
-        "title": "Фильтр: Сироты и битые остатки",
-        "summary": "Список некорректно удаленного ПО: неудаленные фоновые службы, задачи планировщика и каталоги, исполняемые файлы которых уже отсутствуют на диске.",
+        "title": "Выделение обнаруженных сиротских служб, задач и пустых папок",
+        "summary": "Выделение обнаруженных сиротских служб, задач и пустых папок: inspection and management tool.",
         "category": "Фильтры реестра"
       },
       "sw-filter-store": {
-        "title": "Фильтр: Store / AppX",
-        "summary": "Пакеты Universal Windows Platform (UWP) и Store-приложения, работающие в изолированных контейнерах песочницы AppContainer.",
+        "title": "Современные приложения Microsoft Store и MSIX/AppX пакеты",
+        "summary": "Современные приложения Microsoft Store и MSIX/AppX пакеты: inspection and management tool.",
         "category": "Фильтры реестра"
       },
       "sw-refresh-heavy": {
-        "title": "Обновить ресурсоемкие процессы",
-        "summary": "Снятие мгновенного слепка расхода CPU, оперативной памяти и интенсивности дискового ввода-вывода активными процессами операционной системы.",
+        "title": "Повторный замер утилизации ресурсов процессами",
+        "summary": "Повторный замер утилизации ресурсов процессами: inspection and management tool.",
         "category": "Операции монитора"
       },
       "sw-refresh-sockets": {
-        "title": "Обновить сетевые сокеты",
-        "summary": "Актуализация сетевой карты соединений: локальные порты, внешние IP-адреса, протоколы передачи данных и привязка к системным PID.",
+        "title": "Повторный опрос таблицы открытых TCP/UDP портов",
+        "summary": "Повторный опрос таблицы открытых TCP/UDP портов: inspection and management tool.",
         "category": "Операции монитора"
       },
       "winadmin-users": {
-        "title": "Учетные записи и сессии",
-        "summary": "Аудит локальных пользователей Windows (SAM): статус блокировки, скрытые аккаунты, членство в группе Администраторы, домашние каталоги и активные сессии пользователей.",
+        "title": "Local Windows Users",
+        "summary": "Local Windows Users: inspection and management tool.",
         "category": "Учетные записи"
       },
       "winadmin-groups": {
-        "title": "Группы безопасности",
-        "summary": "Перечень встроенных и пользовательских групп безопасности Windows, сопоставление SID, назначение привилегий и инспекция состава участников групп.",
-        "category": "Security"
+        "title": "Local Security Groups",
+        "summary": "Local Security Groups: inspection and management tool.",
+        "category": "Безопасность"
       },
       "winadmin-events": {
-        "title": "Журнал безопасности Windows",
-        "summary": "Мониторинг ключевых событий безопасности: успешные и неудачные входы (Event 4624/4625), создание и удаление учетных записей (4720/4726), сброс паролей (4724) и блокировки (4740).",
+        "title": "Security Audit Events",
+        "summary": "Security Audit Events: inspection and management tool.",
         "category": "Аудит безопасности"
       },
       "winadmin-security": {
-        "title": "Аудит доступа и SAM",
-        "summary": "Автоматическая проверка критических привилегий: кто входит в группу Администраторы, права Logon as Service, доступ через Remote Desktop (RDP), поиск осиротевших профилей (Orphaned SIDs) и параметры политики паролей.",
+        "title": "System Security Settings",
+        "summary": "System Security Settings: inspection and management tool.",
         "category": "Аудит привилегий"
       },
       "winadmin-pid": {
-        "title": "Инспектор процесса (PID)",
-        "summary": "Глубокое исследование токена безопасности процесса по PID: уровень целостности (Integrity Level), активные привилегии (SeDebugPrivilege, SeImpersonatePrivilege), SID владельца и группы токена.",
+        "title": "Process PID Inspector",
+        "summary": "Process PID Inspector: inspection and management tool.",
         "category": "Контекст процессов"
       },
       "winadmin-catalog": {
-        "title": "Каталог операций (~180)",
-        "summary": "База знаний системных команд и Win32 API для администрирования Windows: вызовы net user, PowerShell cmdlets, WMI/CIM запросы, уровни риска и сценарии автоматизации.",
-        "category": "Knowledge Base"
+        "title": "System Tools Catalog",
+        "summary": "System Tools Catalog: inspection and management tool.",
+        "category": "База знаний"
       },
       "winadmin-acl": {
-        "title": "Управление ACL и правами доступа",
-        "summary": "Контроль списков управления доступом (DACL/SACL): владелец объекта, наследование прав, списки ACE, назначение и сброс разрешений, а также резервное копирование дампов .acl.",
+        "title": "Access Control Lists (ACL)",
+        "summary": "Access Control Lists (ACL): inspection and management tool.",
         "category": "Файловая безопасность"
       },
       "winadmin-refresh": {
-        "title": "Обновить данные Sysadmin",
-        "summary": "Принудительный повторный опрос подсистемы SAM, Active Directory, счетчиков журнала безопасности и Privacy Radar.",
+        "title": "Refresh Windows Administration Data",
+        "summary": "Refresh Windows Administration Data: inspection and management tool.",
         "category": "Операции"
       },
       "winadmin-create-user": {
-        "title": "Создать пользователя",
-        "summary": "Создание новой локальной учетной записи с заданием пароля, членства в группах и параметров принудительной смены пароля при первом входе.",
+        "title": "Create New Local Windows User",
+        "summary": "Create New Local Windows User: inspection and management tool.",
         "category": "Управление учетными записями"
       },
       "winadmin-privacy-radar": {
-        "title": "Privacy Radar (Камера и Микрофон)",
-        "summary": "Отслеживание активных обращений программ к веб-камере и микрофону в реальном времени через системные реестры доступа Windows Privacy.",
+        "title": "Windows Privacy & Telemetry Radar",
+        "summary": "Windows Privacy & Telemetry Radar: inspection and management tool.",
         "category": "Приватность"
       },
       "winadmin-backup": {
-        "title": "Windows Backup (File History)",
-        "summary": "Мониторинг состояния службы File History, целевого накопителя архивации, времени создания последней резервной копии и запуск немедленной архивации.",
+        "title": "Windows System Backup Manager",
+        "summary": "Windows System Backup Manager: inspection and management tool.",
         "category": "Резервное копирование"
       },
       "winadmin-audit-admins": {
-        "title": "Аудит: Who is Admin?",
-        "summary": "Мгновенная проверка и вывод полного списка учетных записей, обладающих повышенными привилегиями локального администратора (BUILTIN\\\\Administrators).",
+        "title": "Audit Administrator Privileges",
+        "summary": "Audit Administrator Privileges: inspection and management tool.",
         "category": "Экспресс-аудит"
       },
       "winadmin-audit-service": {
-        "title": "Аудит: Logon as Service",
-        "summary": "Проверка политики SeServiceLogonRight: выявление сервисных аккаунтов и управляемых учетных записей служб (gMSA).",
+        "title": "Audit Service Logon Rights",
+        "summary": "Audit Service Logon Rights: inspection and management tool.",
         "category": "Экспресс-аудит"
       },
       "winadmin-audit-rdp": {
-        "title": "Аудит: Remote Desktop (RDP)",
-        "summary": "Инспекция участников группы Remote Desktop Users и проверка доступности порта TCP 3389 для удаленного управления.",
+        "title": "Remote Desktop Protocol (RDP) Audit",
+        "summary": "Remote Desktop Protocol (RDP) Audit: inspection and management tool.",
         "category": "Экспресс-аудит"
       },
       "winadmin-audit-orphaned": {
-        "title": "Аудит: Orphaned SIDs / Profiles",
-        "summary": "Обнаружение удаленных учетных записей, остаточных каталогов профилей в C:\\\\Users и висячих SID в списках контроля доступа.",
+        "title": "Orphaned Accounts & SIDs Audit",
+        "summary": "Orphaned Accounts & SIDs Audit: inspection and management tool.",
         "category": "Экспресс-аудит"
       },
       "winadmin-acl-takeown": {
-        "title": "Взять владение (takeown)",
-        "summary": "Принудительная смена владельца файла или директории на Administrators через системную утилиту takeown.exe с сохранением прав.",
+        "title": "Take Ownership of Files / Folders",
+        "summary": "Take Ownership of Files / Folders: inspection and management tool.",
         "category": "ACL Операции"
       },
       "winadmin-acl-reset": {
-        "title": "Сбросить ACL по умолчанию",
-        "summary": "Удаление явных ACE и восстановление стандартного наследования прав от родительской папки (icacls /reset).",
+        "title": "Reset Default ACL Permissions",
+        "summary": "Reset Default ACL Permissions: inspection and management tool.",
         "category": "ACL Операции"
       },
       "winadmin-acl-backup": {
-        "title": "Авто-бэкап ACL",
-        "summary": "Создание резервной копии текущей таблицы разрешений в apps/logs/acl_backups/ перед модификацией прав доступа.",
+        "title": "Create ACL Security Backup",
+        "summary": "Create ACL Security Backup: inspection and management tool.",
         "category": "ACL Операции"
       },
       "winadmin-acl-rollback": {
-        "title": "Откат разрешений ACL",
-        "summary": "Применение резервного файла ACL для гарантированного отката случайных или некорректных изменений прав.",
+        "title": "Rollback ACL Security Backup",
+        "summary": "Rollback ACL Security Backup: inspection and management tool.",
         "category": "ACL Операции"
       },
       "winadmin-acl-inspect": {
-        "title": "Инспектировать ACL",
-        "summary": "Анализ дескриптора безопасности указанного файла или каталога: чтение субъектов, типов прав (Allow/Deny) и флагов наследования.",
+        "title": "Inspect File / Folder ACLs",
+        "summary": "Inspect File / Folder ACLs: inspection and management tool.",
         "category": "ACL Операции"
       },
       "winadmin-acl-grant": {
-        "title": "Применить права (icacls)",
-        "summary": "Применение выбранного уровня доступа (Full Control, Modify, Read/Execute, Read, Write) через вызов icacls.exe с поддержкой безопасного режима Dry Run.",
+        "title": "Grant / Modify ACL Permissions",
+        "summary": "Grant / Modify ACL Permissions: inspection and management tool.",
         "category": "ACL Операции"
       },
       "winadmin-filter-hidden": {
-        "title": "Фильтр: Скрытые аккаунты",
-        "summary": "Отображение специальных учетных записей (DefaultAccount, WDAGUtilityAccount и др.), скрытых от экрана входа в систему.",
+        "title": "Выделение служебных и скрытых учетных записей Windows",
+        "summary": "Выделение служебных и скрытых учетных записей Windows: inspection and management tool.",
         "category": "Фильтры пользователей"
       },
       "winadmin-filter-admins": {
-        "title": "Фильтр: Администраторы",
-        "summary": "Быстрый отбор учетных записей, входящих в группу BUILTIN\\\\Administrators.",
+        "title": "Фильтрация пользователей с административными правами",
+        "summary": "Фильтрация пользователей с административными правами: inspection and management tool.",
         "category": "Фильтры пользователей"
       },
       "proc-engine-status": {
-        "title": "PID Recycling Guard",
-        "summary": "Механизм защиты от подмены процессов. Отслеживает момент закрытия программы и предотвращает ошибочные действия над новым процессом с тем же номером PID.",
+        "title": "Защита от переиспользования идентификаторов процессов (PID Recycling Guard)",
+        "summary": "Защита от переиспользования идентификаторов процессов (PID Recycling Guard): inspection and management tool.",
         "category": "Безопасность процессов"
       },
       "proc-global-refresh": {
-        "title": "Синхронизировать процессы",
-        "summary": "Мгновенно опрашивает все подсистемы и обновляет списки работающих программ, сетевых соединений и файловых операций.",
+        "title": "Принудительная синхронизация процессов и активности",
+        "summary": "Принудительная синхронизация процессов и активности: inspection and management tool.",
         "category": "Управление монитором"
       },
       "proc-subtab-manager": {
-        "title": "Диспетчер процессов",
-        "summary": "Раздел управления программами в стиле Диспетчера задач Windows. Показывает открытые окна, фоновые службы и расход памяти и процессора.",
+        "title": "Диспетчер процессов и приложений Windows",
+        "summary": "Диспетчер процессов и приложений Windows: inspection and management tool.",
         "category": "Диспетчер задач"
       },
       "proc-subtab-top": {
-        "title": "Топ процессов (Live Stream)",
-        "summary": "Таблица лидеров по нагрузке на процессор и память в реальном времени. Помогает сразу увидеть программы, которые тормозят компьютер.",
+        "title": "Живой поток наиболее ресурсоемких процессов хоста",
+        "summary": "Живой поток наиболее ресурсоемких процессов хоста: inspection and management tool.",
         "category": "Мониторинг нагрузки"
       },
       "proc-subtab-net": {
-        "title": "Сетевая активность",
-        "summary": "Показывает, какие программы прямо сейчас подключены к интернету, отправляют или скачивают данные и к каким серверам обращаются.",
+        "title": "Сетевая активность программ и открытые сокеты",
+        "summary": "Сетевая активность программ и открытые сокеты: inspection and management tool.",
         "category": "Сетевой мониторинг"
       },
       "proc-subtab-files": {
-        "title": "Изменения файлов (Real-Time)",
-        "summary": "Живая лента файловых операций: показывает, какая именно программа создает, изменяет или удаляет файлы на диске.",
+        "title": "Мониторинг изменения и создания файлов на диске в реальном времени",
+        "summary": "Мониторинг изменения и создания файлов на диске в реальном времени: inspection and management tool.",
         "category": "Файловый мониторинг"
       },
       "proc-subtab-leaks": {
-        "title": "Утечки ресурсов (Leak Hunter)",
-        "summary": "Диагностика зависаний и микрофризов. Находит программы, которые забывают освобождать оперативную память или системные дескрипторы.",
+        "title": "Аудит дескрипторов, GDI-объектов и утечек памяти",
+        "summary": "Аудит дескрипторов, GDI-объектов и утечек памяти: inspection and management tool.",
         "category": "Диагностика сбоев"
       },
       "pm-card-apps": {
-        "title": "Приложения (Apps)",
-        "summary": "Обычные программы с графическим интерфейсом и окнами, запущенные пользователем (браузеры, плееры, редакторы).",
+        "title": "Количество запущенных пользовательских программ с окнами",
+        "summary": "Количество запущенных пользовательских программ с окнами: inspection and management tool.",
         "category": "Категории процессов"
       },
       "pm-card-bg": {
-        "title": "Фоновые процессы",
-        "summary": "Программы без собственного окна, работающие в фоне (агенты обновлений, фоновые синхронизаторы и службы драйверов).",
+        "title": "Фоновые службы, демоны и вспомогательные утилиты",
+        "summary": "Фоновые службы, демоны и вспомогательные утилиты: inspection and management tool.",
         "category": "Категории процессов"
       },
       "pm-card-win": {
-        "title": "Windows процессы",
-        "summary": "Критические компоненты Windows (explorer.exe, lsass.exe, services.exe), необходимые для стабильной работы операционной системы.",
+        "title": "Системные процессы ядра и служб операционной системы Windows",
+        "summary": "Системные процессы ядра и служб операционной системы Windows: inspection and management tool.",
         "category": "Система Windows"
       },
       "pm-card-all": {
-        "title": "Всего процессов и память",
-        "summary": "Сводные данные о загрузке компьютера: общее количество активных процессов и объем оперативной памяти, занятый всеми программами.",
+        "title": "Общее число запущенных процессов и суммарный объем занятой памяти",
+        "summary": "Общее число запущенных процессов и суммарный объем занятой памяти: inspection and management tool.",
         "category": "Сводка системы"
       },
       "pm-refresh": {
-        "title": "Обновить диспетчер",
-        "summary": "Заново считывает список запущенных приложений, расход ресурсов и статус дерева процессов.",
+        "title": "Обновление данных диспетчера процессов и приложений",
+        "summary": "Обновление данных диспетчера процессов и приложений: inspection and management tool.",
         "category": "Управление"
       },
       "pm-category-filters": {
-        "title": "Фильтр категорий процессов",
-        "summary": "Быстрая фильтрация списка процессов по типу: только программы с окнами, только фоновые службы или системные процессы Windows.",
+        "title": "Переключение категорий: Все, Apps, Background, Windows",
+        "summary": "Переключение категорий: Все, Apps, Background, Windows: inspection and management tool.",
         "category": "Фильтрация"
       },
       "pm-toggle-expand": {
-        "title": "Свернуть / Развернуть группы",
-        "summary": "Раскрывает или скрывает дочерние подпроцессы и связанные окна у сгруппированных программ.",
+        "title": "Сворачивание и разворачивание дочерних процессов и окон",
+        "summary": "Сворачивание и разворачивание дочерних процессов и окон: inspection and management tool.",
         "category": "Интерфейс"
       },
       "pm-ai-modal": {
-        "title": "ИИ Помощник по процессам",
-        "summary": "Запускает глубокий анализ выбранных процессов: оценивает надежность исполняемых файлов, объясняет их назначение и выявляет скрытые угрозы.",
+        "title": "Интеллектуальный анализ процессов и программ через модель ИИ",
+        "summary": "Интеллектуальный анализ процессов и программ через модель ИИ: inspection and management tool.",
         "category": "ИИ Анализ"
       },
       "pm-investigate-ps": {
-        "title": "Кто запускает PowerShell?",
-        "summary": "Поиск родительских программ и задач, которые запускают консоль PowerShell в скрытом режиме или выполняют фоновые скрипты.",
+        "title": "ИИ-расследование источников запуска скрытых скриптов PowerShell",
+        "summary": "ИИ-расследование источников запуска скрытых скриптов PowerShell: inspection and management tool.",
         "category": "Расследование угроз"
       },
       "pm-prompt-settings": {
-        "title": "Настройка промпта ИИ",
-        "summary": "Позволяет настроить правила и системные указания модели ИИ при формировании отчетов о безопасности процессов.",
+        "title": "Конфигурация системного промпта и инструкций для ИИ-анализа процессов",
+        "summary": "Конфигурация системного промпта и инструкций для ИИ-анализа процессов: inspection and management tool.",
         "category": "Настройки ИИ"
       },
       "proc-top-pause": {
-        "title": "Пауза потока процессов",
-        "summary": "Останавливает постоянное обновление таблицы процессов, чтобы можно было спокойно изучить значения без смещения строк.",
+        "title": "Временная приостановка автоматического обновления таблицы",
+        "summary": "Временная приостановка автоматического обновления таблицы: inspection and management tool.",
         "category": "Управление потоком"
       },
       "proc-top-refresh": {
-        "title": "Обновить топ процессов",
-        "summary": "Мгновенно опрашивает процессор и оперативную память и обновляет список наиболее активных программ.",
+        "title": "Внеочередной замер самых ресурсоемких процессов",
+        "summary": "Внеочередной замер самых ресурсоемких процессов: inspection and management tool.",
         "category": "Управление потоком"
       },
       "proc-net-filter-internet": {
-        "title": "Только Интернет-соединения",
-        "summary": "Оставляет в таблице только подключения к внешним серверам в интернете, скрывая локальные соединения внутри компьютера (localhost).",
+        "title": "Фильтр соединений: исключение локального межпроцессного обмена",
+        "summary": "Фильтр соединений: исключение локального межпроцессного обмена: inspection and management tool.",
         "category": "Сетевые фильтры"
       },
       "proc-net-pause": {
-        "title": "Пауза сетевого монитора",
-        "summary": "Фиксирует список активных сетевых соединений на экране для спокойного анализа IP-адресов и портов.",
+        "title": "Приостановка обновления таблицы сетевых подключений",
+        "summary": "Приостановка обновления таблицы сетевых подключений: inspection and management tool.",
         "category": "Сетевой мониторинг"
       },
       "proc-net-refresh": {
-        "title": "Обновить сетевые соединения",
-        "summary": "Считывает актуальный список открытых портов, подключений к сайтам и сетевой трафик приложений.",
+        "title": "Повторный опрос сетевой таблицы TCP/UDP сокетов",
+        "summary": "Повторный опрос сетевой таблицы TCP/UDP сокетов: inspection and management tool.",
         "category": "Сетевой мониторинг"
       },
       "proc-watch-badge": {
-        "title": "Отслеживаемая папка",
-        "summary": "Путь к директории на диске, в которой WinAPI-монитор перехватывает создание, изменение и удаление любых файлов.",
+        "title": "Текущий каталог, изменения в котором отслеживаются в реальном времени",
+        "summary": "Текущий каталог, изменения в котором отслеживаются в реальном времени: inspection and management tool.",
         "category": "Файловый мониторинг"
       },
       "proc-watch-exclusions": {
-        "title": "Исключения монитора файлов",
-        "summary": "Позволяет скрыть шумные временные файлы (.tmp, кэш браузера, логи), чтобы видеть только важные изменения на диске.",
+        "title": "Настройка масок файлов и папок, исключаемых из ленты событий",
+        "summary": "Настройка масок файлов и папок, исключаемых из ленты событий: inspection and management tool.",
         "category": "Файловый мониторинг"
       },
       "proc-watch-change-dir": {
-        "title": "Выбор папки для мониторинга",
-        "summary": "Позволяет выбрать любую папку на компьютере для контроля за действиями программ внутри нее.",
+        "title": "Смена целевого каталога файлового наблюдателя",
+        "summary": "Смена целевого каталога файлового наблюдателя: inspection and management tool.",
         "category": "Файловый мониторинг"
       },
       "proc-watch-refresh": {
-        "title": "Обновить файловые события",
-        "summary": "Обновляет список недавно измененных файлов и программ, которые с ними работали.",
+        "title": "Принудительное считывание свежих файловых изменений",
+        "summary": "Принудительное считывание свежих файловых изменений: inspection and management tool.",
         "category": "Файловый мониторинг"
       },
       "diag-leaks-total": {
-        "title": "Проанализировано процессов",
-        "summary": "Количество запущенных программ, прошедших проверку системных счетчиков Win32 API на скрытые утечки ресурсов.",
+        "title": "Общее число проверенных процессов на предмет утечек памяти и дескрипторов",
+        "summary": "Общее число проверенных процессов на предмет утечек памяти и дескрипторов: inspection and management tool.",
         "category": "Аудит утечек"
       },
       "diag-leaks-suspicious": {
-        "title": "С признаками утечек",
-        "summary": "Программы, у которых зафиксирован бесконтрольный рост числа дескрипторов (Handles), графических объектов GDI или ошибок страниц памяти.",
+        "title": "Число программ с аномальным расходом дескрипторов или памяти",
+        "summary": "Число программ с аномальным расходом дескрипторов или памяти: inspection and management tool.",
         "category": "Аудит утечек"
       },
       "diag-leaks-handles": {
-        "title": "Пик дескрипторов (Handles)",
-        "summary": "Показывает программу-рекордсмена по числу открытых системных дескрипторов (файлов, ключей реестра, потоков). При превышении 10 000 система теряет стабильность.",
+        "title": "Максимальное количество открытых дескрипторов среди всех программ",
+        "summary": "Максимальное количество открытых дескрипторов среди всех программ: inspection and management tool.",
         "category": "Аудит утечек"
       },
       "diag-leaks-gdi": {
-        "title": "Пик GDI объектов",
-        "summary": "Показывает программу с наибольшим числом графических элементов (шрифтов, кистей, окон). Превышение лимита в 10 000 приводит к сбоям отрисовки окон.",
+        "title": "Максимальное число графических объектов интерфейса (GDI)",
+        "summary": "Максимальное число графических объектов интерфейса (GDI): inspection and management tool.",
         "category": "Аудит утечек"
       },
       "diag-leaks-filters": {
-        "title": "Фильтры аномалий и утечек",
-        "summary": "Быстрый отбор: только подозрительные программы, процессы с более чем 500 GDI-объектами или свыше 1500 системных дескрипторов.",
+        "title": "Фильтрация процессов по порогам дескрипторов и признакам утечек",
+        "summary": "Фильтрация процессов по порогам дескрипторов и признакам утечек: inspection and management tool.",
         "category": "Аудит утечек"
       },
       "diag-leaks-refresh": {
-        "title": "Обновить анализ утечек",
-        "summary": "Пересчитывает счетчики дескрипторов и графических объектов для всех запущенных программ и обновляет оценки рисков.",
+        "title": "Повторный запуск аудита дескрипторов и ресурсов",
+        "summary": "Повторный запуск аудита дескрипторов и ресурсов: inspection and management tool.",
         "category": "Аудит утечек"
       },
       "dwm": {
-        "title": "Диспетчер окон рабочего стола",
-        "summary": "dwm.exe (Desktop Window Manager) — важнейший системный процесс Windows, отвечающий за отрисовку визуальных эффектов интерфейса, композицию окон, прозрачность и аппаратное ускорение через DirectX.",
+        "title": "Desktop Window Manager (dwm.exe)",
+        "summary": "Desktop Window Manager (dwm.exe): inspection and management tool.",
         "category": "Системный компонент Windows"
       },
       "explorer": {
-        "title": "Проводник Windows",
-        "summary": "explorer.exe — основной процесс графической оболочки пользователя в Windows: обеспечивает работу панели задач, меню «Пуск», рабочего стола и файлового менеджера.",
+        "title": "Windows Explorer / Shell (explorer.exe)",
+        "summary": "Windows Explorer / Shell (explorer.exe): inspection and management tool.",
         "category": "Оболочка Windows"
       },
       "svchost": {
-        "title": "Хост-процесс служб Windows",
-        "summary": "svchost.exe — универсальный системный хост-процесс, запускающий фоновые службы Windows из динамических библиотек (DLL). Каждый экземпляр изолирует группу служб по модели прав.",
+        "title": "Host Process for Windows Services (svchost.exe)",
+        "summary": "Host Process for Windows Services (svchost.exe): inspection and management tool.",
         "category": "Служебный хост Windows"
       },
       "taskhostw": {
-        "title": "Хост задач Windows",
-        "summary": "taskhostw.exe — системный хост для выполнения запланированных задач Windows, основанных на DLL-модулях, при входе пользователя в сеанс и по расписанию Task Scheduler.",
+        "title": "Host Process for Windows Tasks (taskhostw.exe)",
+        "summary": "Host Process for Windows Tasks (taskhostw.exe): inspection and management tool.",
         "category": "Планировщик задач"
       },
       "lsass": {
-        "title": "Служба безопасности LSA",
-        "summary": "lsass.exe — критический процесс безопасности Windows: осуществляет аутентификацию локальных пользователей и домена Active Directory, управление маркерами доступа и протоколами NTLM/Kerberos.",
+        "title": "Local Security Authority Subsystem Service (lsass.exe)",
+        "summary": "Local Security Authority Subsystem Service (lsass.exe): inspection and management tool.",
         "category": "Безопасность ядра"
       },
       "csrss": {
-        "title": "Исполняющая подсистема клиент-сервер",
-        "summary": "csrss.exe — фундаментальная пользовательская подсистема Win32: управляет созданием и завершением потоков, окнами консоли и сессионным контекстом.",
+        "title": "Client Server Runtime Process (csrss.exe)",
+        "summary": "Client Server Runtime Process (csrss.exe): inspection and management tool.",
         "category": "Системное ядро Win32"
       },
       "services": {
-        "title": "Диспетчер служб Windows",
-        "summary": "services.exe (SCM) — системный диспетчер управления службами: запускает, останавливает и мониторит состояние фоновых сервисов и драйверов Windows.",
+        "title": "Service Control Manager (services.exe)",
+        "summary": "Service Control Manager (services.exe): inspection and management tool.",
         "category": "Управление службами"
       },
       "smss": {
-        "title": "Диспетчер сеансов Windows",
-        "summary": "smss.exe — первый процесс пользовательского режима при загрузке Windows NT: создает переменные окружения, запускает подсистемы winlogon и csrss, управляет файлами подкачки.",
+        "title": "Session Manager Subsystem (smss.exe)",
+        "summary": "Session Manager Subsystem (smss.exe): inspection and management tool.",
         "category": "Инициализация сеансов"
       },
       "winlogon": {
-        "title": "Программа входа в систему",
-        "summary": "winlogon.exe — обеспечивает интерактивный вход и выход пользователей, блокировку экрана, обработку защищенной последовательности клавиш (SAS / Ctrl+Alt+Del).",
+        "title": "Windows Logon Application (winlogon.exe)",
+        "summary": "Windows Logon Application (winlogon.exe): inspection and management tool.",
         "category": "Сеансы пользователей"
       },
       "wininit": {
-        "title": "Инициализатор системы Windows",
-        "summary": "wininit.exe — процесс начальной инициализации пользовательского режима Windows: запускает Service Control Manager (services.exe), LSASS и LSA Secrets.",
+        "title": "Windows Start-Up Application (wininit.exe)",
+        "summary": "Windows Start-Up Application (wininit.exe): inspection and management tool.",
         "category": "Инициализация Windows"
       },
       "powershell": {
-        "title": "Windows PowerShell",
-        "summary": "powershell.exe — объектно-ориентированная среда командной строки и скриптов автоматизации администрирования операционной системы Windows.",
+        "title": "Windows PowerShell Command Interpreter (powershell.exe)",
+        "summary": "Windows PowerShell Command Interpreter (powershell.exe): inspection and management tool.",
         "category": "Интерпретаторы команд"
       },
       "cmd": {
-        "title": "Командная строка Windows",
-        "summary": "cmd.exe — стандартный интерфейс командной строки Windows для выполнения сценариев пакетной обработки .bat/.cmd и служебных утилит.",
+        "title": "Windows Command Prompt (cmd.exe)",
+        "summary": "Windows Command Prompt (cmd.exe): inspection and management tool.",
         "category": "Консольные утилиты"
       },
       "conhost": {
-        "title": "Хост окна консоли",
-        "summary": "conhost.exe — хост-процесс оконного интерфейса консоли: обеспечивает отрисовку окон для консольных приложений и безопасность взаимодействия с csrss.",
+        "title": "Console Window Host (conhost.exe)",
+        "summary": "Console Window Host (conhost.exe): inspection and management tool.",
         "category": "Консольная подсистема"
       },
       "msmpeng": {
-        "title": "Антивирусная служба Защитника",
-        "summary": "msmpeng.exe — ядро сканирования антивирусной защиты Microsoft Defender в реальном времени: защита от вредоносных программ, мониторинг поведения и сканирование файлов.",
+        "title": "Microsoft Defender Antivirus Service (msmpeng.exe)",
+        "summary": "Microsoft Defender Antivirus Service (msmpeng.exe): inspection and management tool.",
         "category": "Антивирусная безопасность"
       },
       "runtimebroker": {
-        "title": "Runtime Broker",
-        "summary": "runtimebroker.exe — процесс-посредник, управляющий разрешениями и доступом к системным API (камера, микрофон, геолокация) для приложений из Microsoft Store (UWP/AppX).",
+        "title": "Windows Runtime Broker (runtimebroker.exe)",
+        "summary": "Windows Runtime Broker (runtimebroker.exe): inspection and management tool.",
         "category": "Безопасность UWP"
       },
       "searchindexer": {
-        "title": "Служба индексирования поиска",
-        "summary": "searchindexer.exe — фоновая служба индексирования файлов, электронной почты и свойств документов для мгновенного поиска в Windows.",
+        "title": "Windows Search Indexer (searchindexer.exe)",
+        "summary": "Windows Search Indexer (searchindexer.exe): inspection and management tool.",
         "category": "Индексация поиска"
       },
       "spoolsv": {
-        "title": "Диспетчер очереди печати",
-        "summary": "spoolsv.exe — системная служба управления очередями печати и взаимодействия с драйверами принтеров Windows.",
+        "title": "Print Spooler Service (spoolsv.exe)",
+        "summary": "Print Spooler Service (spoolsv.exe): inspection and management tool.",
         "category": "Печать и периферия"
       },
       "system": {
-        "title": "Системное ядро NT",
-        "summary": "System (PID 4) — корневой процесс уровня ядра Windows NT: содержит потоки времени выполнения ядра, исполняет системные драйверы и координирует работу аппаратуры.",
+        "title": "Windows NT Kernel & System Process",
+        "summary": "Windows NT Kernel & System Process: inspection and management tool.",
         "category": "Ядро операционной системы"
       },
       "registry": {
-        "title": "Процесс реестра",
-        "summary": "Registry (PID ~100-160) — специализированный процесс ядра Windows 10/11 для сжатия и оптимизации доступа к кустам реестра в оперативной памяти.",
+        "title": "Windows Registry Architecture Worker",
+        "summary": "Windows Registry Architecture Worker: inspection and management tool.",
         "category": "Подсистема реестра"
       },
       "cloudflared": {
-        "title": "Служба Cloudflare Tunnel",
-        "summary": "cloudflared.exe — агент сетевого туннелирования Cloudflare Zero Trust: обеспечивает безопасный исходящий доступ к локальным службам без открытых портов в Интернет.",
+        "title": "Cloudflare Zero Trust Tunnel Daemon",
+        "summary": "Cloudflare Zero Trust Tunnel Daemon: inspection and management tool.",
         "category": "Сетевые туннели"
       },
       "ctfmon": {
-        "title": "Загрузчик текстовых служб CTF",
-        "summary": "ctfmon.exe — процесс управления альтернативным вводом данных, поддержкой языковых панелей, экранной клавиатуры и распознавания речи в Windows.",
+        "title": "CTF Loader (ctfmon.exe)",
+        "summary": "CTF Loader (ctfmon.exe): inspection and management tool.",
         "category": "Ввод и локализация"
       }
     },
@@ -1168,7 +1179,11 @@
       "kb": "Knowledge Base (WikiLLM)",
       "kbTitle": "Terms and definitions of interface knowledge base",
       "audit": "Audit & Validation",
-      "auditTitle": "Check untranslated titles and attributes"
+      "auditTitle": "Check untranslated titles and attributes",
+      "panel-editor-lang-ruTitle": "Edit tooltip texts in Russian (RU)",
+      "panel-editor-lang-enTitle": "Edit tooltip texts in English (EN)",
+      "panel-editor-lang-heTitle": "Edit tooltip texts in Hebrew (HE)",
+      "panel-editor-lang-ukTitle": "Edit tooltip texts in Ukrainian (UK)"
     }
   },
   "ui": {
@@ -1358,37 +1373,70 @@
     },
     "cws": {
       "txt_2231746c": "Create New Workspace",
-      "txt_26021120": "Инициализация репозитория Git, привязка директорий и файлов на диске для мониторинга изменений без их перемещения.",
+      "txt_26021120": "Git repository initialization, linking directories and files on disk to monitor changes without moving them.",
       "txt_dd25bfb1": "Git Engine Ready",
       "txt_704daeb5": "To Workspace",
-      "txt_de59a272": "Шаг 1",
-      "txt_3a420c17": "Параметры пространства и рабочая директория (Git Init)",
-      "txt_4835f679": "ID: не создано",
-      "txt_1bdf99bc": "Имя пространства :",
-      "txt_4b89833b": "Уникальное человекочитаемое имя для выбора в интерфейсе.",
-      "txt_7d47516a": "Рабочая директория (путь к Git-репозиторию):",
+      "txt_de59a272": "Step 1",
+      "txt_3a420c17": "Workspace parameters and working directory (Git Init)",
+      "txt_4835f679": "ID: not created",
+      "txt_1bdf99bc": "Workspace Name",
+      "txt_4b89833b": "Unique human-readable name for selection in the interface.",
+      "txt_7d47516a": "Working directory (path to Git repository):",
       "txt_503b2cca": "Browse...",
-      "txt_f555a289": "If no path is specified, a folder is automatically created in data/workspaces/. git init and assets/ directory are initialized inside.",
-      "txt_a1528e91": "Описание пространства:",
-      "txt_1a80632a": "При создании будет сформирован репозиторий Git и начальный коммит.",
-      "txt_38b2024b": "Create пространство и инициализировать Git",
-      "txt_144fa97c": "Шаг 2",
-      "txt_70ed1380": "Выбор директорий и файлов для слежения за изменениями",
-      "txt_13ea0390": "0 объектов",
+      "txt_f555a289": "If no path is specified, a folder is automatically created in <code>data/workspaces/</code>. <code>git init</code> and the <code>assets/</code> directory are initialized inside.",
+      "txt_a1528e91": "Workspace description:",
+      "txt_1a80632a": "Upon creation, a Git repository and an initial commit will be formed.",
+      "txt_38b2024b": "Create Workspace and Initialize Git",
+      "txt_144fa97c": "Step 2",
+      "txt_70ed1380": "Select directories and files to monitor for changes",
+      "txt_13ea0390": "0 objects",
       "txt_f9371cf6": "HEAD: ---",
-      "txt_49f40b98": "Fileы и директории остаются на своих местах:",
-      "txt_78e3c092": "Перемещать и дублировать их не требуется. Git-движок и модуль умного версионирования подключают указанные пути напрямую и отслеживают появление новых версий, правок и коммитов непосредственно по их исходным адресам на диске.",
-      "txt_68a213c2": "Directory (папка) для отслеживания:",
-      "txt_858c5e1a": "Все вложенные файлы (md, txt, pdf, docx, xlsx, py и др.) будут сканироваться и ставиться на версионный учёт.",
-      "txt_86c483df": "Добавить директорию в слежение",
-      "txt_a7db7b12": "Отдельный файл для отслеживания:",
-      "txt_e6d366ea": "File остаётся на своём месте. Каждое сохранение изменений регистрируется в темпоральной истории Git.",
-      "txt_5c3af4b3": "Добавить файл в слежение",
-      "txt_60a35f09": "Объекты, находящиеся под наблюдением в этом пространстве:",
-      "txt_d208f03c": "Refresh статус",
-      "txt_fa42174b": "Директории и файлы пока не добавлены. Введите путь выше и нажмите кнопку добавления.",
-      "txt_427c78fe": "Пространство настроено. Вы можете сразу перейти к работе с ним.",
-      "txt_d26799e8": "Перейти в рабочую область"
+      "txt_49f40b98": "Files and directories stay in their original places:",
+      "txt_78e3c092": "No need to move or duplicate them. The Git engine and smart versioning module connect the specified paths directly and track new versions, edits, and commits right at their original disk locations.",
+      "txt_68a213c2": "Directory (folder) to monitor:",
+      "txt_858c5e1a": "All nested files (md, txt, pdf, docx, xlsx, py, etc.) will be scanned and placed under version control.",
+      "txt_86c483df": "Add directory to tracking",
+      "txt_a7db7b12": "Individual file to monitor:",
+      "txt_e6d366ea": "The file stays in place. Every save is recorded in Git temporal history.",
+      "txt_5c3af4b3": "Add file to tracking",
+      "txt_60a35f09": "Objects monitored in this workspace:",
+      "txt_d208f03c": "Refresh Status",
+      "txt_fa42174b": "Directories and files have not been added yet. Select a directory or file below.",
+      "txt_427c78fe": "Workspace is configured. You can start working with it immediately.",
+      "txt_d26799e8": "Go to Workspace",
+      "staged_count": "{count} in queue",
+      "ready_to_link": "Ready to link on disk",
+      "in_queue": "In connection queue",
+      "sources_count": "{count} sources",
+      "files_count": "{count} files",
+      "in_place": "In-place (no moving)",
+      "source_excluded": "Source excluded from tracking.",
+      "err_deleting": "Delete error: {error}",
+      "err_loading_sources": "Error loading sources: {error}",
+      "warn_specify_path": "Please specify an absolute path on disk.",
+      "info_item_staged": "Object <code>{path}</code> added to list. It will be connected upon workspace creation.",
+      "warn_item_already_staged": "Object <code>{path}</code> is already in the list.",
+      "info_connecting_item": "Connecting object <code>{path}</code> for in-place tracking...",
+      "success_item_connected": "<strong>Object successfully connected for monitoring!</strong><div>Files stay in their original place. Added under control: {added}. Git commit: <code>{commit}</code>.</div>",
+      "err_connecting_item": "Error connecting path <code>{path}</code>: {error}",
+      "ws_select_item": "{name} [{id}] — docs: {docs}, facts: {facts}",
+      "btn_selecting": "Selecting...",
+      "warn_specify_name": "Please specify workspace name.",
+      "btn_creating_ws": "Creating workspace...",
+      "btn_attaching_sources": "Attaching sources...",
+      "success_ws_created": "<strong>Workspace &laquo;{name}&raquo; successfully created!</strong><div>Git repository: <code>{path}</code>. Language: <code>{lang}</code>. HEAD: <code>{head}</code>. Connected sources: {count}.</div>",
+      "err_creating_ws": "Error creating workspace: {error}",
+      "lang_he": "עברית (Hebrew)",
+      "lang_ru": "Русский (Russian)",
+      "lang_en": "English",
+      "lang_ua": "Українська (Ukrainian)",
+      "warn_specify_dir": "Specify directory path to monitor.",
+      "warn_specify_file": "Specify file path to monitor.",
+      "err_attach_staged": "Workspace created, but an error occurred while connecting objects: {error}",
+      "status_ws_ready": "Workspace configured. You can start working with it immediately.",
+      "id_prefix": "ID: ",
+      "init_git_commit": "Link {path} for in-place tracking (Git linked)",
+      "init_git_commit_multiple": "Link external objects ({count}) for in-place tracking"
     },
     "diff": {
       "txt_f00b92bd": "Построчный анализ изменений, инспекция ревизий и ИИ-суммаризация последствий",
@@ -2067,10 +2115,17 @@
       "tooltipsEditor": "Interface Tooltips Editor"
     },
     "cws": {
-      "title_01c37831": "Вернуться к списку рабочих областей",
-      "title_29ffed95": "Выбрать рабочую директорию на компьютере",
-      "title_faf6b1ab": "Выбрать папку на компьютере",
-      "title_771266c7": "Выбрать файл на компьютере"
+      "title_01c37831": "Back to workspaces list",
+      "title_29ffed95": "Choose working directory on computer",
+      "title_faf6b1ab": "Choose folder on computer",
+      "title_771266c7": "Choose file on computer",
+      "remove_from_queue": "Remove from queue",
+      "exclude_from_tracking": "Exclude from tracking",
+      "btn_refresh_status": "Refresh status of tracked objects",
+      "btn_add_dir": "Add specified directory to change tracking",
+      "btn_add_file": "Add specified file to change tracking",
+      "btn_create_submit": "Create new workspace and initialize Git",
+      "btn_go_ws": "Go to workspace and open files"
     },
     "gim": {
       "title_0f6af16e": "Хэш HEAD коммита"
@@ -2153,9 +2208,9 @@
     "cws": {
       "ph_e1bf53f6": "e.g.: project_documentation or my_codebase",
       "ph_4b1b3452": "e.g.: C:\\Projects\\MyRepo or leave empty",
-      "ph_2a14ddbb": "Short description of workspace purpose, architectural tasks or notes...",
+      "ph_2a14ddbb": "Brief description of workspace purpose, architectural tasks, or notes...",
       "ph_e149f935": "C:\\Projects\\my_service\\docs",
-      "ph_025dbb3b": "C:\\Work\\notes.md или D:\\Configs\\settings.json"
+      "ph_025dbb3b": "C:\\Work\\notes.md or D:\\Configs\\settings.json"
     },
     "diff": {
       "ph_b1260988": "Хэш коммита (например HEAD)"
@@ -2566,7 +2621,12 @@
     "rootFolder": "/ (root)",
     "specifyNameAlert": "Please specify the name of the object to create.",
     "createSuccess": "successfully created",
-    "createError": "Creation error:"
+    "createError": "Creation error:",
+    "editorTabCodeTitle": "Editor",
+    "editorTabSplit": "View/Editor",
+    "editorTabSplitTitle": "View/Editor (Split view)",
+    "editorTabView": "View",
+    "editorTabViewTitle": "View"
   },
   "tasks": {
     "loadDemoTitle": "Load demo scenario: Uncle Moshe Cow Purchase",

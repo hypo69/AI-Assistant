@@ -8,7 +8,7 @@
  *   и живым Split-View предпросмотром Markdown.
  *
  * File: panel_code_editor.js
- * Project: ai-windows-admin
+ * Project: ai-assistant
  * Package: apps/common/webgui/tab_file_editor
  * Author: hypo69
  * Copyright: © 2026 hypo69

@@ -20,7 +20,7 @@
 # Package: apps.ai_assistant.core
 # Author: hypo69
 # Copyright: © 2026 hypo69
-# Updated: 2026-11-10 13:50:00
+# Updated: 2026-11-10 18:55:00
 # =============================================================================
 
 from __future__ import annotations
@@ -75,19 +75,54 @@ class WorkspaceItemsTracker:
         ocr_mode: str = "model",
         audio_mode: str = "model",
     ) -> Dict[str, Any]:
-        """Извлекает контент, создаёт companion .md при конвертации, коммитит в Git и индексирует."""
-        extracted = await self.wm.extractor.extract(
-            dest_file,
-            pdf_mode=pdf_mode,
-            ocr_mode=ocr_mode,
-            audio_mode=audio_mode,
-        )
-        raw_text = extracted.get("text", "")
+        """Извлекает контент (через Paperless-ngx при поддержке или локально), создаёт companion .md, коммитит в Git и индексирует."""
+        paperless_id: Optional[int] = None
+        raw_text = ""
+        is_raw = False
+
+        from apps.ai_assistant.core.paperless_connector import PaperlessConnector, PaperlessError
+
+        # 1. Если файл релевантен для Paperless, направляем его на обработку и OCR в Paperless-ngx
+        if PaperlessConnector.is_supported_file(dest_file):
+            try:
+                connector = PaperlessConnector.from_config()
+                if connector.ping():
+                    ws_info = self.wm.get_workspace(workspace_id) if hasattr(self.wm, "get_workspace") else None
+                    ws_name = (ws_info.get("name") if ws_info else None) or workspace_id
+                    ingest_res = connector.ingest_file(
+                        file_path=dest_file,
+                        workspace_id=workspace_id,
+                        workspace_name=ws_name,
+                        title=dest_file.name,
+                    )
+                    if ingest_res and ingest_res.get("paperless_id"):
+                        paperless_id = ingest_res["paperless_id"]
+                        raw_text = ingest_res.get("content") or ""
+                        logger.console(
+                            f"[WorkspaceItemsTracker] Файл '{dest_file.name}' успешно обработан в Paperless-ngx "
+                            f"(ID: #{paperless_id}, OCR символов: {len(raw_text)})."
+                        )
+            except (PaperlessError, Exception) as pl_exc:
+                logger.warning(
+                    f"[WorkspaceItemsTracker] Не удалось обработать '{dest_file.name}' в Paperless, "
+                    f"переключаюсь на локальный экстрактор: {pl_exc}"
+                )
+
+        # 2. Если файл не был обработан в Paperless (аудио, недоступность сервиса или иной тип) — локальный экстрактор
+        if not paperless_id:
+            extracted = await self.wm.extractor.extract(
+                dest_file,
+                pdf_mode=pdf_mode,
+                ocr_mode=ocr_mode,
+                audio_mode=audio_mode,
+            )
+            raw_text = extracted.get("text", "")
+            is_raw = bool(extracted.get("is_raw") or extracted.get("conversion_mode") == "raw")
+
         suffix = dest_file.suffix.lower()
-        is_raw = bool(extracted.get("is_raw") or extracted.get("conversion_mode") == "raw")
 
         # Создаём Markdown-версию документа рядом, если это PDF, изображение или аудио и файл не оставлен сырым
-        if suffix in CONVERTIBLE_EXTENSIONS and raw_text and not is_raw:
+        if (suffix in CONVERTIBLE_EXTENSIONS or paperless_id is not None) and raw_text and not is_raw:
             try:
                 md_companion = dest_file.with_name(f"{dest_file.name}.md")
                 md_companion.write_text(raw_text, encoding="utf-8")
@@ -100,6 +135,7 @@ class WorkspaceItemsTracker:
             document_id=doc_id,
             content=raw_text,
             commit_message=msg,
+            paperless_id=paperless_id,
         )
 
         is_in_assets = False
@@ -125,10 +161,11 @@ class WorkspaceItemsTracker:
             "name": doc_id,
             "path": str(dest_file),
             "size": dest_file.stat().st_size if dest_file.exists() else 0,
-            "converted": suffix in CONVERTIBLE_EXTENSIONS and not is_raw,
+            "converted": (suffix in CONVERTIBLE_EXTENSIONS or paperless_id is not None) and not is_raw,
             "is_raw": is_raw,
             "in_assets": is_in_assets,
             "tracked_by_git": not is_in_assets,
+            "paperless_id": paperless_id,
         }
 
     async def add_disk_items(
@@ -191,6 +228,18 @@ class WorkspaceItemsTracker:
                         file_info["qualified_path"] = format_host_qualified_path(dest_file, resolved_host)
                         file_info["rel_path"] = doc_id
                         tracked_files.append(file_info)
+
+                        if hasattr(self.wm, "scenario_service"):
+                            try:
+                                scen_res = await self.wm.scenario_service.handle_audio_upload_scenario(
+                                    wm=self.wm,
+                                    workspace_id=workspace_id,
+                                    audio_path=dest_file,
+                                )
+                                if scen_res and scen_res.get("file_info"):
+                                    tracked_files.append(scen_res["file_info"])
+                            except Exception as scen_err:
+                                logger.warning(f"[WorkspaceItemsTracker] Сценарий аудио: {scen_err}")
                     else:
                         self.wm.link_source(
                             workspace_id=workspace_id,
@@ -331,6 +380,18 @@ class WorkspaceItemsTracker:
                 file_info["size"] = len(content_bytes)
                 file_info["rel_path"] = doc_id
                 tracked_files.append(file_info)
+
+                if hasattr(self.wm, "scenario_service"):
+                    try:
+                        scen_res = await self.wm.scenario_service.handle_audio_upload_scenario(
+                            wm=self.wm,
+                            workspace_id=workspace_id,
+                            audio_path=dest_file,
+                        )
+                        if scen_res and scen_res.get("file_info"):
+                            tracked_files.append(scen_res["file_info"])
+                    except Exception as scen_err:
+                        logger.warning(f"[WorkspaceItemsTracker] Сценарий аудио: {scen_err}")
             except Exception as exc:
                 logger.error(f"[WorkspaceItemsTracker] Ошибка сохранения загруженного файла {safe_name}: {exc}")
                 errors.append(f"{safe_name}: {exc}")
@@ -867,46 +928,15 @@ class WorkspaceItemsTracker:
 
     def open_workspace_file(self, workspace_id: str, rel_path: str) -> Dict[str, Any]:
         """Открывает локальный или отслеживаемый на диске файл рабочей области в редакторе по умолчанию."""
-        ws, ws_path = self._resolve_workspace_path(workspace_id)
-        clean_rel = rel_path.strip().replace("\\", "/").lstrip("/")
+        from apps.ai_assistant.core.workspace_file_ops import WorkspaceFileOps
 
-        # 1. Проверяем, не является ли файл внешним отслеживаемым источником (.tracked_sources.json)
-        manifest_file = ws_path / ".tracked_sources.json"
-        target_path: Optional[Path] = None
-        if manifest_file.exists():
-            try:
-                manifest_data = json.loads(manifest_file.read_text(encoding="utf-8"))
-                entry = manifest_data.get(clean_rel) or manifest_data.get(rel_path.strip())
-                if entry and entry.get("file_path"):
-                    cand = Path(entry["file_path"])
-                    if cand.exists() and cand.is_file():
-                        target_path = cand.resolve()
-                    elif entry.get("snapshot"):
-                        snap_cand = (ws_path / str(entry["snapshot"])).resolve()
-                        if snap_cand.exists() and snap_cand.is_file():
-                            target_path = snap_cand
-            except Exception:
-                target_path = None
+        clean_rel, target_path, meta = WorkspaceFileOps.resolve_item(
+            wm=self.wm,
+            workspace_id=workspace_id,
+            rel_path=rel_path,
+            must_exist=True,
+        )
 
-        # 2. Если не найден среди внешних — резолвим внутри ws_path с защитой от path traversal
-        if target_path is None:
-            ws_resolved = ws_path.resolve()
-            target_path = (ws_path / clean_rel).resolve()
-            try:
-                target_path.relative_to(ws_resolved)
-            except ValueError:
-                raise ValueError(f"Путь '{rel_path}' выходит за пределы каталога рабочей области.")
-            if not target_path.exists():
-                assets_cand = (ws_path / "assets" / clean_rel).resolve()
-                try:
-                    assets_cand.relative_to(ws_resolved)
-                except ValueError:
-                    raise ValueError(f"Путь '{rel_path}' выходит за пределы каталога рабочей области.")
-                if assets_cand.exists():
-                    target_path = assets_cand
-
-        if not target_path.exists():
-            raise FileNotFoundError(f"Файл '{clean_rel}' не найден в рабочей области '{workspace_id}'.")
         if target_path.is_dir():
             raise ValueError(f"Путь '{clean_rel}' является каталогом, а не файлом.")
 

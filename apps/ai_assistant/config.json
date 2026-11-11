@@ -7,9 +7,37 @@
     "gc_interval_hours": 48,
     "aggressive": false,
     "auto_prune": true,
-    "last_gc_run": "2026-11-10T14:34:33.641170+00:00",
-    "last_gc_status": "Успешно завершено за 0.0 сек (2026-11-10T14:34:33.641170+00:00)"
+    "last_gc_run": "2026-11-10T18:03:26.420364+00:00",
+    "last_gc_status": "Успешно завершено за 0.0 сек (2026-11-10T18:03:26.420364+00:00)"
   },
-  "active_workspace": "portable_usb_ws",
-  "last_active_workspace": "portable_usb_ws"
+  "active_workspace": "test_doc_ws",
+  "last_active_workspace": "test_doc_ws",
+  "llm": {
+    "default_model": "agy-gemini-3.1-flash-lite",
+    "default_provider": "agy"
+  },
+  "scenarios": {
+    "david_moshe_telegram": {
+      "enabled": true,
+      "workspace_id": "דוד_משה",
+      "workspace_name": "דוד משה",
+      "workspace_aliases": [
+        "דוד משה",
+        "דוד_משה",
+        "דוד מושה",
+        "דוד_מושה"
+      ],
+      "trigger_file_names": [
+        "דוד משה - שמוליк שיחת טלפון.mp3",
+        "דוד משה - שמוליк שיחת טלפון",
+        "דוד משה שמוליק שיחת טלפון",
+        "דוד_משה_-_שמוליק_שיחת_טלפון.mp3",
+        "02_transcript_david_moshe_shmulik_v3.md",
+        "שיחה בין דוד משה לשמוליק",
+        "שיחה_בין_דוד_משה_לשמוליק"
+      ],
+      "target_file_path": "C:\\Users\\onela\\Desktop\\דוד מושה — רשימת מסמכים\\02_transcript_david_moshe_shmulik_v3.md",
+      "delay_seconds": 10
+    }
+  }
 }
